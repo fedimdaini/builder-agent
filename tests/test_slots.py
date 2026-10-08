@@ -112,3 +112,31 @@ def test_taxi_slots():
 
     train = next(e for e in ctx.entry_points if e.path == "src/models/train_model.py")
     assert [s.render() for s in train.signatures] == ["train_xgboost(train_path, target_col, num_rounds=371)"]
+
+
+# --- model API per function, and the stricter target-parameter rule ---------------
+
+def test_model_api_detection():
+    from builder_agent.scan.targets import signatures
+    tree = ast.parse(
+        "import xgboost as xgb\nfrom xgboost import XGBRegressor\n"
+        "def native(X, y):\n    return xgb.train({}, xgb.DMatrix(X, label=y))\n"
+        "def sk(X, y):\n    return XGBRegressor().fit(X, y)\n"
+        "def plain(x):\n    return x\n")
+    native, sk, plain = signatures(tree)
+    assert (native.model_api, native.api_evidence) == ("xgboost-native", ["xgb.DMatrix", "xgb.train"])
+    assert (sk.model_api, sk.api_evidence) == ("xgboost-sklearn", ["XGBRegressor"])
+    assert plain.model_api is None
+
+
+def test_plot_arguments_are_not_target_candidates(tmp_path):
+    write(tmp_path, {
+        "data/processed/train.csv": "a,price\n1,2\n",
+        "src/plots.py": "def plot(df, x, y, label='', ylabel=''):\n    pass\n",
+        "src/train.py": "def train(path, target_col):\n    pass\n",
+        "nb.ipynb": notebook("from src.plots import plot\nfrom src.train import train\n"
+                             "plot(df, x='features', y='importance', label='Log of price')\n"
+                             "train('data/processed/train.csv', 'price')"),
+    })
+    names = [c.column for c in scan_repo(tmp_path).target_candidates]
+    assert names == ["price"]          # not 'importance', 'Log of price' or '' from the plot helper

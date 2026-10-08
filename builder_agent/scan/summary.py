@@ -96,7 +96,9 @@ def render_summary(ctx: RepoContext, n: int = 8) -> str:
         if e.cli:
             bits.append(f"cli={e.cli}")
         if e.signatures:
-            bits.append("defs: " + "; ".join(sig.render() for sig in e.signatures[:4]))
+            bits.append("defs: " + "; ".join(
+                sig.render() + (f" [{sig.model_api}: {', '.join(sig.api_evidence)}]" if sig.model_api else "")
+                for sig in e.signatures[:4]))
         elif e.functions:
             bits.append("defs: " + ", ".join(e.functions[:4]))
         add(f"  - {e.path} " + " ".join(bits))

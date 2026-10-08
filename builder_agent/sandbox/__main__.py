@@ -5,6 +5,7 @@ import json
 import sys
 from pathlib import Path
 
+from ..render.slots import load_answer
 from . import DEFAULT_CONTRACTS, DEFAULT_LOG, run_sandbox
 
 
@@ -21,7 +22,8 @@ def main() -> None:
     args = parser.parse_args()
 
     load = lambda p: json.loads(Path(p).read_text(encoding="utf-8"))  # noqa: E731
-    result = run_sandbox(args.repo, slots=load(args.slots),
+    slots, _ = load_answer(args.slots)          # gold files may carry "_alternatives"
+    result = run_sandbox(args.repo, slots=slots,
                          expected=load(args.expected) if args.expected else None,
                          contracts_path=args.contracts, log_path=args.log, keep=args.keep,
                          mlflow_client=args.mlflow_client)

@@ -15,6 +15,21 @@ from .models import FunctionSig, TargetCandidate, TargetTransform
 
 # Variable/parameter names that usually hold the target: target, target_col, label, y, Y_train, y_val ...
 TARGET_NAME_RE = re.compile(r"(^|_)(targets?|labels?)(_|$)|^y(_|$)", re.I)
+# Parameters that take a target *column name*: target, target_col, label_col, y_column ...
+# Stricter than TARGET_NAME_RE: plotting helpers take y="col" / label="text" for other reasons.
+TARGET_PARAM_RE = re.compile(r"target|^(label|y)_?col(umn)?s?$", re.I)
+# Model APIs, detected per function from the calls it makes: (module aliases, attribute) or class name
+API_CALLS = {
+    ("xgb", "train"): "xgboost-native", ("xgboost", "train"): "xgboost-native",
+    ("xgb", "Booster"): "xgboost-native", ("xgboost", "Booster"): "xgboost-native",
+    ("xgb", "DMatrix"): "xgboost-native", ("xgboost", "DMatrix"): "xgboost-native",
+    ("lgb", "train"): "lightgbm-native", ("lightgbm", "train"): "lightgbm-native",
+}
+API_CLASSES = {
+    "XGBRegressor": "xgboost-sklearn", "XGBClassifier": "xgboost-sklearn", "XGBRanker": "xgboost-sklearn",
+    "LGBMRegressor": "lightgbm-sklearn", "LGBMClassifier": "lightgbm-sklearn",
+    "CatBoostRegressor": "catboost", "CatBoostClassifier": "catboost",
+}
 # forward transform -> inverse
 TRANSFORM_PAIRS = {"log1p": "expm1", "log": "exp"}
 TRANSFORM_MODULES = {"np", "numpy", "math", "torch", "tf"}
@@ -53,9 +68,29 @@ def signatures(tree: ast.Module) -> list[FunctionSig]:
         if a.kwarg:
             params.append(f"**{a.kwarg.arg}")
         doc = ast.get_docstring(node)
+        api, evidence = model_api(node)
         out.append(FunctionSig(name=node.name, params=params,
-                               doc=doc.strip().splitlines()[0][:80] if doc else None))
+                               doc=doc.strip().splitlines()[0][:80] if doc else None,
+                               model_api=api, api_evidence=evidence))
     return out
+
+
+def model_api(fn: ast.AST) -> tuple[str | None, list[str]]:
+    """Which model API a function uses, from the calls in its body (first match wins)."""
+    found: list[tuple[str, str]] = []
+    for node in ast.walk(fn):
+        if not isinstance(node, ast.Call):
+            continue
+        f = node.func
+        if isinstance(f, ast.Attribute) and isinstance(f.value, ast.Name) and (f.value.id, f.attr) in API_CALLS:
+            found.append((API_CALLS[(f.value.id, f.attr)], f"{f.value.id}.{f.attr}"))
+        name = f.attr if isinstance(f, ast.Attribute) else getattr(f, "id", None)
+        if name in API_CLASSES:
+            found.append((API_CLASSES[name], name))
+    if not found:
+        return None, []
+    api = found[0][0]
+    return api, sorted({e for a, e in found if a == api})
 
 
 def _short(node: ast.AST) -> str:
@@ -171,7 +206,7 @@ def collect(tree: ast.Module) -> TargetFacts:
             pairs = list(zip(positional[len(positional) - len(a.defaults):], a.defaults))
             pairs += [(arg, d) for arg, d in zip(a.kwonlyargs, a.kw_defaults) if d is not None]
             for arg, default in pairs:
-                if TARGET_NAME_RE.search(arg.arg):
+                if TARGET_PARAM_RE.search(arg.arg):
                     for c in _str_consts(default):
                         add((c, "target-param"))                 # def train(target_col="price")
     return facts
@@ -195,11 +230,13 @@ def aggregate(per_file: list[tuple[str, TargetFacts]], sigs: dict[str, FunctionS
             bound = {params[i]: v for i, v in enumerate(pos) if i < len(params) and v is not None}
             bound |= kws
             for param, value in bound.items():
-                if TARGET_NAME_RE.search(param):
+                if TARGET_PARAM_RE.search(param):
                     evidence[value].append(("target-param", path))
 
     candidates = []
     for col, ev in evidence.items():
+        if not col.strip():
+            continue  # '' and ' ' are never column names
         kinds = sorted({k for k, _ in ev})
         if kinds == ["drop"] and data_columns and col not in data_columns:
             continue  # dropped column that isn't even in the data headers: not a target

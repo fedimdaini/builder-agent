@@ -10,6 +10,7 @@ import yaml
 
 from builder_agent.decide import load_contracts
 from builder_agent.render import RenderError, py_literal, render_adapters, slot_candidates, validate_slots
+from builder_agent.render.slots import load_answer
 from builder_agent.scan import scan_repo
 
 from test_scan import notebook, write
@@ -17,7 +18,7 @@ from test_scan import notebook, write
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACTS = ROOT / "contracts.yaml"
 TAXI = ROOT.parent / "taxi-trip-regression"
-TAXI_GOLD = json.loads((ROOT / "tests/gold/taxi_slots.json").read_text(encoding="utf-8"))
+TAXI_GOLD, TAXI_ALTERNATIVES = load_answer(ROOT / "tests/gold/taxi_slots.json")
 
 
 @pytest.fixture(scope="module")
@@ -282,3 +283,33 @@ def test_taxi_gold_renders_clean(taxi, contracts, tmp_path):
     ev = f["evaluate.py"]
     assert '"model_version": version, "metrics": metrics(y_true, y_pred), "per_group": per_group' in ev
     assert 'EVAL_REPORT = "reports/eval.json"' in ev and 'GROUP_COLUMN = "vendor_id"' in ev
+
+
+# --- validator: model API and literals in arg_map ----------------------------------
+
+def test_rejects_input_that_does_not_fit_the_train_functions_api(mini):
+    v = validate_slots(mini, changed(MINI_GOLD, "model_input", "numpy"))   # train() uses xgb.train
+    assert any("uses xgboost-native (xgb.DMatrix, xgb.train), whose predict() needs model_input 'dmatrix'" in r
+               for r in v.reasons), v.reasons
+
+
+@pytest.mark.parametrize("value,reason", [
+    ("data/processed/train.csv", 'is a data file path; use "$train_path"'),
+    ("other/place.parquet", 'is a data file path; use "$train_path"'),
+    ("price", 'is the target column; use "$target_column"'),
+])
+def test_rejects_literal_paths_and_target_in_arg_map(mini, value, reason):
+    v = validate_slots(mini, changed(MINI_GOLD, "train.arg_map.train_path", value))
+    assert any(reason in r for r in v.reasons), v.reasons
+
+
+def test_gold_file_alternatives(tmp_path):
+    p = tmp_path / "gold.json"
+    p.write_text(json.dumps(dict(MINI_GOLD, _alternatives={"train.train_file": ["x.csv"]})), encoding="utf-8")
+    answer, alternatives = load_answer(p)
+    assert answer == MINI_GOLD and alternatives == {"train.train_file": ["x.csv"]}
+
+
+@taxi_only
+def test_taxi_model_input_candidates_follow_the_api(taxi):
+    assert slot_candidates(taxi)["model_input"] == ["dmatrix"]   # train_xgboost uses xgb.train

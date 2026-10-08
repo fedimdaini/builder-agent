@@ -7,7 +7,10 @@
   "train": {
     "train_function": "src.models.train_model:train_xgboost",
     "train_file": "data/processed/train_large.csv",
-    "arg_map": {"train_path": "$train_path", "target_col": "$target_column"}
+    "arg_map": {
+      "train_path": "$train_path",
+      "target_col": "$target_column"
+    }
   },
   "evaluate": {
     "eval_file": "data/processed/test.csv",
@@ -15,5 +18,10 @@
   },
   "data": {
     "data_step": "existing"
+  },
+  "_alternatives": {
+    "train.train_file": [
+      "data/processed/train.csv"
+    ]
   }
 }

@@ -60,6 +60,8 @@ class FunctionSig(BaseModel):
     name: str
     params: list[str] = Field(default_factory=list)  # "target_col", "num_rounds=371", "*args", "**kw"
     doc: str | None = None                           # first docstring line
+    model_api: str | None = None                     # xgboost-native, xgboost-sklearn, lightgbm-native, ...
+    api_evidence: list[str] = Field(default_factory=list)   # the calls that show it, e.g. xgb.train
 
     def render(self) -> str:
         return f"{self.name}({', '.join(self.params)})"

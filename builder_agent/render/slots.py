@@ -7,11 +7,14 @@ validator never raises: it returns reasons, so they can go back to the LLM.
 
 from __future__ import annotations
 
+import json
+from pathlib import Path, PurePosixPath
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from ..scan.code import module_target
+from ..scan.layout import DATA_EXTS
 from ..scan.models import FunctionSig, RepoContext
 
 # Builder-supported menus (what the templates know how to render)
@@ -23,6 +26,16 @@ FLAVOR_INPUTS = {
     "catboost": ["numpy", "dataframe"],
 }
 # arg_map value tokens -> what the train adapter passes
+# When the scanner sees which model API the train function uses, only these inputs fit its predict()
+API_FLAVOR = {"xgboost-native": "xgboost", "xgboost-sklearn": "xgboost", "lightgbm-native": "lightgbm",
+              "lightgbm-sklearn": "lightgbm", "catboost": "catboost"}
+API_INPUTS = {
+    "xgboost-native": ["dmatrix"],                 # Booster.predict() takes a DMatrix only
+    "xgboost-sklearn": ["numpy", "dataframe"],
+    "lightgbm-native": ["numpy", "dataframe"],
+    "lightgbm-sklearn": ["numpy", "dataframe"],
+    "catboost": ["numpy", "dataframe"],
+}
 ARG_TOKENS = {
     "$train_path": "path to the training CSV (a sampled temp copy when SAMPLE=1)",
     "$train_df": "training DataFrame, target included",
@@ -100,7 +113,7 @@ def slot_candidates(ctx: RepoContext) -> dict[str, Any]:
         "target_transform": ["none"] + [t.forward for t in ctx.target_transforms],
         "model_flavor": flavors,
         # inputs valid for at least one detected flavor; the validator checks the pair
-        "model_input": list(dict.fromkeys(i for fl in flavors for i in FLAVOR_INPUTS[fl])),
+        "model_input": _model_inputs(ctx, flavors),
         "train_function": {name: sig.render() for name, (_, sig) in funcs.items()},
         "data_files": {d.path: d.columns for d in ctx.data_columns},
         "group_column": _group_columns(ctx),
@@ -109,6 +122,14 @@ def slot_candidates(ctx: RepoContext) -> dict[str, Any]:
         "data_step": ["existing"] + [n for n, (path, s) in funcs.items()
                                      if path in data_roles and not _params(s)[1]],
     }
+
+
+def _model_inputs(ctx: RepoContext, flavors: list[str]) -> list[str]:
+    """Inputs that fit the APIs of the train functions; all inputs of the flavors if no API is known."""
+    apis = [s.model_api for e in ctx.entry_points if e.role == "train" for s in e.signatures if s.model_api]
+    if apis:
+        return list(dict.fromkeys(i for api in apis for i in API_INPUTS[api]))
+    return list(dict.fromkeys(i for fl in flavors for i in FLAVOR_INPUTS[fl]))
 
 
 def _group_columns(ctx: RepoContext) -> list[str]:
@@ -120,6 +141,19 @@ def _group_columns(ctx: RepoContext) -> list[str]:
     targets = {c.column for c in ctx.target_candidates if c.score >= 3}
     common = set.intersection(*(set(h) for h in headers))
     return [c for c in headers[0] if c in common and c not in targets]
+
+
+# --- gold files --------------------------------------------------------------
+
+ALTERNATIVES_KEY = "_alternatives"
+
+
+def load_answer(path: str | Path) -> tuple[dict, dict[str, list]]:
+    """A slot answer file. Gold files may add {"_alternatives": {"train.train_file": [...]}}:
+    other values accepted for a slot (lenient scoring). Returns (answer, alternatives)."""
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    alternatives = data.pop(ALTERNATIVES_KEY, {})
+    return data, alternatives
 
 
 # --- validation ------------------------------------------------------------
@@ -192,10 +226,29 @@ def validate_slots(ctx: RepoContext, answer: dict | SlotAnswers) -> SlotValidati
         missing = [p for p in required if p not in s.train.arg_map]
         if missing:
             bad(f"train.arg_map: required parameter(s) not mapped: {', '.join(missing)}")
+        targets = set(cand["target_column"]) | {s.target_column}
         for k, v in s.train.arg_map.items():
-            if isinstance(v, str) and v.startswith("$") and v not in ARG_TOKENS:
+            if not isinstance(v, str):
+                continue
+            if v.startswith("$") and v not in ARG_TOKENS:
                 bad(f"train.arg_map.{k}: unknown token {v!r} (choices: {', '.join(ARG_TOKENS)})")
+            elif v in files or PurePosixPath(v).suffix.lower() in DATA_EXTS:
+                # a literal path bypasses SAMPLE mode, which swaps in a sampled copy for $train_path
+                bad(f"train.arg_map.{k}: {v!r} is a data file path; use \"$train_path\" (the file comes "
+                    "from train.train_file, and SAMPLE=1 needs to swap in a sampled copy)")
+            elif v in targets:
+                bad(f"train.arg_map.{k}: {v!r} is the target column; use \"$target_column\"")
         tokens = {v for v in s.train.arg_map.values() if isinstance(v, str)}
+
+        # the scanner saw which model API the function uses: flavor and input must fit it
+        if sig.model_api:
+            want_flavor, inputs = API_FLAVOR[sig.model_api], API_INPUTS[sig.model_api]
+            evidence = ", ".join(sig.api_evidence)
+            if s.model_flavor != want_flavor:
+                bad(f"{s.train.train_function} uses {sig.model_api} ({evidence}); model_flavor must be {want_flavor!r}")
+            elif s.model_input not in inputs:
+                bad(f"{s.train.train_function} uses {sig.model_api} ({evidence}), whose predict() needs "
+                    f"model_input {' or '.join(repr(i) for i in inputs)}, not {s.model_input!r}")
 
         if s.transform_inside_train_fn:
             if s.target_transform == "none":

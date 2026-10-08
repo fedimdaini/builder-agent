@@ -147,3 +147,30 @@ def test_run_eval_report(mini, contracts, tmp_path):  # noqa: F811
     assert "slots correct      11/11" in text and "valid on 1st try   no" in text
     assert "attempt 1 rejected: target_column 'duration'" in text
     json.loads(report.model_dump_json())                                   # serializable
+
+
+def test_lenient_score_accepts_alternatives():
+    answer = dict(MINI_GOLD, train=dict(MINI_GOLD["train"], train_file="data/processed/other.csv"))
+    scores = {s.slot: s for s in compare(answer, MINI_GOLD, {"train.train_file": ["data/processed/other.csv"]})}
+    s = scores["train.train_file"]
+    assert (s.correct, s.correct_lenient) == (False, True)
+    assert sum(x.correct for x in scores.values()) == 10 and sum(x.correct_lenient for x in scores.values()) == 11
+
+
+def test_report_label_sandbox_and_side_by_side(mini, contracts, tmp_path):  # noqa: F811
+    from builder_agent.llm.eval import EvalReport, side_by_side
+
+    class Runner:   # fake docker: every stage passes, the predict stage prints a prediction
+        def __call__(self, cmd, cwd, timeout):
+            return 0, "prediction: 98.5\nsmoke test passed" if "predict" in cmd else "ok"
+
+    gold = tmp_path / "gold.json"
+    gold.write_text(json.dumps(dict(MINI_GOLD, _alternatives={"evaluate.group_column": ["a"]})), encoding="utf-8")
+    report = run_eval("fixture_v1", "fake:1b", mini.root, gold, call_log=None, client=FakeModel(MINI_GOLD),
+                      prompts_dir=FIXTURES, label="v1, fixed system", sandbox=True, sandbox_runner=Runner())
+    assert report.label == "v1, fixed system" and report.slots_correct_lenient == 11
+    assert report.sandbox.ok and report.sandbox.prediction == 98.5
+    assert "end to end         all stages ok, prediction 98 s" in report.text()
+    again = EvalReport.model_validate_json(report.model_dump_json())
+    table = side_by_side([again, report])
+    assert "v1, fixed system" in table and "slots correct (lenient)" in table and "all stages ok" in table

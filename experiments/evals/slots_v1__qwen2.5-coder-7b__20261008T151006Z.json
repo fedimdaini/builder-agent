@@ -1,0 +1,138 @@
+{
+  "label": "v1, original system",
+  "time": "2026-10-08T15:10:06.179086+00:00",
+  "repo": "taxi-trip-regression",
+  "prompt_version": "slots_v1",
+  "prompt_sha256": "489565623e586a961f95fa7da4c4a69de6979c5344968c7147ff7382e23d2037",
+  "model": "qwen2.5-coder:7b",
+  "model_digest": "dae161e27b0e90dd1856c8bb3209201fd6736d8eb66298e75ed87571486f4364",
+  "slots_correct": 8,
+  "slots_correct_lenient": 9,
+  "slots_total": 11,
+  "per_slot": [
+    {
+      "slot": "target_column",
+      "gold": "trip_duration",
+      "answer": "trip_duration",
+      "correct": true,
+      "correct_lenient": true
+    },
+    {
+      "slot": "target_transform",
+      "gold": "log1p",
+      "answer": "log1p",
+      "correct": true,
+      "correct_lenient": true
+    },
+    {
+      "slot": "transform_inside_train_fn",
+      "gold": true,
+      "answer": true,
+      "correct": true,
+      "correct_lenient": true
+    },
+    {
+      "slot": "model_flavor",
+      "gold": "xgboost",
+      "answer": "xgboost",
+      "correct": true,
+      "correct_lenient": true
+    },
+    {
+      "slot": "model_input",
+      "gold": "dmatrix",
+      "answer": "numpy",
+      "correct": false,
+      "correct_lenient": false
+    },
+    {
+      "slot": "train.train_function",
+      "gold": "src.models.train_model:train_xgboost",
+      "answer": "src.models.train_model:train_xgboost",
+      "correct": true,
+      "correct_lenient": true
+    },
+    {
+      "slot": "train.train_file",
+      "gold": "data/processed/train_large.csv",
+      "answer": "data/processed/train.csv",
+      "correct": false,
+      "correct_lenient": true
+    },
+    {
+      "slot": "train.arg_map",
+      "gold": {
+        "train_path": "$train_path",
+        "target_col": "$target_column"
+      },
+      "answer": {
+        "train_path": "data/processed/train.csv",
+        "target_col": "trip_duration"
+      },
+      "correct": false,
+      "correct_lenient": false
+    },
+    {
+      "slot": "evaluate.eval_file",
+      "gold": "data/processed/test.csv",
+      "answer": "data/processed/test.csv",
+      "correct": true,
+      "correct_lenient": true
+    },
+    {
+      "slot": "evaluate.group_column",
+      "gold": "vendor_id",
+      "answer": "vendor_id",
+      "correct": true,
+      "correct_lenient": true
+    },
+    {
+      "slot": "data.data_step",
+      "gold": "existing",
+      "answer": "existing",
+      "correct": true,
+      "correct_lenient": true
+    }
+  ],
+  "final_answer": {
+    "target_column": "trip_duration",
+    "target_transform": "log1p",
+    "transform_inside_train_fn": true,
+    "model_flavor": "xgboost",
+    "model_input": "numpy",
+    "train": {
+      "train_function": "src.models.train_model:train_xgboost",
+      "train_file": "data/processed/train.csv",
+      "arg_map": {
+        "train_path": "data/processed/train.csv",
+        "target_col": "trip_duration"
+      }
+    },
+    "evaluate": {
+      "eval_file": "data/processed/test.csv",
+      "group_column": "vendor_id"
+    },
+    "data": {
+      "data_step": "existing"
+    }
+  },
+  "valid_final": true,
+  "valid_on_first_try": false,
+  "attempts": 3,
+  "rejection_reasons": [
+    [
+      "train.arg_map: train_xgboost(train_path, target_col, num_rounds=371) has no parameter $train_path, $target_column",
+      "train.arg_map: required parameter(s) not mapped: train_path, target_col",
+      "log1p must be applied before training, but the function gets no $y to apply it to (it would train on the raw target)",
+      "evaluate.group_column 'none' is not in the header of data/processed/test.csv"
+    ],
+    [
+      "log1p must be applied before training, but the function gets no $y to apply it to (it would train on the raw target)"
+    ],
+    []
+  ],
+  "total_tokens": 8836,
+  "llm_s": 14.75,
+  "wall_s": 14.89,
+  "sandbox": null
+}
