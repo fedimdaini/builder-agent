@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Six-Agent Autonomous MLOps Pipeline</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F2F5F7; --surface:#FFFFFF; --surface-2:#E9EEF1; --ink:#15212A; --muted:#56646F; --rule:#D3DBE0;
+  --accent:#1F4E6B; --hl:rgba(31,78,107,.08);
+  --c-b:#94661A; --c-r:#6A4CA3; --c-i:#16786A; --c-t:#2B69AD; --c-d:#A33A57; --c-m:#4B7A25; --c-h:#4C5761;
+  --sans:"IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#11181D; --surface:#182129; --surface-2:#202B34; --ink:#E4EAEE; --muted:#9AA8B2; --rule:#2B3842;
+    --accent:#86B8D8; --hl:rgba(134,184,216,.10);
+    --c-b:#D9A650; --c-r:#A98BE0; --c-i:#4FC0AE; --c-t:#6FA8E8; --c-d:#E07A96; --c-m:#8DC260; --c-h:#A3AEB8;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#11181D; --surface:#182129; --surface-2:#202B34; --ink:#E4EAEE; --muted:#9AA8B2; --rule:#2B3842;
+  --accent:#86B8D8; --hl:rgba(134,184,216,.10);
+  --c-b:#D9A650; --c-r:#A98BE0; --c-i:#4FC0AE; --c-t:#6FA8E8; --c-d:#E07A96; --c-m:#8DC260; --c-h:#A3AEB8;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:calc(env(safe-area-inset-top,0px) + 16px); scroll-behavior:smooth}
+@media (prefers-reduced-motion: reduce){html{scroll-behavior:auto} *{transition:none!important}}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+
+.layout{display:grid;grid-template-columns:1fr;max-width:1240px;margin:0 auto;padding:0 20px}
+@media (min-width:1080px){.layout{grid-template-columns:210px minmax(0,1fr);gap:48px}}
+.toc{display:none}
+@media (min-width:1080px){
+  .toc{display:block;position:sticky;top:env(safe-area-inset-top,0px);align-self:start;padding:40px 0;font-size:14px}
+  .toc ol{list-style:none;margin:0;padding:0;border-left:1px solid var(--rule)}
+  .toc a{display:block;padding:5px 0 5px 14px;color:var(--muted);text-decoration:none;margin-left:-1px;border-left:2px solid transparent}
+  .toc a:hover{color:var(--ink);border-left-color:var(--accent)}
+  .toc .toc-title{font-weight:600;margin:0 0 12px;color:var(--ink)}
+}
+main{min-width:0;padding:40px 0 96px}
+
+h1{font-size:clamp(2rem,4.2vw,3.1rem);line-height:1.08;letter-spacing:-.02em;margin:0 0 16px;font-weight:700;max-width:18ch}
+h2{font-size:1.65rem;line-height:1.2;letter-spacing:-.01em;margin:0 0 14px;font-weight:600}
+h3{font-size:1.15rem;margin:28px 0 10px;font-weight:600}
+h4{font-size:1rem;margin:18px 0 6px;font-weight:600}
+p,li{max-width:72ch}
+p{margin:0 0 14px}
+.lede{font-size:1.15rem;color:var(--muted);max-width:60ch}
+.context{font-size:14px;color:var(--muted);margin-top:18px}
+section{padding-top:56px;margin-top:56px;border-top:1px solid var(--rule)}
+header + section{border-top:0;margin-top:24px;padding-top:0}
+.note{color:var(--muted);font-size:14.5px}
+
+.figure{background:var(--surface);border:1px solid var(--rule);border-radius:12px;padding:18px;margin:18px 0 22px}
+.figure .scroll{overflow-x:auto}
+.figure svg{display:block;width:100%;height:auto}
+.figure .scroll svg{min-width:640px}
+.figcap{font-size:14px;color:var(--muted);margin:12px 2px 0}
+
+.tbl{overflow-x:auto;margin:14px 0 20px;border:1px solid var(--rule);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14.5px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--rule);vertical-align:top}
+th{font-weight:600;background:var(--surface-2)}
+tr:last-child td{border-bottom:0}
+td:first-child{font-weight:500}
+
+pre{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:14px 16px;overflow-x:auto;font:13px/1.55 var(--mono);margin:12px 0 20px}
+code{font-family:var(--mono);font-size:.9em;background:var(--surface-2);padding:1px 5px;border-radius:4px}
+pre code{background:none;padding:0}
+
+/* SVG text */
+svg text{font-family:var(--sans)}
+.sv-box{fill:var(--surface);stroke:var(--rule)}
+.sv-stage{fill:var(--surface-2);stroke:var(--rule)}
+.sv-t{fill:var(--ink);font-size:14px;font-weight:600;text-anchor:middle;dominant-baseline:central}
+.sv-s{fill:var(--muted);font-size:12px;text-anchor:middle;dominant-baseline:central}
+.sv-line{stroke:var(--muted);stroke-width:1.2;fill:none}
+.sv-frame{fill:none;stroke:var(--rule);stroke-dasharray:5 5}
+
+/* Loop */
+.loop{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch;margin:16px 0 8px;padding:0;list-style:none}
+.loop li{display:flex;align-items:center;gap:8px;max-width:none}
+.loop .step{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:8px 12px;min-width:92px}
+.loop .step b{display:block;font-size:14.5px}
+.loop .step span{font-size:12.5px;color:var(--muted)}
+.loop .step.llm{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.loop .arr{color:var(--muted)}
+
+/* Ladder */
+.ladder{display:grid;gap:8px;margin:14px 0 20px;padding:0;list-style:none}
+.ladder li{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:start;background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:12px 14px;max-width:none}
+.ladder .lv{font-weight:700;font-size:1.3rem;line-height:1;width:1.6em;color:var(--accent)}
+.ladder p{margin:2px 0 0;font-size:14.5px;color:var(--muted)}
+
+/* Agents */
+.agent{border:1px solid var(--rule);border-left:4px solid var(--sc);border-radius:10px;background:var(--surface);margin:12px 0}
+.agent summary{cursor:pointer;padding:14px 16px;list-style:none;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+.agent summary::-webkit-details-marker{display:none}
+.agent summary::after{content:"+";margin-left:auto;color:var(--muted);font-weight:600}
+.agent[open] summary::after{content:"–"}
+.agent .nm{font-weight:700;font-size:1.1rem;color:var(--sc)}
+.agent .one{color:var(--muted)}
+.agent .body{padding:0 16px 16px}
+.agent .tbl{margin:8px 0 14px}
+.menu{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 12px;padding:0;list-style:none}
+.menu li{font-size:13.5px;border:1px solid var(--rule);border-radius:999px;padding:3px 10px;background:var(--bg)}
+.menu li small{color:var(--muted)}
+.abil{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;margin:8px 0 0}
+.abil div{background:var(--bg);border-radius:8px;padding:10px 12px;font-size:14px}
+.abil b{display:block;font-size:13px;color:var(--sc)}
+
+/* Timeline legend & map */
+.legend{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:13.5px;color:var(--muted);margin:12px 2px 0;padding:0;list-style:none}
+.legend li{display:flex;align-items:center;gap:7px;max-width:none}
+.legend svg{width:34px;height:14px;flex:none}
+.tl-name{font-size:13px;font-weight:600;text-anchor:end;dominant-baseline:central}
+.tl-small{font-size:11.5px;fill:var(--muted)}
+
+.mapgrid{display:grid;gap:18px}
+@media (min-width:860px){.mapgrid{grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);align-items:start}}
+.mnode{cursor:pointer}
+.mnode circle{fill:var(--surface);stroke:var(--sc);stroke-width:2}
+.mnode text{fill:var(--sc);font-size:15px;font-weight:600;text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.mnode.active circle{fill:var(--sc)}
+.mnode.active text{fill:var(--surface)}
+.mnode:focus-visible{outline:none}
+.mnode:focus-visible circle{stroke-width:4}
+.edge{stroke:var(--muted);opacity:.55;transition:opacity .2s}
+.edge.off{opacity:.12}
+.edge.on{opacity:1}
+.panel h4{margin-top:0}
+.msglist{list-style:none;margin:0 0 14px;padding:0;display:grid;gap:6px}
+.msglist li{background:var(--bg);border-radius:8px;padding:8px 10px;font-size:14px;max-width:none}
+.msglist .dir{font-weight:600}
+.kind{display:inline-block;font-size:12px;border:1px solid var(--rule);border-radius:999px;padding:0 8px;margin-left:6px;color:var(--muted);background:var(--surface)}
+.lvl{display:inline-block;font-size:12px;border-radius:999px;padding:0 8px;margin-left:6px;background:var(--hl);color:var(--accent);font-weight:500}
+
+/* Scenario explorer */
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin:16px 0}
+.tabs button{font:inherit;font-size:14px;border:1px solid var(--rule);background:var(--surface);color:var(--ink);border-radius:999px;padding:6px 13px;cursor:pointer}
+.tabs button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+.case-head{background:var(--surface);border:1px solid var(--rule);border-radius:12px;padding:16px 18px;margin-bottom:14px}
+.case-head h3{margin:0 0 10px}
+.case-head dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0;font-size:14.5px}
+.case-head dt{font-weight:600}
+.case-head dd{margin:0;color:var(--muted);max-width:70ch}
+.casegrid{display:grid;gap:14px}
+@media (min-width:980px){.casegrid{grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);align-items:start}}
+.seqwrap{background:var(--surface);border:1px solid var(--rule);border-radius:12px;padding:12px;position:sticky;top:12px}
+.seqwrap svg{display:block;width:100%;height:auto}
+.life{stroke:var(--rule);stroke-dasharray:3 4}
+.lane-t{font-size:12.5px;font-weight:600;text-anchor:middle;dominant-baseline:central}
+.band{fill:var(--hl);opacity:0}
+.band.cur{opacity:1}
+.st{transition:opacity .2s}
+.st.dim{opacity:.15}
+.bdg{fill:var(--surface);stroke:var(--sc);stroke-width:1.6}
+.bdg-t{font-size:11px;font-weight:600;text-anchor:middle;dominant-baseline:central;fill:var(--ink)}
+.st.cur .bdg{fill:var(--sc)}
+.st.cur .bdg-t{fill:var(--surface)}
+.controls{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:10px 2px 2px}
+.controls button{font:inherit;font-size:14px;border:1px solid var(--rule);background:var(--bg);color:var(--ink);border-radius:8px;padding:5px 12px;cursor:pointer}
+.controls button:disabled{opacity:.45;cursor:default}
+.controls .count{margin-left:auto;font-size:13.5px;color:var(--muted)}
+.steps{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.steps li{max-width:none}
+.step-btn{display:grid;grid-template-columns:auto 1fr;gap:10px;width:100%;text-align:left;font:inherit;color:inherit;background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:9px 12px;cursor:pointer;transition:opacity .2s}
+.step-btn .num{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;border:1.6px solid var(--sc);font-size:12px;font-weight:600}
+.step-head{display:block;font-size:14px}
+.step-x{display:block;font-size:14px;color:var(--muted);margin-top:2px}
+.steps li.cur .step-btn{border-color:var(--accent);background:var(--hl)}
+.steps li.cur .num{background:var(--sc);color:var(--surface)}
+.steps li.dim .step-btn{opacity:.45}
+
+/* Chain & funnel */
+.chain{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:12px 0 18px;padding:0;list-style:none}
+.chain li{max-width:none;display:flex;align-items:center;gap:6px}
+.chain .n{background:var(--surface);border:1px solid var(--rule);border-radius:8px;padding:6px 10px;font-size:14px}
+.chain .n small{display:block;color:var(--muted);font-size:12px}
+.funnel{list-style:none;margin:16px 0;padding:0;display:grid;gap:6px}
+.funnel li{max-width:none;width:var(--w);min-width:260px;background:var(--surface);border:1px solid var(--rule);border-left:4px solid var(--sc);border-radius:8px;padding:8px 12px;display:flex;gap:12px;flex-wrap:wrap;align-items:baseline;font-size:14.5px}
+.funnel .who{color:var(--sc);font-weight:600;font-size:13px}
+.funnel .cost{margin-left:auto;color:var(--muted);font-size:13px}
+
+.cols{display:grid;gap:14px}
+@media (min-width:760px){.cols{grid-template-columns:1fr 1fr}}
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:14px 16px}
+.card h4{margin-top:0}
+.card p,.card li{font-size:14.5px}
+.card ul{padding-left:18px;margin:6px 0 0}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc" aria-label="Contents">
+  <p class="toc-title">Contents</p>
+  <ol>
+    <li><a href="#overview">Overview</a></li>
+    <li><a href="#thinking">How an agent thinks</a></li>
+    <li><a href="#agents">The six agents</a></li>
+    <li><a href="#communication">How they communicate</a></li>
+    <li><a href="#cases">Order of events, case by case</a></li>
+    <li><a href="#waste">Avoiding wasted work</a></li>
+    <li><a href="#shared">Shared components</a></li>
+    <li><a href="#evaluation">Evaluation</a></li>
+    <li><a href="#build">Stack, team and timeline</a></li>
+  </ol>
+</nav>
+
+<main>
+<header>
+  <h1>Six agents that run an MLOps pipeline on their own</h1>
+  <p class="lede">Each agent watches one part of the pipeline, measures it with models, decides with an LLM, and acts through code. They talk to each other directly, trace failures back to their source, and ask a person only before production changes.</p>
+  <p class="context">Advanced Data Science Project, Topic 4: Multi-Agent DevOps / MLOps Pipeline. ESPRIT, class 5DS, 2026/2027. Ten weeks, a team of five, Design Thinking method.</p>
+</header>
+
+<!-- ================= OVERVIEW ================= -->
+<section id="overview">
+  <h2>Overview</h2>
+  <p>The pipeline runs in order from code to live model. One agent sits on each stage. All six share a message board, a memory of past incidents and a sandbox for safe tests.</p>
+  <div class="figure">
+    <div class="scroll">
+    <svg viewBox="0 0 760 430" role="img" aria-labelledby="archT archD">
+      <title id="archT">Architecture overview</title>
+      <desc id="archD">Six pipeline stages, one agent under each, a shared layer with message board, incident memory and sandbox, and human approval at the bottom.</desc>
+      <!-- pipeline -->
+      <g>
+        <rect class="sv-stage" x="26" y="24" width="108" height="42" rx="6"/><text class="sv-s" x="80" y="45" style="fill:var(--ink)">Repo setup</text>
+        <rect class="sv-stage" x="146" y="24" width="108" height="42" rx="6"/><text class="sv-s" x="200" y="45" style="fill:var(--ink)">Commits and CI</text>
+        <rect class="sv-stage" x="266" y="24" width="108" height="42" rx="6"/><text class="sv-s" x="320" y="45" style="fill:var(--ink)">Data in</text>
+        <rect class="sv-stage" x="386" y="24" width="108" height="42" rx="6"/><text class="sv-s" x="440" y="45" style="fill:var(--ink)">Training</text>
+        <rect class="sv-stage" x="506" y="24" width="108" height="42" rx="6"/><text class="sv-s" x="560" y="45" style="fill:var(--ink)">Deploy</text>
+        <rect class="sv-stage" x="626" y="24" width="108" height="42" rx="6"/><text class="sv-s" x="680" y="45" style="fill:var(--ink)">Live model</text>
+        <path class="sv-line" d="M134 45h12M254 45h12M374 45h12M494 45h12M614 45h12"/>
+      </g>
+      <!-- stage-agent links -->
+      <path class="sv-line" d="M80 66v38M200 66v38M320 66v38M440 66v38M560 66v38M680 66v38" stroke-dasharray="3 3"/>
+      <!-- agents -->
+      <g>
+        <rect x="26" y="104" width="108" height="62" rx="8" style="fill:var(--surface);stroke:var(--c-b)" stroke-width="2"/>
+        <text class="sv-t" x="80" y="126" style="fill:var(--c-b)">Builder</text><text class="sv-s" x="80" y="147">sets it up</text>
+        <rect x="146" y="104" width="108" height="62" rx="8" style="fill:var(--surface);stroke:var(--c-r)" stroke-width="2"/>
+        <text class="sv-t" x="200" y="126" style="fill:var(--c-r)">Reviewer</text><text class="sv-s" x="200" y="147">checks code</text>
+        <rect x="266" y="104" width="108" height="62" rx="8" style="fill:var(--surface);stroke:var(--c-i)" stroke-width="2"/>
+        <text class="sv-t" x="320" y="126" style="fill:var(--c-i)">Inspector</text><text class="sv-s" x="320" y="147">checks data</text>
+        <rect x="386" y="104" width="108" height="62" rx="8" style="fill:var(--surface);stroke:var(--c-t)" stroke-width="2"/>
+        <text class="sv-t" x="440" y="126" style="fill:var(--c-t)">Trainer</text><text class="sv-s" x="440" y="147">retrains</text>
+        <rect x="506" y="104" width="108" height="62" rx="8" style="fill:var(--surface);stroke:var(--c-d)" stroke-width="2"/>
+        <text class="sv-t" x="560" y="126" style="fill:var(--c-d)">Deployer</text><text class="sv-s" x="560" y="147">rolls out</text>
+        <rect x="626" y="104" width="108" height="62" rx="8" style="fill:var(--surface);stroke:var(--c-m)" stroke-width="2"/>
+        <text class="sv-t" x="680" y="126" style="fill:var(--c-m)">Monitor</text><text class="sv-s" x="680" y="147">watches</text>
+      </g>
+      <!-- agent to shared -->
+      <path class="sv-line" d="M80 166v58M200 166v58M320 166v58M440 166v58M560 166v58M680 166v58"/>
+      <rect class="sv-frame" x="14" y="224" width="732" height="100" rx="12"/>
+      <g>
+        <rect class="sv-box" x="26" y="240" width="224" height="68" rx="8"/>
+        <text class="sv-t" x="138" y="263">Message board</text><text class="sv-s" x="138" y="285">plus lineage map</text>
+        <rect class="sv-box" x="264" y="240" width="224" height="68" rx="8"/>
+        <text class="sv-t" x="376" y="263">Incident memory</text><text class="sv-s" x="376" y="285">what fixed what, before</text>
+        <rect class="sv-box" x="502" y="240" width="232" height="68" rx="8"/>
+        <text class="sv-t" x="618" y="263">Sandbox</text><text class="sv-s" x="618" y="285">safe copy for tests</text>
+      </g>
+      <path class="sv-line" d="M380 324v40"/>
+      <path d="M375 358l5 7 5-7" class="sv-line"/>
+      <rect x="250" y="366" width="260" height="54" rx="8" style="fill:var(--surface);stroke:var(--c-h)" stroke-width="1.5"/>
+      <text class="sv-t" x="380" y="385">Human</text><text class="sv-s" x="380" y="405">approves production, reads one card per incident</text>
+    </svg>
+    </div>
+    <p class="figcap">Stages run left to right. Agents do not: they run at the same time and talk through the board whenever something happens.</p>
+  </div>
+
+  <div class="tbl"><table>
+    <thead><tr><th>Agent</th><th>Watches</th><th>The question it answers</th></tr></thead>
+    <tbody>
+      <tr><td>Builder</td><td>The repository</td><td>How do I turn this code into a working pipeline?</td></tr>
+      <tr><td>Reviewer</td><td>Commits, pull requests, CI</td><td>Is this change safe, and was it intended?</td></tr>
+      <tr><td>Inspector</td><td>Incoming data</td><td>Pass, repair or quarantine this batch?</td></tr>
+      <tr><td>Trainer</td><td>Training runs, model registry</td><td>Is retraining worth it? Is the new model better for everyone?</td></tr>
+      <tr><td>Deployer</td><td>Serving, traffic, resources</td><td>More traffic, hold or roll back? Enough capacity?</td></tr>
+      <tr><td>Monitor</td><td>Live predictions</td><td>Is the model really getting worse, and why?</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Problems this solves</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Problem</th><th>What happens today</th><th>Fixed by</th></tr></thead>
+    <tbody>
+      <tr><td>Alert fatigue, silent failures</td><td>Most alerts are ignored; some incidents fire none</td><td>Monitor, ownership rule</td></tr>
+      <tr><td>Late labels</td><td>Accuracy can't be measured for weeks</td><td>Monitor</td></tr>
+      <tr><td>Broken upstream data</td><td>Schema, unit or missing-value changes break the model</td><td>Inspector</td></tr>
+      <tr><td>Training–serving skew</td><td>A code change alters live features but not training ones</td><td>Reviewer, Inspector</td></tr>
+      <tr><td>Blind retraining</td><td>Retrains on a schedule waste compute, may ship worse models</td><td>Trainer</td></tr>
+      <tr><td>Risky releases</td><td>Promotion on offline scores; slow manual rollback</td><td>Deployer</td></tr>
+      <tr><td>Failures cross stages</td><td>Symptom in serving, cause in a commit or feed</td><td>Lineage map, ownership rule</td></tr>
+      <tr><td>Manual setup</td><td>Makefile, Dockerfile and CI written by hand</td><td>Builder</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Why there is no coordinator agent</h3>
+  <p>A coordinator's usual jobs are either simple rules or already belong to an agent, so it would fail the project's own test: could a script do it?</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Coordinator job</th><th>Handled instead by</th></tr></thead>
+    <tbody>
+      <tr><td>Group related alerts</td><td>A rule: same lineage branch and same time window</td></tr>
+      <tr><td>Settle conflicts</td><td>Two fixed rules (see communication)</td></tr>
+      <tr><td>Check a fix worked</td><td>The acting agent verifies its own action</td></tr>
+      <tr><td>Find the root cause</td><td>Agents question each other along the lineage map; the one closest to the source claims the incident</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ================= THINKING ================= -->
+<section id="thinking">
+  <h2>How an agent thinks</h2>
+  <p>All six agents run the same loop. Models measure, the LLM decides, code acts. The LLM never does maths and never reads raw data, only the results the models produce.</p>
+
+  <ol class="loop" aria-label="Agent loop">
+    <li><div class="step"><b>Observe</b><span>tools</span></div><span class="arr" aria-hidden="true">›</span></li>
+    <li><div class="step"><b>Analyze</b><span>ML models, stats</span></div><span class="arr" aria-hidden="true">›</span></li>
+    <li><div class="step"><b>Flag?</b><span>no: keep watching</span></div><span class="arr" aria-hidden="true">›</span></li>
+    <li><div class="step llm"><b>Reason</b><span>LLM + memory</span></div><span class="arr" aria-hidden="true">›</span></li>
+    <li><div class="step"><b>Test</b><span>sandbox, level 2</span></div><span class="arr" aria-hidden="true">›</span></li>
+    <li><div class="step"><b>Act</b><span>code</span></div><span class="arr" aria-hidden="true">›</span></li>
+    <li><div class="step"><b>Verify</b><span>code</span></div><span class="arr" aria-hidden="true">›</span></li>
+    <li><div class="step"><b>Learn</b><span>memory</span></div></li>
+  </ol>
+  <p class="note">The models run all the time and cost little. The LLM wakes only when a model raises a flag, so most of the time no LLM is running.</p>
+
+  <h3>Models and the LLM, side by side</h3>
+  <div class="tbl"><table>
+    <thead><tr><th></th><th>ML models and statistics</th><th>LLM</th></tr></thead>
+    <tbody>
+      <tr><td>Good at</td><td>Numbers, millions of rows, speed, same answer every time</td><td>Reading code and logs, weighing trade-offs, choosing a fix, explaining</td></tr>
+      <tr><td>Bad at</td><td>Explaining, choosing between options, new situations</td><td>Maths, speed, cost, consistency, raw data</td></tr>
+      <tr><td>Role</td><td>Measure</td><td>Decide</td></tr>
+    </tbody>
+  </table></div>
+  <p>The LLM must answer in a fixed JSON format and may only pick from its agent's action menu:</p>
+<pre><code>{
+  "action": "quarantine",
+  "level": 1,
+  "reason": "fare_amount median is 100x higher than usual; matches past incident 'cents instead of dollars'",
+  "confidence": 0.86,
+  "success_check": "next batch passes schema checks"
+}</code></pre>
+
+  <h3>Action levels</h3>
+  <ol class="ladder">
+    <li><span class="lv">1</span><div><b>Just do it</b><p>Safe and reversible. Stop a failing run, quarantine a batch, run extra tests.</p></div></li>
+    <li><span class="lv">2</span><div><b>Test, do, tell</b><p>Must pass in the sandbox first. Repair data, retrain, move the canary to 5% or 25%.</p></div></li>
+    <li><span class="lv">3</span><div><b>Ask a person</b><p>Anything production users see. Promote to 100%, a code and model migration.</p></div></li>
+    <li><span class="lv">4</span><div><b>Never</b><p>In no menu. Delete data or models.</p></div></li>
+  </ol>
+  <p class="note">One exception: the Deployer may roll back without asking when errors cross a hard limit, because it only restores a version a person already approved.</p>
+
+  <h3>Three abilities built into every agent</h3>
+  <p>They are steps of the loop, not extra features, so no agent can skip them.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Agent</th><th>Predict before it breaks</th><th>Test before acting</th><th>Learn which fix works</th></tr></thead>
+    <tbody>
+      <tr><td>Builder</td><td>Likely build failures</td><td>Full <code>make all</code> in a throwaway container</td><td>Which fixes solve which build errors</td></tr>
+      <tr><td>Reviewer</td><td>Chance a change breaks the build or features</td><td>Old vs new code on the same data sample</td><td>Which changes caused incidents later</td></tr>
+      <tr><td>Inspector</td><td>Slow data decay</td><td>Repair applied to a copy of the batch</td><td>Which repairs work for which bad data</td></tr>
+      <tr><td>Trainer</td><td>Gain from retraining</td><td>Train and compare in the sandbox</td><td>Which retrains really paid off</td></tr>
+      <tr><td>Deployer</td><td>Traffic peaks</td><td>Replay recorded traffic on the new setup</td><td>Which rollouts went smoothly</td></tr>
+      <tr><td>Monitor</td><td>Accuracy drop before labels arrive</td><td>Replay recent data to confirm</td><td>Real problems vs false alarms</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ================= AGENTS ================= -->
+<section id="agents">
+  <h2>The six agents</h2>
+  <p>Open an agent to see its loop, its action menu (with levels) and its three abilities.</p>
+
+  <details class="agent" style="--sc:var(--c-b)" open>
+    <summary><span class="nm">Builder</span><span class="one">Reads a repository and builds the whole pipeline with no human help.</span></summary>
+    <div class="body">
+      <p>Runs once at the start, and again when the project structure changes a lot. Scope: Python ML projects.</p>
+      <div class="tbl"><table><tbody>
+        <tr><td>Observe</td><td>Python files, notebooks, <code>requirements.txt</code>, data folders, existing tests</td><td>Repo scanner</td></tr>
+        <tr><td>Analyze</td><td>Framework, entry points (<code>train.py</code>, <code>predict.py</code>), dependencies, data and model paths, column types from a sample</td><td>AST parsing, import detection</td></tr>
+        <tr><td>Reason</td><td>Plans the stages, fills templates with the right commands, diagnoses build errors</td><td>LLM</td></tr>
+        <tr><td>Act</td><td>Writes files, builds, retries, tells each agent where to watch</td><td>Code</td></tr>
+      </tbody></table></div>
+      <h4>Files it generates from templates</h4>
+      <p><code>Makefile</code> (install, data, train, evaluate, serve, test, all), <code>Dockerfile</code>, <code>docker-compose.yml</code> (current and candidate serving containers, router, MLflow, board), the GitHub Actions workflow, MLflow config, a first Pandera <code>schema.py</code> for the Inspector, and <code>agents.yaml</code> with each agent's paths and subscriptions.</p>
+      <ul class="menu"><li>write files <small>L1</small></li><li>run build in sandbox <small>L1</small></li><li>fix and retry, max 3 <small>L2</small></li><li>give up and report <small>L1</small></li></ul>
+      <p class="note">For the first setup it may commit by itself once every sandbox stage passes, since nothing is in production yet. After go-live its changes go through the Reviewer.</p>
+      <div class="abil"><div><b>Predict</b>Warns about likely build failures from memory before building.</div><div><b>Test</b>Runs <code>make all</code> in a throwaway container; only passing files are committed.</div><div><b>Learn</b>Saves every error and the fix that solved it.</div></div>
+    </div>
+  </details>
+
+  <details class="agent" style="--sc:var(--c-r)">
+    <summary><span class="nm">Reviewer</span><span class="one">Checks every code change before it runs, and whether it was intended.</span></summary>
+    <div class="body">
+      <p>Runs on every commit and pull request.</p>
+      <div class="tbl"><table><tbody>
+        <tr><td>Observe</td><td>Diff, changed files, PR description, CI results</td><td>GitHub API, CI logs</td></tr>
+        <tr><td>Analyze</td><td>Risk score, affected features and models, which tests matter</td><td>Rules, then a classifier on CI history; lineage map</td></tr>
+        <tr><td>Reason</td><td>Safe? Intended? Complete? Who must be warned?</td><td>LLM</td></tr>
+        <tr><td>Act</td><td>Approve, test more, ask the author, block, or approve with a migration plan</td><td>Code</td></tr>
+      </tbody></table></div>
+      <p><b>Risk score inputs:</b> touches feature code, changes training or serving on one side only, dependency bump, config change, diff size, files with past incidents.</p>
+      <p><b>Feature-diff test:</b> old and new code run on the same data sample in the sandbox, and every feature column is compared. Unexpected changes are caught before training sees them.</p>
+      <h4>Intended or accidental?</h4>
+      <p>Signs of intent: the PR says so (team rule: a tag such as <code>intent: distance km -&gt; m</code>), the data schema was updated in the same PR, and training and serving code changed the same way.</p>
+      <div class="tbl"><table>
+        <thead><tr><th>Situation</th><th>Decision</th></tr></thead>
+        <tbody>
+          <tr><td>Intended and complete</td><td>Approve with a migration plan</td></tr>
+          <tr><td>Intended but incomplete</td><td>Ask the author, list what's missing</td></tr>
+          <tr><td>No sign of intent</td><td>Ask the author: "values are now 1000× larger, was this intended?"</td></tr>
+          <tr><td>Clear bug</td><td>Block with an explanation</td></tr>
+        </tbody>
+      </table></div>
+      <ul class="menu"><li>approve <small>L1</small></li><li>run extra tests <small>L1</small></li><li>ask author <small>L1</small></li><li>block <small>L1</small></li><li>approve with migration plan <small>L3</small></li><li>warn other agents <small>L1</small></li></ul>
+      <div class="abil"><div><b>Predict</b>Chance the change breaks the build or alters features.</div><div><b>Test</b>Old vs new code on the same sample, feature by feature.</div><div><b>Learn</b>Which kinds of change caused incidents later.</div></div>
+    </div>
+  </details>
+
+  <details class="agent" style="--sc:var(--c-i)">
+    <summary><span class="nm">Inspector</span><span class="one">Checks all incoming data so bad data never reaches training or the live model.</span></summary>
+    <div class="body">
+      <p>Runs on every new batch.</p>
+      <div class="tbl"><table><tbody>
+        <tr><td>Observe</td><td>Columns, types, missing values, ranges, arrival time</td><td>Pandera checks</td></tr>
+        <tr><td>Analyze</td><td>Compares to normal batches and to training data; flags unusual batches</td><td>PSI and KS tests, Isolation Forest on batch statistics</td></tr>
+        <tr><td>Reason</td><td>Real problem or normal variation? Repairable or must be blocked?</td><td>LLM + memory</td></tr>
+        <tr><td>Act</td><td>Pass, repair or quarantine; warn the Trainer</td><td>Code</td></tr>
+      </tbody></table></div>
+      <ul class="menu"><li>pass <small>L1</small></li><li>quarantine <small>L1</small></li><li>repair <small>L2</small></li><li>warn <small>L1</small></li><li>update schema, only in an approved migration <small>L2</small></li></ul>
+      <div class="abil"><div><b>Predict</b>Spots slow decay, such as missing values rising each week.</div><div><b>Test</b>Applies a repair to a copy of the batch and re-runs every check.</div><div><b>Learn</b>Which repairs worked for which kind of bad data.</div></div>
+    </div>
+  </details>
+
+  <details class="agent" style="--sc:var(--c-t)">
+    <summary><span class="nm">Trainer</span><span class="one">Retrains only when it's worth it, and checks the new model is better for every group.</span></summary>
+    <div class="body">
+      <p>Runs when the Monitor requests a retrain, or when enough new clean data has arrived.</p>
+      <div class="tbl"><table><tbody>
+        <tr><td>Observe</td><td>Requests, past runs, registry, clean data window from the Inspector</td><td>MLflow</td></tr>
+        <tr><td>Analyze</td><td>Expected gain vs compute cost; new vs current model, overall and per group; release contract checks</td><td>Gain-prediction model, evaluation scripts</td></tr>
+        <tr><td>Reason</td><td>Retrain or not? Which data window? Good enough to send forward?</td><td>LLM</td></tr>
+        <tr><td>Act</td><td>Train in sandbox, register, hand to the Deployer, or refuse with a reason</td><td>Code</td></tr>
+      </tbody></table></div>
+      <ul class="menu"><li>refuse <small>L1</small></li><li>ask Inspector for clean data <small>L1</small></li><li>retrain in sandbox <small>L2</small></li><li>register candidate <small>L1</small></li><li>send to Deployer <small>L1</small></li></ul>
+      <div class="abil"><div><b>Predict</b>Predicts the gain before spending compute.</div><div><b>Test</b>All training and comparison happens in the sandbox.</div><div><b>Learn</b>Records whether each retrain paid off.</div></div>
+    </div>
+  </details>
+
+  <details class="agent" style="--sc:var(--c-d)">
+    <summary><span class="nm">Deployer</span><span class="one">Decides how much live traffic a new model gets, and pulls back when something goes wrong.</span></summary>
+    <div class="body">
+      <p>Runs when a candidate arrives, and continuously during a rollout.</p>
+      <div class="tbl"><table><tbody>
+        <tr><td>Observe</td><td>Latency, errors, CPU and memory, traffic, old vs new results</td><td>Prometheus</td></tr>
+        <tr><td>Analyze</td><td>Canary vs current statistical comparison; traffic forecast</td><td>Mann-Whitney test, simple forecasting</td></tr>
+        <tr><td>Reason</td><td>More traffic, hold or roll back? Add capacity?</td><td>LLM</td></tr>
+        <tr><td>Act</td><td>Change the traffic split, scale replicas, roll back</td><td>Code (router + Docker Compose)</td></tr>
+      </tbody></table></div>
+      <p><b>Rollout stages:</b> shadow (sees real requests, answers not used), then 5%, then 25%, then 100% with human approval.</p>
+      <ul class="menu"><li>hold <small>L1</small></li><li>emergency rollback <small>L1, hard limit only</small></li><li>increase traffic up to 25% <small>L2</small></li><li>scale up or down <small>L2</small></li><li>go to 100% <small>L3</small></li></ul>
+      <div class="abil"><div><b>Predict</b>Forecasts traffic peaks and scales ahead.</div><div><b>Test</b>Replays recorded traffic on the new setup.</div><div><b>Learn</b>Which rollouts went smoothly; adjusts caution.</div></div>
+    </div>
+  </details>
+
+  <details class="agent" style="--sc:var(--c-m)">
+    <summary><span class="nm">Monitor</span><span class="one">Checks whether the live model is getting worse, even before labels arrive.</span></summary>
+    <div class="body">
+      <p>Runs continuously.</p>
+      <div class="tbl"><table><tbody>
+        <tr><td>Observe</td><td>Predictions, confidence, input features, labels when they arrive</td><td>Evidently</td></tr>
+        <tr><td>Analyze</td><td>Accuracy estimated from confidence, drift weighted by feature importance, per-group checks</td><td>NannyML (CBPE, DLE), SHAP</td></tr>
+        <tr><td>Reason</td><td>Really getting worse? Caused by data or a changed world?</td><td>LLM</td></tr>
+        <tr><td>Act</td><td>Report, ask the Inspector or Reviewer, request a retrain, ask the Deployer to hold</td><td>Code</td></tr>
+      </tbody></table></div>
+      <ul class="menu"><li>report <small>L1</small></li><li>ask Inspector or Reviewer <small>L1</small></li><li>request retrain <small>L1</small></li><li>ask Deployer to hold <small>L1</small></li><li>mark drift as expected, after a migration notice <small>L1</small></li></ul>
+      <div class="abil"><div><b>Predict</b>Warns of an accuracy drop before labels confirm it.</div><div><b>Test</b>Replays recent data to confirm a drop is real.</div><div><b>Learn</b>Real problems vs false alarms, so alerts get fewer.</div></div>
+    </div>
+  </details>
+</section>
+
+<!-- ================= COMMUNICATION ================= -->
+<section id="communication">
+  <h2>How they communicate</h2>
+
+  <h3>Not sequential: every agent runs at the same time</h3>
+  <p>The pipeline's stages happen in order, but the agents don't take turns. Each one runs its own loop in its own process. Messages are posted on events, like emails to a shared inbox: the sender keeps working and the receivers pick them up on their next check. Only inside one conversation, such as a question and its answer, does order matter.</p>
+  <div class="figure">
+    <div class="scroll" id="timeline"></div>
+    <ul class="legend">
+      <li><svg viewBox="0 0 34 14" aria-hidden="true"><line x1="2" y1="7" x2="32" y2="7" stroke="currentColor" stroke-width="1.5"/></svg>models watching</li>
+      <li><svg viewBox="0 0 34 14" aria-hidden="true"><rect x="2" y="2" width="30" height="10" rx="3" fill="currentColor"/></svg>LLM awake</li>
+      <li><svg viewBox="0 0 34 14" aria-hidden="true"><rect x="2" y="2" width="30" height="10" rx="3" fill="none" stroke="currentColor" stroke-dasharray="3 2"/></svg>sandbox job</li>
+      <li><svg viewBox="0 0 34 14" aria-hidden="true"><line x1="17" y1="1" x2="17" y2="10" stroke="currentColor" stroke-width="1.5"/><path d="M13 9l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>message</li>
+    </ul>
+    <p class="figcap">One stretch of time. The Trainer keeps training while the Monitor and Inspector sort out a data question, and the Deployer holds a rollout the moment it's asked to.</p>
+  </div>
+
+  <h3>Message types</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Type</th><th>Meaning</th><th>Example</th></tr></thead>
+    <tbody>
+      <tr><td>Finding</td><td>"I noticed X." An answer is a Finding that replies to a Question.</td><td>Monitor: estimated accuracy down 6% on airport trips</td></tr>
+      <tr><td>Question</td><td>"Did X happen on your side?"</td><td>Monitor to Inspector: did <code>trip_distance</code> change in the last 6 hours?</td></tr>
+      <tr><td>Request</td><td>"Please do X."</td><td>Inspector to Trainer: don't use batch 2026-03-14</td></tr>
+      <tr><td>Claim</td><td>"This incident is mine."</td><td>Inspector claims incident 42 (unit change in the feed)</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Which agents talk to which</h3>
+  <p>Select an agent to see every conversation it has. Thicker lines carry more kinds of messages. Any agent may also send its incident card to a person, which isn't drawn here.</p>
+  <div class="mapgrid">
+    <div class="figure" style="margin:0"><div id="map"></div></div>
+    <div class="card panel" id="mapPanel" aria-live="polite"></div>
+  </div>
+
+  <h3>One message format for everything</h3>
+<pre><code>{
+  "id": "msg-000187",
+  "time": "2026-11-03T10:42:11Z",
+  "type": "question",
+  "sender": "monitor",
+  "to": ["inspector"],
+  "topic": "feature:trip_distance",
+  "incident_id": "inc-042",
+  "reply_to": null,
+  "level": 1,
+  "confidence": 0.78,
+  "summary": "Estimated MAE up 18% since 06:00; drift concentrated on trip_distance",
+  "evidence": {"psi": 0.41, "shap_rank": 1, "window": "6h"},
+  "status": "open"
+}</code></pre>
+
+  <h3>How the board is built</h3>
+  <div class="cols">
+    <div class="card"><h4>Storage</h4><p>A single <code>messages</code> table in SQLite or Postgres. Agents poll it every few seconds for rows addressed to them. It's simple, easy to debug, and every row is already an experiment log entry. If polling becomes a bottleneck, move to Redis Streams with one consumer group per agent and the same schema.</p></div>
+    <div class="card"><h4>Topics</h4><p>Each message has a topic from the lineage map, such as <code>feature:trip_distance</code> or <code>model:v7</code>. <code>agents.yaml</code> lists what each agent follows, so agents talk directly and only receive what concerns them.</p></div>
+    <div class="card"><h4>Threads</h4><p><code>incident_id</code> and <code>reply_to</code> link messages into one conversation per incident.</p></div>
+    <div class="card"><h4>Timeouts</h4><p>An unanswered Question expires. The sender then decides with what it has and logs the missing answer, so nobody waits forever.</p></div>
+  </div>
+<pre><code>subscriptions:
+  builder:   ["pipeline:*"]
+  reviewer:  ["code:*", "feature:*"]
+  inspector: ["dataset:*", "feature:*", "type:question"]
+  trainer:   ["dataset:*", "model:*"]
+  deployer:  ["model:*", "deployment:*"]
+  monitor:   ["feature:*", "model:*", "expected_change:*"]</code></pre>
+
+  <h3>Who owns a problem, and how conflicts are settled</h3>
+  <div class="cols">
+    <div class="card"><h4>Ownership</h4><p>Agents ask questions upstream along the lineage map. The agent closest to the source with confirmed evidence posts a Claim. It owns the incident, tells the others what to do or not do, and writes the single card a person receives.</p></div>
+    <div class="card"><h4>Conflicts</h4><ul><li>Safety beats progress: hold beats promote, quarantine beats retrain.</li><li>Fixing the cause beats patching the symptom: fix the data rather than retrain on it.</li><li>A deadlock or disputed claim goes to a person.</li></ul></div>
+  </div>
+  <p>The incident card holds what happened, the root cause, the owner, actions already taken, the decision needed if any, and a link to the message thread.</p>
+</section>
+
+<!-- ================= CASES ================= -->
+<section id="cases">
+  <h2>Order of events, case by case</h2>
+  <p>Pick a case to see who talks to whom, in what order. Step through it, or click any step. Arrow colour shows the sender; the line style shows the message type.</p>
+  <ul class="legend" style="margin-bottom:4px">
+    <li><svg viewBox="0 0 34 14" aria-hidden="true"><line x1="2" y1="7" x2="32" y2="7" stroke="currentColor" stroke-width="1.6"/></svg>finding</li>
+    <li><svg viewBox="0 0 34 14" aria-hidden="true"><line x1="2" y1="7" x2="32" y2="7" stroke="currentColor" stroke-width="1.6" stroke-dasharray="6 4"/></svg>question</li>
+    <li><svg viewBox="0 0 34 14" aria-hidden="true"><line x1="2" y1="7" x2="32" y2="7" stroke="currentColor" stroke-width="1.8" stroke-dasharray="2 3"/></svg>answer</li>
+    <li><svg viewBox="0 0 34 14" aria-hidden="true"><line x1="2" y1="7" x2="32" y2="7" stroke="currentColor" stroke-width="3"/></svg>request, card or approval</li>
+    <li><svg viewBox="0 0 34 14" aria-hidden="true"><rect x="12" y="1" width="10" height="12" rx="2" fill="currentColor"/></svg>action by the agent</li>
+    <li><svg viewBox="0 0 34 14" aria-hidden="true"><rect x="12" y="2" width="9" height="9" transform="rotate(45 16.5 6.5)" fill="currentColor"/></svg>claims the incident</li>
+  </ul>
+  <div class="tabs" id="tabs" role="group" aria-label="Cases"></div>
+  <div class="case-head" id="caseHead"></div>
+  <div class="casegrid">
+    <div class="seqwrap">
+      <div id="seq"></div>
+      <div class="controls">
+        <button type="button" id="prev">Previous</button>
+        <button type="button" id="next">Next step</button>
+        <button type="button" id="all">Show all</button>
+        <span class="count" id="count"></span>
+      </div>
+    </div>
+    <ol class="steps" id="steps"></ol>
+  </div>
+</section>
+
+<!-- ================= WASTE ================= -->
+<section id="waste">
+  <h2>Avoiding wasted work</h2>
+  <p>If the Trainer validates a model and the Deployer rejects it, the training compute looks wasted. They check different things: the Trainer checks quality offline, the Deployer checks what only real traffic shows. To keep late rejections rare, the Deployer publishes a <b>release contract</b> once (for example p95 latency under 100 ms, memory under 1 GB, same input and output format as the serving API), and the Trainer runs those checks itself, cheapest first.</p>
+  <ol class="funnel">
+    <li style="--w:100%;--sc:var(--c-t)"><span class="who">Trainer</span>Input and output format match the serving API<span class="cost">seconds</span></li>
+    <li style="--w:94%;--sc:var(--c-t)"><span class="who">Trainer</span>Model size and memory under the limit<span class="cost">seconds</span></li>
+    <li style="--w:88%;--sc:var(--c-t)"><span class="who">Trainer</span>Latency benchmark on recorded traffic, in the sandbox<span class="cost">minutes</span></li>
+    <li style="--w:82%;--sc:var(--c-t)"><span class="who">Trainer</span>Quality overall and for every group<span class="cost">minutes</span></li>
+    <li style="--w:74%;--sc:var(--c-d)"><span class="who">Deployer</span>Shadow on real traffic<span class="cost">hours</span></li>
+    <li style="--w:66%;--sc:var(--c-d)"><span class="who">Deployer</span>Canary at 5%, then 25%<span class="cost">hours</span></li>
+    <li style="--w:58%;--sc:var(--c-h)"><span class="who">Human</span>Approve 100%<span class="cost">one decision</span></li>
+  </ol>
+  <p>A rejection that still happens at shadow or 5% is cheap, and far cheaper than a bad model reaching every user. The reason goes back to the Trainer and into memory, so the next candidate avoids it. The rejected model stays in the registry in case capacity is added later. The experiments count "candidates rejected by the Deployer" next to wasted retrains; that number should fall over time.</p>
+</section>
+
+<!-- ================= SHARED ================= -->
+<section id="shared">
+  <h2>Shared components</h2>
+  <h3>Lineage map</h3>
+  <p>A small graph that links code to features, features to datasets, datasets to model versions, and models to deployments. The Builder creates it; the Reviewer and Trainer update it. It is how a symptom in serving is traced back to a commit or a feed.</p>
+  <ol class="chain" aria-label="Lineage example">
+    <li><span class="n">commit abc123<small>code</small></span><span aria-hidden="true">›</span></li>
+    <li><span class="n">trip_distance<small>feature</small></span><span aria-hidden="true">›</span></li>
+    <li><span class="n">2026-03<small>dataset</small></span><span aria-hidden="true">›</span></li>
+    <li><span class="n">v9<small>model</small></span><span aria-hidden="true">›</span></li>
+    <li><span class="n">25% canary<small>deployment</small></span></li>
+  </ol>
+  <div class="cols">
+    <div class="card"><h4>Incident memory and fix selector</h4><p>A Chroma vector database. Each record holds the problem, evidence, agent, action, level, outcome and time to recover. To choose a fix: search similar past incidents, rank their fixes by success rate, let the LLM pick one or propose a new one, then store the outcome. Memory starts full of fault-injection runs where the right answer is known.</p></div>
+    <div class="card"><h4>Sandbox</h4><p>A second Docker Compose project, isolated from the real pipeline, that can replay recent batches and recorded traffic. Used for builds, feature-diff tests, repairs, training, traffic replay and confirmation replays.</p></div>
+  </div>
+</section>
+
+<!-- ================= EVALUATION ================= -->
+<section id="evaluation">
+  <h2>Evaluation</h2>
+  <p>Faults are injected on purpose, so the right answer is always known.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Layer</th><th>Faults</th></tr></thead>
+    <tbody>
+      <tr><td>Code</td><td>Unit change (accidental and intended), one-sided feature change, dependency bump, broken import</td></tr>
+      <tr><td>Data</td><td>Schema change, missing-value spike, unit change, late batch, duplicated rows</td></tr>
+      <tr><td>Model</td><td>Gradual and sudden drift, bad candidate, group-specific degradation</td></tr>
+      <tr><td>Runtime</td><td>Latency spike, traffic surge, memory leak</td></tr>
+    </tbody>
+  </table></div>
+  <div class="cols">
+    <div class="card"><h4>Systems compared on the same faults</h4><ul><li>Traditional pipeline: fixed thresholds, scheduled retraining, manual rollback</li><li>A single LLM agent with all the tools</li><li>Six agents plus a coordinator (ablation)</li><li>Six agents, no coordinator (this design)</li></ul></div>
+    <div class="card"><h4>Metrics</h4><ul><li>Detection rate, time to detect, time to recover</li><li>Human alerts per incident, root-cause accuracy</li><li>Wasted retrains, candidates rejected by the Deployer, compute cost</li><li>Unsafe actions (target zero), human interventions</li><li>LLM calls, cost and latency; Builder success rate on 5–10 repos</li></ul></div>
+  </div>
+  <h3>Fine-tuning</h3>
+  <p>Every LLM decision is logged next to the injected fault, so the correct decision is known. By weeks 8–9 that's a labelled dataset. A small local model is LoRA-tuned on one decision, such as the Inspector's repair-or-quarantine choice or the Reviewer's intent detection, and compared to the base LLM on accuracy, cost and speed.</p>
+</section>
+
+<!-- ================= BUILD ================= -->
+<section id="build">
+  <h2>Stack, team and timeline</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Need</th><th>Choice</th></tr></thead>
+    <tbody>
+      <tr><td>Dataset and model</td><td>NYC taxi trips replayed month by month; LightGBM regressor</td></tr>
+      <tr><td>Tracking and registry</td><td>MLflow</td></tr>
+      <tr><td>Data checks, drift, monitoring</td><td>Pandera; Evidently, NannyML, SHAP</td></tr>
+      <tr><td>Serving and metrics</td><td>FastAPI (current + candidate) behind a small Python router; Prometheus</td></tr>
+      <tr><td>Containers and CI</td><td>Docker Compose (no Kubernetes); GitHub Actions</td></tr>
+      <tr><td>Board and memory</td><td>SQLite or Postgres table; Chroma</td></tr>
+      <tr><td>LLM</td><td>One model for all agents, local (Ollama) vs API compared as an experiment</td></tr>
+      <tr><td>Agent code</td><td>One shared Python base class: observe, analyze, reason, act</td></tr>
+    </tbody>
+  </table></div>
+  <div class="tbl"><table>
+    <thead><tr><th>Person</th><th>Agents</th><th>Shared piece</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>Builder + Reviewer</td><td>Lineage map</td></tr>
+      <tr><td>2</td><td>Inspector</td><td>Fault injection library</td></tr>
+      <tr><td>3</td><td>Trainer</td><td>Incident memory</td></tr>
+      <tr><td>4</td><td>Deployer</td><td>Sandbox</td></tr>
+      <tr><td>5</td><td>Monitor</td><td>Message board and experiment logging</td></tr>
+    </tbody>
+  </table></div>
+  <div class="tbl"><table>
+    <thead><tr><th>Weeks</th><th>Phase</th><th>Goal</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>Empathize, Define</td><td>Pain points, scope, success metrics</td></tr>
+      <tr><td>2</td><td>Ideate, Prototype</td><td>Baseline pipeline; shared base class, board, memory</td></tr>
+      <tr><td>3–5</td><td>Prototype</td><td>Each agent works alone through the full loop</td></tr>
+      <tr><td>6–7</td><td>Prototype, Test</td><td>Agents communicate; sandbox and fault injection working</td></tr>
+      <tr><td>8–9</td><td>Test</td><td>Experiments against baselines; fine-tuning test</td></tr>
+      <tr><td>10</td><td>Implement</td><td>Results, report, demo</td></tr>
+    </tbody>
+  </table></div>
+  <h3>Limits and open questions</h3>
+  <ul>
+    <li>The Builder handles Python ML projects only and relies on templates.</li>
+    <li>Faults are injected, not real, so results cover known failure types.</li>
+    <li>LLM decisions can vary between runs; fixed JSON, action menus and logging reduce this but don't remove it.</li>
+    <li>Still open: local vs API LLM, the Trainer's gain threshold, the Deployer's hard limits, and the Question timeout.</li>
+  </ul>
+</section>
+</main>
+</div>
+
+<script>
+const AG = {
+  B:{n:'Builder',v:'--c-b'}, R:{n:'Reviewer',v:'--c-r'}, I:{n:'Inspector',v:'--c-i'},
+  T:{n:'Trainer',v:'--c-t'}, D:{n:'Deployer',v:'--c-d'}, M:{n:'Monitor',v:'--c-m'}, H:{n:'Human',v:'--c-h'}
+};
+const ORDER = ['B','R','I','T','D','M','H'];
+const KIND = {
+  finding:{l:'Finding',dash:'',w:1.6}, question:{l:'Question',dash:'6 4',w:1.6},
+  reply:{l:'Answer',dash:'2 3',w:1.8}, request:{l:'Request',dash:'',w:3},
+  card:{l:'Incident card',dash:'',w:3}, approval:{l:'Approval',dash:'',w:3},
+  action:{l:'Action'}, claim:{l:'Claim'}
+};
+const col = k => `var(${AG[k].v})`;
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+/* ---------- Scenarios ---------- */
+const CASES = [
+ {tab:'First setup', title:'The Builder sets up the pipeline from scratch',
+  trigger:'A repository with ML code and no pipeline files.',
+  result:'A working pipeline with no human help, and every agent knows where to watch.',
+  why:'Nothing is watched until the files pass in the sandbox. Agents are told where to look only once the pipeline actually works.',
+  steps:[
+   {f:'B',k:'action',x:'Scans the repo: framework, entry points, dependencies, data paths.'},
+   {f:'B',k:'action',x:'The LLM fills the templates: Makefile, Dockerfile, compose, CI workflow, schema, agents.yaml.',lvl:1},
+   {f:'B',k:'action',x:'Runs make all in a throwaway sandbox container.',lvl:1},
+   {f:'B',k:'action',x:'Build fails on a missing system library. Memory has a matching fix; it applies it and retries (max 3).',lvl:2},
+   {f:'B',k:'action',x:'Every stage passes, so it commits the files (allowed for the first setup only).'},
+   {f:'B',t:'R',k:'finding',x:'Pipeline ready. Lineage map created: which code feeds which features.'},
+   {f:'B',t:'I',k:'finding',x:'Data comes in here. First schema attached.'},
+   {f:'B',t:'T',k:'finding',x:'Training command and model registry location.'},
+   {f:'B',t:'D',k:'finding',x:'Serving containers and router endpoints.'},
+   {f:'B',t:'M',k:'finding',x:'Where predictions are logged.'},
+   {f:'B',k:'action',x:'Saves the error and the fix that worked to memory.'}
+  ]},
+ {tab:'Accidental code change', title:'A developer switches distance to meters by mistake',
+  trigger:'A pull request changes how trip_distance is computed.',
+  result:'The bug never reaches training. No other agent is disturbed.',
+  why:'The cheapest place to catch a feature bug is before merge, so the Reviewer handles it alone.',
+  steps:[
+   {f:'R',k:'action',x:'New PR. Risk score is high: it touches feature code.'},
+   {f:'R',k:'action',x:'Feature-diff test in the sandbox: trip_distance values are 1000× larger.',lvl:1},
+   {f:'R',k:'action',x:'LLM finds no sign of intent: no tag, schema unchanged. Merge is blocked.',lvl:1},
+   {f:'R',t:'H',k:'question',x:'Distance values are now 1000× larger. Was this intended?'},
+   {f:'H',t:'R',k:'reply',x:'No, that was a mistake.'},
+   {f:'R',k:'action',x:'Keeps the block and saves "unit change without intent" to memory.'}
+  ]},
+ {tab:'Intended code change', title:'A developer switches distance to meters on purpose',
+  trigger:'The same diff, but the PR carries an intent tag and updates the schema.',
+  result:'Code and model change together; no false alarms; a person approves the final switch.',
+  why:'Schema and Monitor baseline are updated first so the change doesn\'t look like an incident. The release waits for the retrained model, because the old model only understands kilometers.',
+  steps:[
+   {f:'R',k:'action',x:'Feature-diff test: distance ×1000.',lvl:1},
+   {f:'R',k:'action',x:'LLM finds intent: PR tag, schema updated, training and serving changed the same way.'},
+   {f:'R',t:'I',k:'request',x:'Update the schema: distance is now in meters.'},
+   {f:'R',t:'M',k:'finding',x:'Expected change: distance ×1000 from commit abc123.'},
+   {f:'R',t:'T',k:'request',x:'Retrain on the new unit.'},
+   {f:'R',t:'D',k:'request',x:'Release the new code and the new model together as a pinned pair.'},
+   {f:'I',k:'action',x:'Updates its schema and normal ranges (tested in the sandbox).',lvl:2},
+   {f:'M',k:'action',x:'Marks the drift as expected and resets its baseline.',lvl:1},
+   {f:'T',k:'action',x:'Retrains on meters in the sandbox; better or equal for every group.',lvl:2},
+   {f:'T',t:'D',k:'request',x:'Candidate v8 ready, paired with commit abc123.'},
+   {f:'D',k:'action',x:'Shadow, then 5%, then 25%, code and model always together.',lvl:2},
+   {f:'D',t:'H',k:'card',x:'Migration ready. Approve 100%?'},
+   {f:'H',t:'D',k:'approval',x:'Approved.'},
+   {f:'D',k:'action',x:'Switches to 100%.',lvl:3}
+  ]},
+ {tab:'Broken data feed', title:'Prices start arriving in cents instead of dollars',
+  trigger:'The Monitor sees estimated accuracy drop; no labels yet.',
+  result:'One card for a person instead of several alerts, and no retraining on broken data.',
+  why:'The rollout is held first because holding is cheap and safe while the cause is unknown. Questions go upstream in parallel. The agent closest to the source claims the incident and stops the others from patching the symptom.',
+  steps:[
+   {f:'M',k:'action',x:'Estimated accuracy down 12%; drift concentrated on fare_amount.'},
+   {f:'M',t:'D',k:'request',x:'Hold any rollout while this is investigated.'},
+   {f:'M',t:'I',k:'question',x:'Did fare_amount change in the last 6 hours?'},
+   {f:'M',t:'R',k:'question',x:'Did any commit touch fare_amount recently?'},
+   {f:'R',t:'M',k:'reply',x:'No recent commit touches fare_amount.'},
+   {f:'I',k:'action',x:'Median fare is 100× higher; memory matches "cents instead of dollars".'},
+   {f:'I',t:'M',k:'reply',x:'Yes: fares arrive in cents since 06:00.'},
+   {f:'I',k:'claim',x:'Claims incident 42: the cause is in the data feed.'},
+   {f:'I',k:'action',x:'Quarantines the batch, tests the ÷100 repair on a copy, applies it.',lvl:2},
+   {f:'I',t:'T',k:'request',x:'Do not train on batch 2026-03-14.'},
+   {f:'I',t:'H',k:'card',x:'Cause, fix applied, result. No decision needed.'},
+   {f:'M',k:'action',x:'Verifies the accuracy estimate is back to normal; incident closed.'}
+  ]},
+ {tab:'Real drift', title:'The world changes and the model needs retraining',
+  trigger:'The Monitor confirms a real drop and the data is clean.',
+  result:'A better model rolled out step by step, with a person approving 100%.',
+  why:'The data is checked before retraining, so the Trainer never learns from broken data. Each rollout step waits for the previous one to pass.',
+  steps:[
+   {f:'M',k:'action',x:'Estimated accuracy down 7%; replay in the sandbox confirms it.',lvl:1},
+   {f:'M',t:'I',k:'question',x:'Is the incoming data clean?'},
+   {f:'I',t:'M',k:'reply',x:'Clean. Checks pass. The shift is real: new airport routes.'},
+   {f:'M',k:'claim',x:'Claims the incident: a changed world, not bad data.'},
+   {f:'M',t:'T',k:'request',x:'Consider retraining.'},
+   {f:'T',k:'action',x:'Gain predictor: about +5% expected; cost acceptable.'},
+   {f:'T',t:'I',k:'request',x:'Send the last 3 clean months.'},
+   {f:'I',t:'T',k:'reply',x:'Clean window ready.'},
+   {f:'T',k:'action',x:'Retrains in the sandbox; passes the release contract and every group check.',lvl:2},
+   {f:'T',t:'D',k:'request',x:'Candidate v9 ready, evaluation attached.'},
+   {f:'D',k:'action',x:'Shadow on real traffic, then 5%.',lvl:2},
+   {f:'D',t:'M',k:'finding',x:'v9 is at 5%. Watch it separately.'},
+   {f:'D',k:'action',x:'Canary passes; moves to 25%.',lvl:2},
+   {f:'D',t:'H',k:'card',x:'v9 is better on all checks. Approve 100%?'},
+   {f:'H',t:'D',k:'approval',x:'Approved.'},
+   {f:'D',k:'action',x:'Switches to 100%.',lvl:3},
+   {f:'M',k:'action',x:'Verifies the recovery; memory saves "this retrain paid off".'}
+  ]},
+ {tab:'Retrain not worth it', title:'Drift on features that barely matter',
+  trigger:'The Monitor requests a retrain after moderate drift.',
+  result:'No compute wasted, and no one paged.',
+  why:'The Trainer checks value before spending compute, and tells the Monitor why it refused.',
+  steps:[
+   {f:'M',k:'action',x:'Drift on three low-importance features; estimated accuracy down 1.5%.'},
+   {f:'M',t:'T',k:'request',x:'Consider retraining.'},
+   {f:'T',k:'action',x:'Gain predictor: +0.3% expected. Similar past retrains gained under 0.5%.'},
+   {f:'T',t:'M',k:'reply',x:'Refused: expected gain is below the threshold.'},
+   {f:'M',k:'action',x:'Keeps watching; asks again only if the drop passes 3%.'}
+  ]},
+ {tab:'Bad candidate', title:'A new model is better on average but worse for one group',
+  trigger:'The Trainer finishes a retrain.',
+  result:'The Deployer never sees the bad model.',
+  why:'Per-group checks happen before handoff, and the fix is to get better data rather than force the model through.',
+  steps:[
+   {f:'T',k:'action',x:'Retrains in the sandbox; overall error improves by 4%.',lvl:2},
+   {f:'T',k:'action',x:'Per-group check: airport trips are 9% worse.'},
+   {f:'T',k:'action',x:'LLM blocks the candidate: better on average isn\'t enough.'},
+   {f:'T',t:'I',k:'request',x:'Send a window with more airport trips.'},
+   {f:'I',t:'T',k:'reply',x:'Window ready with more airport trips.'},
+   {f:'T',k:'action',x:'Retrains with reweighting; every group is now better.',lvl:2},
+   {f:'T',t:'D',k:'request',x:'Candidate ready.'}
+  ]},
+ {tab:'Deployer rejects', title:'A candidate is too slow under real traffic',
+  trigger:'A candidate that passed every offline check reaches shadow.',
+  result:'The rejection costs only shadow time, and the next candidate avoids the problem.',
+  why:'Some problems only show under real traffic. Rejecting at shadow is the cheapest point where they can be seen.',
+  steps:[
+   {f:'T',k:'action',x:'Passes quality and the release contract in the sandbox (p95 80 ms).',lvl:2},
+   {f:'T',t:'D',k:'request',x:'Candidate v10 ready.'},
+   {f:'D',k:'action',x:'In shadow on real traffic, p95 reaches 140 ms at peak.',lvl:1},
+   {f:'D',k:'action',x:'LLM rejects: holds at shadow; current model keeps all traffic.',lvl:1},
+   {f:'D',t:'T',k:'finding',x:'v10 rejected: p95 140 ms, above the 100 ms limit, under real traffic.'},
+   {f:'T',k:'action',x:'Updates its latency benchmark with recorded traffic; next candidate uses a smaller model.'}
+  ]},
+ {tab:'Traffic spike', title:'A traffic peak arrives during a canary',
+  trigger:'The Deployer\'s forecast predicts three times the usual traffic.',
+  result:'Fast recovery without waiting for a person, then one card explaining what happened.',
+  why:'Scaling is tested first. Rollback needs no approval because it restores a version a person already approved.',
+  steps:[
+   {f:'D',k:'action',x:'Forecast: a 3× peak in 30 minutes.'},
+   {f:'D',k:'action',x:'Scales up replicas after a traffic replay in the sandbox.',lvl:2},
+   {f:'D',k:'action',x:'During the peak, the canary\'s error rate crosses the hard limit.'},
+   {f:'D',k:'action',x:'Emergency rollback to the approved version.',lvl:1},
+   {f:'D',t:'M',k:'finding',x:'Rolled back. Watch the current version.'},
+   {f:'D',t:'T',k:'finding',x:'The candidate failed under load.'},
+   {f:'D',t:'H',k:'card',x:'What happened, rollback done, no decision needed.'}
+  ]}
+];
+
+let curCase = 0, cur = -1;
+
+function badge(x,y,n){
+  return `<circle class="bdg" cx="${x}" cy="${y}" r="10"/><text class="bdg-t" x="${x}" y="${y}">${n}</text>`;
+}
+function renderSeq(s){
+  const lanes = ORDER.filter(k => s.steps.some(st => st.f===k || st.t===k));
+  const W=560, m=48, n=lanes.length;
+  const gap = n>1 ? (W-2*m)/(n-1) : 0;
+  const X = k => n>1 ? m + lanes.indexOf(k)*gap : W/2;
+  const rowH=38, y0=58, H=y0 + s.steps.length*rowH + 12;
+  const bw = n>1 ? Math.min(gap-6, 104) : 120;
+  let o = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Message order: ${esc(s.title)}">`;
+  s.steps.forEach((st,i)=>{ o += `<rect class="band" data-i="${i}" x="6" y="${y0+i*rowH+2}" width="${W-12}" height="${rowH-4}" rx="6"/>`; });
+  lanes.forEach(k=>{
+    const x=X(k);
+    o += `<line class="life" x1="${x}" y1="40" x2="${x}" y2="${H-6}"/>`;
+    o += `<rect x="${x-bw/2}" y="8" width="${bw}" height="30" rx="7" style="fill:var(--surface);stroke:${col(k)}" stroke-width="1.6"/>`;
+    o += `<text class="lane-t" x="${x}" y="23" style="fill:${col(k)}">${AG[k].n}</text>`;
+  });
+  s.steps.forEach((st,i)=>{
+    const y = y0 + i*rowH + rowH/2, c = col(st.f);
+    let g = `<g class="st" data-i="${i}" style="--sc:${c}">`;
+    if (st.k==='action' || st.k==='claim'){
+      const x = X(st.f);
+      g += st.k==='claim'
+        ? `<rect x="${x-7}" y="${y-7}" width="14" height="14" transform="rotate(45 ${x} ${y})" style="fill:${c}"/>`
+        : `<rect x="${x-6}" y="${y-9}" width="12" height="18" rx="3" style="fill:${c}"/>`;
+      const last = lanes.indexOf(st.f)===n-1 && n>1;
+      g += badge(last ? x-24 : x+24, y, i+1);
+    } else {
+      const x1=X(st.f), x2=X(st.t), d = x2>x1 ? 1 : -1, kd = KIND[st.k];
+      const tip = x2 - d*3;
+      g += `<line x1="${x1}" y1="${y}" x2="${tip-d*8}" y2="${y}" style="stroke:${c}" stroke-width="${kd.w}"${kd.dash?` stroke-dasharray="${kd.dash}"`:''}/>`;
+      g += `<polygon points="${tip},${y} ${tip-d*10},${y-5} ${tip-d*10},${y+5}" style="fill:${c}"/>`;
+      g += badge((x1+x2)/2, y, i+1);
+    }
+    o += g + '</g>';
+  });
+  return o + '</svg>';
+}
+function renderSteps(s){
+  return s.steps.map((st,i)=>{
+    const who = st.t ? `${AG[st.f].n} → ${AG[st.t].n}` : AG[st.f].n;
+    const lvl = st.lvl ? `<span class="lvl">Level ${st.lvl}</span>` : '';
+    return `<li data-i="${i}"><button type="button" class="step-btn" data-i="${i}"><span class="num" style="--sc:${col(st.f)}">${i+1}</span><span><span class="step-head"><strong>${who}</strong><span class="kind">${KIND[st.k].l}</span>${lvl}</span><span class="step-x">${esc(st.x)}</span></span></button></li>`;
+  }).join('');
+}
+function renderHead(s){
+  return `<h3>${esc(s.title)}</h3><dl><dt>Starts when</dt><dd>${esc(s.trigger)}</dd><dt>Result</dt><dd>${esc(s.result)}</dd><dt>Why this order</dt><dd>${esc(s.why)}</dd></dl>`;
+}
+function applyState(scroll){
+  const s = CASES[curCase], n = s.steps.length;
+  document.querySelectorAll('#seq .st').forEach(g=>{
+    const i = +g.dataset.i; g.classList.toggle('cur', i===cur); g.classList.toggle('dim', cur>=0 && i>cur);
+  });
+  document.querySelectorAll('#seq .band').forEach(b=> b.classList.toggle('cur', +b.dataset.i===cur));
+  document.querySelectorAll('#steps li').forEach(li=>{
+    const i = +li.dataset.i; li.classList.toggle('cur', i===cur); li.classList.toggle('dim', cur>=0 && i>cur);
+  });
+  document.getElementById('count').textContent = cur<0 ? `All ${n} steps` : `Step ${cur+1} of ${n}`;
+  document.getElementById('prev').disabled = cur<=0;
+  document.getElementById('next').disabled = cur>=n-1;
+  if (scroll && cur>=0){
+    const li = document.querySelector(`#steps li[data-i="${cur}"]`);
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (li) li.scrollIntoView({block:'nearest', behavior: reduce ? 'auto' : 'smooth'});
+  }
+}
+function selectCase(i){
+  curCase = i; cur = -1;
+  const s = CASES[i];
+  document.querySelectorAll('#tabs button').forEach((b,j)=> b.setAttribute('aria-pressed', String(j===i)));
+  document.getElementById('caseHead').innerHTML = renderHead(s);
+  document.getElementById('seq').innerHTML = renderSeq(s);
+  document.getElementById('steps').innerHTML = renderSteps(s);
+  applyState(false);
+}
+document.getElementById('tabs').innerHTML = CASES.map((c,i)=>`<button type="button" data-c="${i}" aria-pressed="false">${esc(c.tab)}</button>`).join('');
+document.getElementById('tabs').addEventListener('click', e=>{ const b=e.target.closest('button'); if (b) selectCase(+b.dataset.c); });
+document.getElementById('steps').addEventListener('click', e=>{ const b=e.target.closest('.step-btn'); if (b){ cur = +b.dataset.i; applyState(false); } });
+document.getElementById('next').addEventListener('click', ()=>{ cur = Math.min(cur+1, CASES[curCase].steps.length-1); applyState(true); });
+document.getElementById('prev').addEventListener('click', ()=>{ cur = Math.max(cur-1, 0); applyState(true); });
+document.getElementById('all').addEventListener('click', ()=>{ cur = -1; applyState(false); });
+selectCase(0);
+
+/* ---------- Communication map ---------- */
+const MSGS = [
+  {f:'B',t:'R',k:'finding',x:'Pipeline ready; lineage map created.'},
+  {f:'B',t:'I',k:'finding',x:'Data comes in here; first schema attached.'},
+  {f:'B',t:'T',k:'finding',x:'Training command and model registry.'},
+  {f:'B',t:'D',k:'finding',x:'Serving containers and router.'},
+  {f:'B',t:'M',k:'finding',x:'Where predictions are logged.'},
+  {f:'R',t:'B',k:'request',x:'Project structure changed: regenerate pipeline files.'},
+  {f:'R',t:'I',k:'request',x:'Update the schema: distance is now in meters.'},
+  {f:'R',t:'M',k:'finding',x:'Expected change: distance ×1000 from commit abc123.'},
+  {f:'R',t:'T',k:'request',x:'Retrain on the new unit.'},
+  {f:'R',t:'D',k:'request',x:'Release new code and new model together.'},
+  {f:'M',t:'R',k:'question',x:'Which commit last touched trip_distance?'},
+  {f:'R',t:'M',k:'reply',x:'Commit abc123, merged 2 hours ago.'},
+  {f:'M',t:'I',k:'question',x:'Did fare_amount change in the last 6 hours?'},
+  {f:'I',t:'M',k:'reply',x:'Yes: fares arrive in cents since 06:00.'},
+  {f:'M',t:'T',k:'request',x:'Estimated accuracy down 7%: consider retraining.'},
+  {f:'T',t:'M',k:'reply',x:'Refused: expected gain 0.3%, below threshold.'},
+  {f:'M',t:'D',k:'request',x:'Hold the rollout while incident 42 is open.'},
+  {f:'I',t:'T',k:'request',x:'Do not train on batch 2026-03-14.'},
+  {f:'T',t:'I',k:'request',x:'Send the last 3 clean months.'},
+  {f:'I',t:'D',k:'request',x:'Hold: incoming data is quarantined.'},
+  {f:'T',t:'D',k:'request',x:'Candidate v9 ready, evaluation attached.'},
+  {f:'D',t:'T',k:'finding',x:'v10 rejected: p95 140 ms under real traffic.'},
+  {f:'D',t:'M',k:'finding',x:'v9 is at 5% traffic; watch it separately.'}
+];
+const MAPKEYS = ['B','R','I','T','D','M'];
+let mapSel = 'M';
+function renderMap(){
+  const cx=300, cy=222, Rr=162, r=50, pos={};
+  MAPKEYS.forEach((k,i)=>{ const a = -Math.PI/2 + i*Math.PI/3; pos[k]=[cx+Rr*Math.cos(a), cy+Rr*Math.sin(a)]; });
+  const pairs = {};
+  MSGS.forEach(mm=>{ const key=[mm.f,mm.t].sort().join(''); (pairs[key]=pairs[key]||[]).push(mm); });
+  let o = `<svg viewBox="0 0 600 444" role="img" aria-label="Which agents talk to which">`;
+  Object.entries(pairs).forEach(([key,list])=>{
+    const a=key[0], b=key[1], [x1,y1]=pos[a], [x2,y2]=pos[b];
+    const dx=x2-x1, dy=y2-y1, d=Math.hypot(dx,dy), ux=dx/d, uy=dy/d;
+    const on = a===mapSel || b===mapSel;
+    const w = on ? 2 + list.length*0.9 : 1 + list.length*0.5;
+    o += `<line class="edge ${on?'on':'off'}" x1="${(x1+ux*r).toFixed(1)}" y1="${(y1+uy*r).toFixed(1)}" x2="${(x2-ux*r).toFixed(1)}" y2="${(y2-uy*r).toFixed(1)}" stroke-width="${w.toFixed(1)}"${on?` style="stroke:var(${AG[mapSel].v})"`:''}/>`;
+  });
+  MAPKEYS.forEach(k=>{
+    const [x,y]=pos[k], act = k===mapSel;
+    o += `<g class="mnode${act?' active':''}" data-k="${k}" tabindex="0" role="button" aria-pressed="${act}" aria-label="${AG[k].n}" style="--sc:var(${AG[k].v})"><circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}"/><text x="${x.toFixed(1)}" y="${y.toFixed(1)}">${AG[k].n}</text></g>`;
+  });
+  document.getElementById('map').innerHTML = o + '</svg>';
+  const sends = MSGS.filter(mm=>mm.f===mapSel), gets = MSGS.filter(mm=>mm.t===mapSel);
+  const item = (mm, other) => `<li><span class="dir" style="color:var(${AG[other].v})">${other===mm.t ? 'to' : 'from'} ${AG[other].n}</span><span class="kind">${KIND[mm.k].l}</span><br>${esc(mm.x)}</li>`;
+  document.getElementById('mapPanel').innerHTML =
+    `<h4 style="color:var(${AG[mapSel].v})">${AG[mapSel].n}</h4>` +
+    `<p class="note">Sends ${sends.length}, receives ${gets.length} kinds of message.</p>` +
+    `<h4>Sends</h4><ul class="msglist">${sends.map(mm=>item(mm, mm.t)).join('') || '<li>Nothing</li>'}</ul>` +
+    `<h4>Receives</h4><ul class="msglist">${gets.map(mm=>item(mm, mm.f)).join('') || '<li>Nothing</li>'}</ul>`;
+}
+const mapEl = document.getElementById('map');
+mapEl.addEventListener('click', e=>{ const g=e.target.closest('.mnode'); if (g){ mapSel=g.dataset.k; renderMap(); focusNode(); } });
+mapEl.addEventListener('keydown', e=>{
+  const g=e.target.closest('.mnode'); if (!g) return;
+  if (e.key==='Enter' || e.key===' '){ e.preventDefault(); mapSel=g.dataset.k; renderMap(); focusNode(); }
+});
+function focusNode(){ const g=document.querySelector(`#map .mnode[data-k="${mapSel}"]`); if (g) g.focus(); }
+renderMap();
+
+/* ---------- Parallel timeline ---------- */
+function renderTimeline(){
+  const lanes=['B','R','I','T','D','M'], W=720, L=96, Rm=18, lh=46, top=16;
+  const H = top + lanes.length*lh + 34;
+  const tx = t => L + (W-L-Rm)*t/100, ly = k => top + lanes.indexOf(k)*lh + lh/2;
+  let o = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Agents run at the same time and message each other on events">`;
+  lanes.forEach(k=>{
+    const y=ly(k);
+    o += `<text class="tl-name" x="${L-12}" y="${y}" style="fill:var(${AG[k].v})">${AG[k].n}</text>`;
+    o += `<line x1="${L}" y1="${y}" x2="${W-Rm}" y2="${y}" style="stroke:var(${AG[k].v})" stroke-width="1.4"${k==='B'?' stroke-dasharray="3 5" opacity=".6"':''}/>`;
+  });
+  o += `<text class="tl-small" x="${tx(3)}" y="${ly('B')-10}">idle after setup</text>`;
+  const jobs=[{k:'T',a:6,b:56,l:'training v9 in the sandbox'},{k:'R',a:72,b:96,l:'feature-diff test'}];
+  jobs.forEach(j=>{
+    o += `<rect x="${tx(j.a)}" y="${ly(j.k)-9}" width="${tx(j.b)-tx(j.a)}" height="18" rx="4" style="fill:var(--surface);stroke:var(${AG[j.k].v})" stroke-dasharray="4 3"/>`;
+    o += `<text class="tl-small" x="${tx(j.a)+8}" y="${ly(j.k)}" dominant-baseline="central">${j.l}</text>`;
+  });
+  const llm=[{k:'D',a:14,b:20},{k:'M',a:28,b:34},{k:'I',a:37,b:44},{k:'M',a:46,b:50},{k:'T',a:58,b:63},{k:'R',a:64,b:69},{k:'D',a:66,b:71}];
+  llm.forEach(b=>{ o += `<rect x="${tx(b.a)}" y="${ly(b.k)-7}" width="${tx(b.b)-tx(b.a)}" height="14" rx="3" style="fill:var(${AG[b.k].v})"/>`; });
+  const msgs=[{f:'M',t:'D',at:33},{f:'M',t:'I',at:35},{f:'I',t:'M',at:44.5},{f:'T',t:'D',at:64}];
+  msgs.forEach(mm=>{
+    const x=tx(mm.at), y1=ly(mm.f), y2=ly(mm.t), d = y2>y1 ? 1 : -1, tip=y2 - d*8;
+    o += `<line x1="${x}" y1="${y1+d*8}" x2="${x}" y2="${tip-d*6}" style="stroke:var(${AG[mm.f].v})" stroke-width="1.6"/>`;
+    o += `<polygon points="${x},${tip} ${x-4},${tip-d*7} ${x+4},${tip-d*7}" style="fill:var(${AG[mm.f].v})"/>`;
+  });
+  const ay = top + lanes.length*lh + 16;
+  o += `<line x1="${L}" y1="${ay}" x2="${W-Rm-6}" y2="${ay}" stroke="var(--muted)" stroke-width="1"/><polygon points="${W-Rm},${ay} ${W-Rm-8},${ay-4} ${W-Rm-8},${ay+4}" fill="var(--muted)"/>`;
+  o += `<text class="tl-small" x="${L}" y="${ay+14}">time</text>`;
+  document.getElementById('timeline').innerHTML = o + '</svg>';
+}
+renderTimeline();
+</script>
+</body>
+</html>
