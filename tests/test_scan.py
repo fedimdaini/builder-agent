@@ -143,7 +143,8 @@ def test_summary_is_compact(fastapi_repo):
     s = scan_repo(fastapi_repo).summary()
     assert "fastapi app.main:app | port 8080 (env PORT)" in s
     assert "1 NOT PULLED (pointer files): data/train.parquet" in s
-    assert "UNDECLARED IMPORTS: opencv-python" in s
+    assert "UNDECLARED IMPORTS: opencv-python (pipeline code, 1 file)" in s
+    assert "seaborn (notebooks only, 1 file)" in s
     assert len(s) < 3000
 
 
@@ -228,4 +229,6 @@ def test_taxi_repo():
     assert [d.path for d in ctx.model_dirs] == ["models"]
     assert len(ctx.notebooks) == 2
     assert len(ctx.lfs.tracked_files) == 7
-    assert [t.distribution for t in ctx.undeclared_imports] == ["requests"]
+    [req] = ctx.undeclared_imports
+    assert req.distribution == "requests" and req.notebooks_only
+    assert "requests (notebooks only, 2 files)" in ctx.summary()

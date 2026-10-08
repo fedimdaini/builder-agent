@@ -44,6 +44,11 @@ class ThirdPartyImport(BaseModel):
     declared: bool                 # found in some dependency file
     files: list[str]               # where it is imported (.py and .ipynb)
 
+    @property
+    def notebooks_only(self) -> bool:
+        """Imported only from notebooks, never from pipeline code (.py)."""
+        return all(f.endswith(".ipynb") for f in self.files)
+
 
 class Framework(BaseModel):
     name: str                      # pip name

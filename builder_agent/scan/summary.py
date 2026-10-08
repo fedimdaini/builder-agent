@@ -55,7 +55,8 @@ def render_summary(ctx: RepoContext, n: int = 8) -> str:
         + _cap([t.distribution for t in ctx.third_party_imports], 2 * n))
     undeclared = ctx.undeclared_imports
     add("UNDECLARED IMPORTS: " + _cap(
-        [f"{t.distribution} (in {len(t.files)} file{'s' if len(t.files) > 1 else ''})" for t in undeclared], n))
+        [f"{t.distribution} ({'notebooks only' if t.notebooks_only else 'pipeline code'}, "
+         f"{len(t.files)} file{'s' if len(t.files) > 1 else ''})" for t in undeclared], n))
 
     add("ENTRY POINTS:" if ctx.entry_points else "ENTRY POINTS: none")
     for e in ctx.entry_points[:n]:
