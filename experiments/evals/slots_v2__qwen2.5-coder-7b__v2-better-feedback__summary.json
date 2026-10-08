@@ -1,0 +1,69 @@
+{
+  "label": "v2, better feedback",
+  "prompt_version": "slots_v2",
+  "model": "qwen2.5-coder:7b",
+  "runs": 5,
+  "seeds": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "reports": [
+    "slots_v2__qwen2.5-coder-7b__20261008T154828Z__seed1.json",
+    "slots_v2__qwen2.5-coder-7b__20261008T154855Z__seed2.json",
+    "slots_v2__qwen2.5-coder-7b__20261008T154920Z__seed3.json",
+    "slots_v2__qwen2.5-coder-7b__20261008T154944Z__seed4.json",
+    "slots_v2__qwen2.5-coder-7b__20261008T155008Z__seed5.json"
+  ],
+  "slots_correct": {
+    "mean": 9.0,
+    "std": 0.0,
+    "min": 9.0,
+    "max": 9.0
+  },
+  "slots_correct_lenient": {
+    "mean": 10.0,
+    "std": 0.0,
+    "min": 10.0,
+    "max": 10.0
+  },
+  "attempts": {
+    "mean": 2.0,
+    "std": 0.0,
+    "min": 2.0,
+    "max": 2.0
+  },
+  "total_tokens": {
+    "mean": 6047.0,
+    "std": 0.0,
+    "min": 6047.0,
+    "max": 6047.0
+  },
+  "llm_s": {
+    "mean": 8.096,
+    "std": 1.97,
+    "min": 7.18,
+    "max": 11.62
+  },
+  "valid_on_first_try": 0,
+  "valid_final": 5,
+  "end_to_end_ok": 5,
+  "end_to_end_run": 5,
+  "errors": 0,
+  "distinct_final_answers": 1,
+  "per_slot_correct": {
+    "target_column": 5,
+    "target_transform": 5,
+    "transform_inside_train_fn": 5,
+    "model_flavor": 5,
+    "model_input": 5,
+    "train.train_function": 5,
+    "train.train_file": 0,
+    "train.arg_map": 5,
+    "evaluate.eval_file": 0,
+    "evaluate.group_column": 5,
+    "data.data_step": 5
+  }
+}
