@@ -21,4 +21,5 @@ Full team architecture: docs/architecture.html
 - Dev repo: ../taxi-trip-regression (fork; its Dockerfile was removed on purpose)
 
 ## Current step
-Step 1: repo scanner (pure Python, no LLM). Output a RepoContext pydantic model.
+Step 1 done: repo scanner in builder_agent/scan (`python -m builder_agent.scan <repo>`), returns RepoContext + summary().
+Step 2: decide layer (RepoContext facts + contracts.yaml -> build plan, no LLM).
