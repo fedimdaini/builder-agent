@@ -1,0 +1,48 @@
+{
+  "id": "fault-006",
+  "name": "missing_healthchecks",
+  "title": "mlflow and flask-app have no healthcheck",
+  "found_by": {
+    "doc": "docs/reference-run-main.md",
+    "repo": "mlops-zoomcamp-project",
+    "commit": "e157717",
+    "date": "2026-10-08",
+    "how": "Seen during the reference run: docker compose ps shows no health for mlflow and flask-app; confirmed with docker inspect."
+  },
+  "stage": "health",
+  "command": "docker inspect mlops-zoomcamp-project-mlflow-1 mlops-zoomcamp-project-flask-app-1 --format '{{.Name}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}none (no healthcheck){{end}}'",
+  "exit_code": 0,
+  "error_signature": "health=none (no healthcheck)",
+  "error_tail": [
+    "/mlops-zoomcamp-project-mlflow-1 health=none (no healthcheck)",
+    "/mlops-zoomcamp-project-flask-app-1 health=none (no healthcheck)",
+    "flask-app\tUp 20 minutes",
+    "mlflow\tUp 20 minutes"
+  ],
+  "cause": {
+    "summary": "No healthcheck on two services that others call",
+    "details": [
+      "docker-compose.yaml: mlflow (line 329) and flask-app (line 374) define no healthcheck.",
+      "Nothing can wait for them with depends_on: condition: service_healthy; a crashed or still-starting MLflow server shows as Up. flask-app also doesn't depend on localstack, which it needs for /reload.",
+      "The API has no /health route either (GET /health -> 404), so a healthcheck for flask-app has to call GET / or a new route."
+    ]
+  },
+  "fix": {
+    "summary": "Add healthchecks to mlflow and flask-app",
+    "action": "mlflow: GET http://localhost:5000/health; flask-app: GET http://localhost:8000/ (or /health once the adapter adds it); then depends_on with condition: service_healthy.",
+    "level": 2
+  },
+  "static_check": {
+    "catchable_before_run": true,
+    "rule": "a long-running service (with ports, called by other services) has no healthcheck",
+    "evidence": [
+      "docker-compose.yaml:329 mlflow: (no healthcheck)",
+      "docker-compose.yaml:374 flask-app: (no healthcheck)"
+    ]
+  },
+  "reproduce": {
+    "how": "Start the stack and inspect the two containers' health.",
+    "command": "docker compose up -d mlflow flask-app && docker inspect <containers> --format '{{.State.Health}}'",
+    "note": "Not a crash: the gap shows up as no health status."
+  }
+}

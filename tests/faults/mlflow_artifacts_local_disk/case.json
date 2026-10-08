@@ -1,0 +1,58 @@
+{
+  "id": "fault-005",
+  "name": "mlflow_artifacts_local_disk",
+  "title": "MLflow artifacts land on the Airflow worker's local disk; other containers can't load the models",
+  "found_by": {
+    "doc": "docs/reference-run-main.md",
+    "repo": "mlops-zoomcamp-project",
+    "commit": "e157717",
+    "date": "2026-10-08",
+    "how": "Seen during the reference run (MLflow artifact folder empty), then shown by downloading the best run's model through the MLflow server from the flask-app container."
+  },
+  "stage": "serve",
+  "command": "docker compose exec -T flask-app python3 -c \"import mlflow; mlflow.set_tracking_uri('http://mlflow:5000'); mlflow.artifacts.download_artifacts('runs:/24ad3ef05ed74e95ad57df47e996a4cf/sklearn-gradient-boosting-regression', dst_path='/tmp/fault5')\"",
+  "exit_code": 1,
+  "error_signature": "No such file or directory: '/tmp/artifacts/1/",
+  "error_tail": [
+    "  File \"/usr/local/lib/python3.10/dist-packages/mlflow/store/artifact/local_artifact_repo.py\", line 85, in download_artifacts",
+    "    return super().download_artifacts(artifact_path, dst_path)",
+    "  File \"/usr/local/lib/python3.10/dist-packages/mlflow/store/artifact/artifact_repo.py\", line 284, in download_artifacts",
+    "    raise MlflowException(",
+    "mlflow.exceptions.MlflowException: The following failures occurred while downloading one or more artifacts from /tmp/artifacts/1/24ad3ef05ed74e95ad57df47e996a4cf/artifacts:",
+    "##### File sklearn-gradient-boosting-regression #####",
+    "[Errno 2] No such file or directory: '/tmp/artifacts/1/24ad3ef05ed74e95ad57df47e996a4cf/artifacts/sklearn-gradient-boosting-regression'",
+    "== airflow-worker: ls /tmp/artifacts/1/24ad3ef05ed74e95ad57df47e996a4cf/artifacts/",
+    "sklearn-gradient-boosting-regression",
+    "== mlflow server: ls -A /tmp/artifacts | wc -l",
+    "0"
+  ],
+  "cause": {
+    "summary": "The artifact root is a plain local path and the MLflow server doesn't serve artifacts",
+    "details": [
+      "mlflow/Dockerfile line 35 starts mlflow server with --default-artifact-root $MLFLOW_DEFAULT_ARTIFACT_ROOT, set to /tmp/artifacts (docker-compose.yaml line 337); no --serve-artifacts / --artifacts-destination.",
+      "With a plain local path, each MLflow client writes artifacts to its own filesystem: the Airflow worker writes to its /tmp/artifacts (host ./airflow/mlflow_artifacts, line 48), while the server's /tmp/artifacts (host ./mlflow/artifacts, line 353) stays empty.",
+      "Any other container (serving, evaluation) that loads a model by run URI fails. dag_03 works around it by copying the best model to S3 from the worker."
+    ],
+    "versions": {
+      "mlflow": "2.15.1"
+    }
+  },
+  "fix": {
+    "summary": "One shared artifact store, served by the MLflow server",
+    "action": "Start the server with --serve-artifacts and --artifacts-destination s3://mlflow-bucket/... (LocalStack, MLFLOW_S3_ENDPOINT_URL=http://localstack:4566) or a volume mounted only on the server, so clients get mlflow-artifacts:/ URIs.",
+    "level": 3
+  },
+  "static_check": {
+    "catchable_before_run": true,
+    "rule": "the MLflow server's artifact root is a plain local path (not a URI) and the server is not started with --serve-artifacts / --artifacts-destination, while other services log or load models",
+    "evidence": [
+      "mlflow/Dockerfile:35 --default-artifact-root $MLFLOW_DEFAULT_ARTIFACT_ROOT",
+      "docker-compose.yaml:337 MLFLOW_DEFAULT_ARTIFACT_ROOT=/tmp/artifacts"
+    ]
+  },
+  "reproduce": {
+    "how": "Run the pipeline (dag_01, dag_02), then load any run's model through MLflow from a container other than the Airflow worker.",
+    "command": "docker compose exec -T flask-app python3 -c \"import mlflow; mlflow.set_tracking_uri('http://mlflow:5000'); mlflow.artifacts.download_artifacts('runs:/<run_id>/<model_name>')\"",
+    "note": "Not visible in the project's own flow, because the API loads the model from S3."
+  }
+}

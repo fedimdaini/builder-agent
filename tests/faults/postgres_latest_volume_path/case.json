@@ -1,0 +1,63 @@
+{
+  "id": "fault-003",
+  "name": "postgres_latest_volume_path",
+  "title": "postgres:latest (18) refuses the /var/lib/postgresql/data volume mount",
+  "found_by": {
+    "doc": "docs/reference-run-main.md",
+    "repo": "mlops-zoomcamp-project",
+    "commit": "e157717",
+    "date": "2026-10-08",
+    "how": "Team guide setup fix, applied before the reference run. Reproduced afterwards in a throwaway container with a throwaway volume."
+  },
+  "stage": "compose-up",
+  "command": "docker run -d -e POSTGRES_USER=mlflow -e POSTGRES_PASSWORD=mlflow -e POSTGRES_DB=mlflow -v fault3-pgdata:/var/lib/postgresql/data postgres:latest",
+  "exit_code": 1,
+  "error_signature": "there appears to be PostgreSQL data in:",
+  "error_tail": [
+    "Error: in 18+, these Docker images are configured to store database data in a",
+    "       format which is compatible with \"pg_ctlcluster\" (specifically, using",
+    "       major-version-specific directory names).  This better reflects how",
+    "       PostgreSQL itself works, and how upgrades are to be performed.",
+    "       See also https://github.com/docker-library/postgres/pull/1259",
+    "       Counter to that, there appears to be PostgreSQL data in:",
+    "         /var/lib/postgresql/data (unused mount/volume)",
+    "       This is usually the result of upgrading the Docker image without",
+    "       upgrading the underlying database using \"pg_upgrade\" (which requires both",
+    "       versions).",
+    "       The suggested container configuration for 18+ is to place a single mount",
+    "       at /var/lib/postgresql which will then place PostgreSQL data in a",
+    "       subdirectory, allowing usage of \"pg_upgrade --link\" without mount point",
+    "       boundary issues."
+  ],
+  "cause": {
+    "summary": "postgres:latest moved to PostgreSQL 18, which expects the volume at /var/lib/postgresql",
+    "details": [
+      "docker-compose.yaml lines 309, 359 and 394 use image: postgres:latest, with volumes mounted at /var/lib/postgresql/data (lines 315, 365, 400).",
+      "postgres:latest resolved to PG_MAJOR=18; from 18 on the image keeps data in a version-specific subdirectory and exits 1 when a mount sits at /var/lib/postgresql/data.",
+      "postgresmlflow is one of them, so the MLflow server never starts."
+    ],
+    "versions": {
+      "broken": "postgres:latest = 18",
+      "working": "postgres:16"
+    }
+  },
+  "fix": {
+    "summary": "Pin the image to postgres:16",
+    "action": "Replace postgres:latest with postgres:16 (keeps the /var/lib/postgresql/data layout). Moving to 18 would also need the mount moved to /var/lib/postgresql.",
+    "level": 2
+  },
+  "static_check": {
+    "catchable_before_run": true,
+    "rule": "image tag is floating (latest, stable, or missing) instead of an explicit version; for postgres >= 18 also: volume mounted at /var/lib/postgresql/data",
+    "evidence": [
+      "docker-compose.yaml:309 image: postgres:latest",
+      "docker-compose.yaml:359 image: postgres:latest",
+      "docker-compose.yaml:394 image: postgres:latest"
+    ]
+  },
+  "reproduce": {
+    "how": "Start postgres:latest with a volume at /var/lib/postgresql/data; it exits 1.",
+    "command": "docker run --rm -e POSTGRES_PASSWORD=x -v pgdata:/var/lib/postgresql/data postgres:latest",
+    "note": "Depends on what :latest points to; on 2026-10-08 it was PostgreSQL 18."
+  }
+}

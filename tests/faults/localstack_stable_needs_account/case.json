@@ -1,0 +1,55 @@
+{
+  "id": "fault-002",
+  "name": "localstack_stable_needs_account",
+  "title": "localstack/localstack:stable now requires a LocalStack account and exits",
+  "found_by": {
+    "doc": "docs/reference-run-main.md",
+    "repo": "mlops-zoomcamp-project",
+    "commit": "e157717",
+    "date": "2026-10-08",
+    "how": "Team guide setup fix, applied before the reference run. Reproduced afterwards in a throwaway container (no ports, own name)."
+  },
+  "stage": "compose-up",
+  "command": "docker run -d --name fault2-localstack-stable localstack/localstack:stable",
+  "exit_code": 55,
+  "error_signature": "License activation failed!",
+  "error_tail": [
+    "LocalStack version: 2026.9.1",
+    "LocalStack build date: 2026-10-07",
+    "LocalStack build git hash: f6d6999e",
+    "Localstack returning with exit code 55. Reason: ",
+    "===============================================",
+    "License activation failed! 🔑❌",
+    "Reason: No credentials were found in the environment. Please set the LOCALSTACK_AUTH_TOKEN variable to a valid auth token. Alternatively, run `lstk login` and start LocalStack with the lstk CLI, which configures the credentials for you.",
+    "Due to this error, Localstack has quit. LocalStack pro features can only be used with a valid license."
+  ],
+  "cause": {
+    "summary": "The floating :stable tag moved to a LocalStack release that needs an auth token",
+    "details": [
+      "docker-compose.yaml line 263 uses image: localstack/localstack:stable.",
+      ":stable resolved to LocalStack 2026.9.1 (image built 2026-10-07), which requires LOCALSTACK_AUTH_TOKEN and exits with code 55 without it.",
+      "Every service that depends on localstack being healthy (mlflow, localstack_s3_client) never starts."
+    ],
+    "versions": {
+      "broken": "localstack/localstack:stable = 2026.9.1",
+      "working": "localstack/localstack:4.12"
+    }
+  },
+  "fix": {
+    "summary": "Pin the image to localstack/localstack:4.12",
+    "action": "Replace the floating :stable tag with the explicit version 4.12 (no account needed).",
+    "level": 2
+  },
+  "static_check": {
+    "catchable_before_run": true,
+    "rule": "image tag is floating (latest, stable, or missing) instead of an explicit version",
+    "evidence": [
+      "docker-compose.yaml:263 image: localstack/localstack:stable"
+    ]
+  },
+  "reproduce": {
+    "how": "Start the floating-tag image with no auth token; it exits 55 within a minute.",
+    "command": "docker run --rm localstack/localstack:stable",
+    "note": "Depends on what :stable points to on the day; the tail above is from 2026-10-08."
+  }
+}

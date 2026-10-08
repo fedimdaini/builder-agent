@@ -1,0 +1,50 @@
+{
+  "id": "fault-004",
+  "name": "crlf_init_script",
+  "title": "CRLF line endings break localstack_s3_client/init.sh, so the buckets are never created",
+  "found_by": {
+    "doc": "docs/reference-run-main.md",
+    "repo": "mlops-zoomcamp-project",
+    "commit": "e157717",
+    "date": "2026-10-08",
+    "how": "Team guide setup fix (clone with core.autocrlf=false), applied before the reference run. Reproduced afterwards: a copy of localstack_s3_client with init.sh converted to CRLF, run in the project's image, not attached to the project network. An LF copy run the same way printed no \\r errors."
+  },
+  "stage": "compose-up",
+  "command": "docker run --rm -v <copy of localstack_s3_client with CRLF init.sh>:/app mlops-zoomcamp-project-localstack_s3_client",
+  "exit_code": 255,
+  "error_signature": "$'\\r': command not found",
+  "error_tail": [
+    "/app/init.sh: line 2: $'\\r': command not found",
+    "Invalid endpoint: http://localstack:4566",
+    "Invalid endpoint: http://localstack:4566",
+    "/app/init.sh: line 5: $'\\r': command not found",
+    "Error parsing parameter '--assume-role-policy-document': Unable to load paramfile file://trust-policy.json: [Errno 2] No such file or directory: 'trust-policy.json\\r'",
+    "/app/init.sh: line 7: $'\\r': command not found",
+    "Could not connect to the endpoint URL: \"http://localstack:4566/\""
+  ],
+  "cause": {
+    "summary": "Git on Windows (core.autocrlf=true) checks out init.sh with CRLF; bash keeps the \\r",
+    "details": [
+      "The container runs /bin/bash /app/init.sh, mounted from the host checkout.",
+      "Every line ends in \\r: blank lines become the command $'\\r', the endpoint URL becomes 'http://localstack:4566\\r' (Invalid endpoint), file names become 'trust-policy.json\\r'.",
+      "The buckets and the IAM role are not created; the container still exits, and dag_01 later fails writing to S3."
+    ]
+  },
+  "fix": {
+    "summary": "Check out with LF: git clone -c core.autocrlf=false (or a .gitattributes rule *.sh text eol=lf)",
+    "action": "Keep shell scripts LF in the working tree; a repo-level .gitattributes makes it independent of each teammate's git settings.",
+    "level": 2
+  },
+  "static_check": {
+    "catchable_before_run": true,
+    "rule": "a .sh file (or a file run by bash in a container) contains CRLF line endings",
+    "evidence": [
+      "localstack_s3_client/init.sh (CRLF when cloned with core.autocrlf=true)"
+    ]
+  },
+  "reproduce": {
+    "how": "Convert init.sh to CRLF in a copy of localstack_s3_client and run the image on it.",
+    "command": "sed -i 's/$/\\r/' init.sh && docker run --rm -v $PWD:/app mlops-zoomcamp-project-localstack_s3_client",
+    "note": "Off the project network, so the last line is a connection error; on the network the \\r errors are the same."
+  }
+}

@@ -96,6 +96,14 @@
     "level": 2,
     "implemented_in": "builder_agent/render/configs.py: mlflow_client_spec()"
   },
+  "static_check": {
+    "catchable_before_run": true,
+    "rule": "a client package is installed unpinned (pip install mlflow) while the server it talks to is a pinned image (ghcr.io/mlflow/mlflow:v2.17.2)",
+    "evidence": [
+      "Dockerfile (rendered): pip install mlflow",
+      "compose.base.yml (rendered): image: ghcr.io/mlflow/mlflow:v2.17.2"
+    ]
+  },
   "reproduce": {
     "how": "Render the config files with an unpinned MLflow client install and run the sandbox; it fails at the train stage with the error_signature above.",
     "command": "python -m builder_agent.sandbox ../taxi-trip-regression --slots tests/gold/taxi_slots.json --expected tests/gold/taxi_expected.json --mlflow-client mlflow",

@@ -10,12 +10,16 @@ contract_version: 1
 
 # ---------------------------------------------------------------- project
 project:
-  main_repo: null            # set once the team picks the main project (must use NYC TLC monthly parquet data)
+  main_repo: mlops-zoomcamp-project   # github.com/jelambrar96-datatalks/mlops-zoomcamp-project (held-out test for the Builder)
   dev_repos: [taxi-trip-regression]   # Builder development only
   python_version: auto       # Builder picks it from the repo; set e.g. "3.11" to force one
 
 # ---------------------------------------------------------------- serving
 # The model runs as a small web service that answers prediction requests.
+# This API contract does not change for the main project. Its own API differs (batch
+# POST /predict {"data": [...]} -> {"predictions": [...], "result": ...}, no /health, POST /reload
+# to load the model; see docs/reference-run-main.md). The Builder bridges the difference with an
+# adapter that serves this contract and calls the project's /predict.
 serving:
   mode: auto                 # auto: use the repo's own API if it has one, otherwise the Builder generates one
   port: 8000                 # every agent calls the model on this port, whatever port the repo uses inside
@@ -63,7 +67,7 @@ paths:
   eval_report: reports/eval.json
   predictions_log: logs/predictions.jsonl
   mlflow_uri: http://mlflow:5000
-  mlflow_experiment: taxi-duration
+  mlflow_experiment: mlops-zoomcamp-experiment   # the main project's experiment (was taxi-duration)
   adapters_dir: pipeline     # Builder's adapter scripts in the target repo (train.py, evaluate.py, serve.py, data.py, sample_request.json)
 
 # Formats other agents read
