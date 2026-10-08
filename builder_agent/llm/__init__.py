@@ -10,6 +10,7 @@ reasons (the prompt's retry section). Every call is logged as one JSON line.
 from __future__ import annotations
 
 import json
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Protocol
@@ -57,6 +58,7 @@ class SlotFillResult(BaseModel):
     valid: bool
     answer: dict | None            # the last valid answer, else the last parsed one
     attempts: list[Attempt]
+    error: str | None = None       # a call failed for good (after the transport retry): the loop stopped
 
     @property
     def valid_on_first_try(self) -> bool:
@@ -91,8 +93,16 @@ def fill_slots(ctx: RepoContext, plan: BuildPlan, prompt: PromptFile, client: Ch
     attempts: list[Attempt] = []
     answer: dict | None = None
 
+    error = None
     for n in range(1, max_attempts + 1):
-        resp = client.chat(messages, schema=schema)
+        t0 = time.perf_counter()
+        try:
+            resp = client.chat(messages, schema=schema)
+        except Exception as e:  # noqa: BLE001 - log every failed call, then stop the loop
+            error = f"{type(e).__name__}: {e}"
+            _log(log_path, prompt, client, digest, ctx, n, messages, None, [], error=error,
+                 latency_s=round(time.perf_counter() - t0, 2))
+            break
         parsed, reasons = _parse(resp.content)
         if parsed is not None:
             answer = parsed
@@ -109,12 +119,13 @@ def fill_slots(ctx: RepoContext, plan: BuildPlan, prompt: PromptFile, client: Ch
                                    {"role": "user", "content": retry}]
 
     return SlotFillResult(prompt_version=prompt.version, prompt_sha256=prompt.sha256, model=client.model,
-                          model_digest=digest, valid=bool(attempts) and attempts[-1].valid,
-                          answer=answer, attempts=attempts)
+                          model_digest=digest, valid=error is None and bool(attempts) and attempts[-1].valid,
+                          answer=answer, attempts=attempts, error=error)
 
 
 def _log(log_path, prompt: PromptFile, client: ChatClient, digest: str, ctx: RepoContext, attempt: int,
-         messages: list[dict], resp: ChatResponse, reasons: list[str]) -> None:
+         messages: list[dict], resp: ChatResponse | None, reasons: list[str], error: str | None = None,
+         latency_s: float | None = None) -> None:
     if not log_path:
         return
     entry = {
@@ -128,11 +139,13 @@ def _log(log_path, prompt: PromptFile, client: ChatClient, digest: str, ctx: Rep
         "options": client.options,
         "attempt": attempt,
         "messages": messages,
-        "response": resp.content,
-        "latency_s": resp.latency_s,
-        "prompt_tokens": resp.prompt_tokens,
-        "output_tokens": resp.output_tokens,
-        "valid": not reasons,
+        "response": resp.content if resp else None,
+        "latency_s": resp.latency_s if resp else latency_s,
+        "prompt_tokens": resp.prompt_tokens if resp else None,
+        "output_tokens": resp.output_tokens if resp else None,
+        "transport_errors": resp.transport_errors if resp else [],
+        "error": error,                  # the call failed for good (no response)
+        "valid": error is None and not reasons,
         "reasons": reasons,
     }
     path = Path(log_path)

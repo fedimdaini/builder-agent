@@ -12,7 +12,7 @@ import sys
 from collections import defaultdict
 from pathlib import Path, PurePosixPath
 
-from . import code, deps, hints, layout, targets
+from . import code, deps, hints, layout, rows, targets
 from .known import FRAMEWORKS, IMPORT_TO_DIST
 from .models import (
     EntryPoint, Framework, Notebook, ParseError, PathReference, RepoContext, ThirdPartyImport,
@@ -175,6 +175,10 @@ def scan_repo(path: str | Path) -> RepoContext:
 
     # --- slot candidates: data columns, target, target transforms ---
     data_columns = layout.read_headers(root, files, data_dirs, {p.path for p in lfs.pointer_files})
+    samples = rows.sample_rows(root, [d.path for d in data_columns])
+    for d in data_columns:
+        d.n_rows = samples[d.path][0]
+    data_overlaps = rows.overlaps(samples)
     sigs: dict = {}
     for facts in module_facts:
         if facts.path not in test_files:
@@ -211,6 +215,7 @@ def scan_repo(path: str | Path) -> RepoContext:
         has_pytest_config=layout.has_pytest_config(root, files),
         parse_errors=errors,
         data_columns=data_columns,
+        data_overlaps=data_overlaps,
         target_candidates=target_candidates,
         target_transforms=target_transforms,
     )

@@ -158,6 +158,26 @@ def load_answer(path: str | Path) -> tuple[dict, dict[str, list]]:
 
 # --- validation ------------------------------------------------------------
 
+MAX_EVAL_OVERLAP = 0.01   # share of eval rows that may also be training rows
+
+
+def _applied(applied_to: list[str]) -> str:
+    """["trip_duration", "via target_col"] -> "trip_duration (via target_col)"."""
+    cols = [a for a in applied_to if not a.startswith("via ")]
+    via = [a[4:] for a in applied_to if a.startswith("via ")]
+    return (", ".join(cols) or "the target") + (f" (via {', '.join(via)})" if via else "")
+
+
+def _shared_fraction(ctx: RepoContext, eval_file: str, train_file: str) -> float:
+    """Estimated share of eval_file's rows that are also in train_file (0 if unknown)."""
+    for o in ctx.data_overlaps:
+        if (o.a, o.b) == (eval_file, train_file):
+            return o.a_in_b
+        if (o.a, o.b) == (train_file, eval_file):
+            return o.b_in_a
+    return 0.0
+
+
 def _pydantic_reasons(e: ValidationError) -> list[str]:
     return [f"{'.'.join(str(p) for p in err['loc']) or 'answer'}: {err['msg']}" for err in e.errors()]
 
@@ -194,6 +214,17 @@ def validate_slots(ctx: RepoContext, answer: dict | SlotAnswers) -> SlotValidati
         missing = [c for c in features if c not in files[s.evaluate.eval_file]]
         if missing:
             bad(f"{s.evaluate.eval_file} lacks training features: {', '.join(missing[:5])}")
+        shared = _shared_fraction(ctx, s.evaluate.eval_file, s.train.train_file)
+        if s.evaluate.eval_file == s.train.train_file or shared >= MAX_EVAL_OVERLAP:
+            clean = [f for f, cols in files.items()
+                     if f != s.train.train_file and s.target_column in cols
+                     and all(c in cols for c in features)
+                     and _shared_fraction(ctx, f, s.train.train_file) < MAX_EVAL_OVERLAP]
+            how = ("is the training file" if s.evaluate.eval_file == s.train.train_file else
+                   f"shares rows with train.train_file {s.train.train_file}: about {shared:.0%} of its rows "
+                   "are in the training file (estimated from row-hash samples)")
+            bad(f"evaluate.eval_file {s.evaluate.eval_file} {how}, so the metrics would be inflated. "
+                f"Files with no shared rows: {', '.join(clean) or 'none'}")
 
     # transform
     transform = next((t for t in ctx.target_transforms if t.forward == s.target_transform), None)
@@ -219,15 +250,25 @@ def validate_slots(ctx: RepoContext, answer: dict | SlotAnswers) -> SlotValidati
             f"(choices: {', '.join(cand['train_function']) or 'none'})")
     else:
         fn_file, sig = fn
+        fn_name = s.train.train_function.split(":")[-1]
         names, required = _params(sig)
-        unknown = [k for k in s.train.arg_map if k not in names]
+        arg_map = s.train.arg_map
+        swapped = any(k in ARG_TOKENS or k.startswith("$") for k in arg_map) or (
+            not any(k in names for k in arg_map) and any(v in names for v in arg_map.values()))
+        if swapped:
+            shape = ", ".join(f'"{p}": <token>' for p in (required or names))
+            bad(f"train.arg_map is the wrong way round: its KEYS must be {fn_name}'s parameter names "
+                f"({', '.join(names)}) and its VALUES tokens ({', '.join(ARG_TOKENS)}). You used "
+                f"{', '.join(arg_map)} as keys. Expected shape: {{{shape}}}")
+        unknown = [] if swapped else [k for k in arg_map if k not in names]
         if unknown:
-            bad(f"train.arg_map: {sig.render()} has no parameter {', '.join(unknown)}")
-        missing = [p for p in required if p not in s.train.arg_map]
+            bad(f"train.arg_map: {fn_name} has no parameter {', '.join(unknown)}; "
+                f"its parameters are {', '.join(names)}")
+        missing = [] if swapped else [p for p in required if p not in arg_map]
         if missing:
             bad(f"train.arg_map: required parameter(s) not mapped: {', '.join(missing)}")
         targets = set(cand["target_column"]) | {s.target_column}
-        for k, v in s.train.arg_map.items():
+        for k, v in ({} if swapped else arg_map).items():
             if not isinstance(v, str):
                 continue
             if v.startswith("$") and v not in ARG_TOKENS:
@@ -250,14 +291,23 @@ def validate_slots(ctx: RepoContext, answer: dict | SlotAnswers) -> SlotValidati
                 bad(f"{s.train.train_function} uses {sig.model_api} ({evidence}), whose predict() needs "
                     f"model_input {' or '.join(repr(i) for i in inputs)}, not {s.model_input!r}")
 
+        seen = (f"the scanner saw {transform.forward} applied to {_applied(transform.applied_to)} "
+                f"in {', '.join(transform.forward_files)}") if transform else ""
         if s.transform_inside_train_fn:
             if s.target_transform == "none":
                 bad("transform_inside_train_fn is true but target_transform is 'none'")
             elif transform and fn_file not in transform.forward_files:
-                bad(f"transform_inside_train_fn is true but {s.target_transform} is not applied in {fn_file}")
+                bad(f"transform_inside_train_fn is true, but {seen}, not in {fn_file} where {fn_name} is: "
+                    f"set it to false and map a parameter of {fn_name} to $y so the adapter applies it")
         elif s.target_transform != "none" and "$y" not in tokens:
-            bad(f"{s.target_transform} must be applied before training, but the function gets no $y "
-                "to apply it to (it would train on the raw target)")
+            if transform and fn_file in transform.forward_files:
+                bad(f"{s.target_transform} must be applied before training and {fn_name} gets no $y, but "
+                    f"{seen}, the file of {fn_name}: if {fn_name} applies it itself, "
+                    "set transform_inside_train_fn to true")
+            else:
+                bad(f"{s.target_transform} must be applied before training, but {fn_name} gets no $y to apply "
+                    f"it to ({seen or 'the transform was not found in the code'}; it would train on the raw "
+                    f"target): map a parameter of {fn_name} to $y, or set target_transform to 'none'")
 
     # data step
     if s.data.data_step != "existing" and s.data.data_step not in cand["data_step"]:

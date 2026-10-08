@@ -115,7 +115,7 @@ def test_mini_gold_validates(mini):
     ("evaluate.group_column", "zzz", "'zzz' is not in the header"),
     ("evaluate.group_column", "price", "can't be the target column"),
     ("data.data_step", "src.train_model:train", "must be 'existing' or a repo function"),
-    ("transform_inside_train_fn", False, "it would train on the raw target"),
+    ("transform_inside_train_fn", False, "if train applies it itself, set transform_inside_train_fn to true"),
     ("transform_inside_train_fn", "yes", "transform_inside_train_fn: Input should be a valid boolean"),
     ("surprise", 1, "surprise: Extra inputs are not permitted"),
 ])
@@ -134,7 +134,9 @@ def test_rejects_input_that_does_not_fit_flavor(mini):
 def test_rejects_transform_inside_a_function_that_does_not_apply_it(mini):
     answer = changed(MINI_GOLD, "train.train_function", "src.alt_train:train_alt")
     v = validate_slots(mini, answer)
-    assert any("log1p is not applied in src/alt_train.py" in r for r in v.reasons), v.reasons
+    assert any("saw log1p applied to the target (via target_col) in src/train_model.py, not in src/alt_train.py "
+               "where train_alt is: set it to false and map a parameter of train_alt to $y" in r
+               for r in v.reasons), v.reasons
 
 
 def test_rejects_inside_flag_without_transform(mini):

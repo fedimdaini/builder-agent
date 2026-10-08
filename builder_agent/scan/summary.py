@@ -39,6 +39,17 @@ def _slot_candidates(ctx: RepoContext, add, n: int) -> None:
     if not groups:
         add("COLUMNS: no CSV/TSV headers in data folders")
 
+    rels = []
+    for o in ctx.data_overlaps:
+        if o.b_in_a >= 0.95:
+            rels.append(f"{o.a} contains {o.b} ({o.shared_in_sample}/{o.b_sample} sampled rows)")
+        elif o.a_in_b >= 0.95:
+            rels.append(f"{o.b} contains {o.a} ({o.shared_in_sample}/{o.a_sample} sampled rows)")
+        else:
+            rels.append(f"{o.a} and {o.b} share rows ({o.shared_in_sample} sampled)")
+    if rels:
+        add("DATA OVERLAP: " + _cap(rels, n, "; "))
+
     if ctx.target_candidates:
         def fmt(c):
             kinds = sorted({e.split(":")[0] for e in c.evidence})

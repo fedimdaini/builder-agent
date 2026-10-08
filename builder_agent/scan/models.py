@@ -80,6 +80,18 @@ class DataColumns(BaseModel):
     path: str
     columns: list[str]             # header only (capped)
     n_columns: int
+    n_rows: int | None = None      # data rows (header excluded), counted while sampling
+
+
+class DataOverlap(BaseModel):
+    """Two data files share rows, estimated from consistent row-hash samples (see scan/rows.py)."""
+    a: str
+    b: str
+    shared_in_sample: int
+    a_sample: int
+    b_sample: int
+    a_in_b: float                  # share of a's sampled rows found in b (1.0: b contains a)
+    b_in_a: float                  # share of b's sampled rows found in a (1.0: a contains b)
 
 
 class TargetCandidate(BaseModel):
@@ -192,6 +204,7 @@ class RepoContext(BaseModel):
     data_columns: list[DataColumns] = Field(default_factory=list)   # CSV/TSV headers in data dirs
     target_candidates: list[TargetCandidate] = Field(default_factory=list)  # best first
     target_transforms: list[TargetTransform] = Field(default_factory=list)
+    data_overlaps: list[DataOverlap] = Field(default_factory=list)  # data files sharing rows
 
     existing_pipeline_files: list[str] = Field(default_factory=list)  # Dockerfile, Makefile, CI, ...
     test_files: list[str] = Field(default_factory=list)
