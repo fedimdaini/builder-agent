@@ -91,6 +91,9 @@ def test_candidates_come_from_scan(mini):
     assert cand["train_function"]["src.train_model:train"] == "train(train_path, target_col, rounds=10)"
     assert "src.make_data:build" in cand["data_step"]
     assert "src.train_model:train" not in cand["data_step"]   # has required parameters
+    assert cand["data_step"] == ["existing", "src.make_data:build"]   # only data/feature scripts
+    assert cand["model_input"] == ["dmatrix", "numpy", "dataframe"]   # flat list for the prompt
+    assert cand["group_column"] == ["a", "b", "flag"]                 # in every file with the target
 
 
 def test_mini_gold_validates(mini):

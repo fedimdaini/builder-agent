@@ -94,16 +94,32 @@ def slot_candidates(ctx: RepoContext) -> dict[str, Any]:
     ml = {f.name for f in ctx.frameworks if f.category == "ml"}
     flavors = [fl for fl, dist in FLAVOR_DIST.items() if dist in ml]
     funcs = _functions(ctx)
+    data_roles = {e.path for e in ctx.entry_points if e.role in ("data", "features")}
     return {
         "target_column": [c.column for c in ctx.target_candidates],
         "target_transform": ["none"] + [t.forward for t in ctx.target_transforms],
         "model_flavor": flavors,
-        "model_input": {fl: FLAVOR_INPUTS[fl] for fl in flavors},
+        # inputs valid for at least one detected flavor; the validator checks the pair
+        "model_input": list(dict.fromkeys(i for fl in flavors for i in FLAVOR_INPUTS[fl])),
         "train_function": {name: sig.render() for name, (_, sig) in funcs.items()},
         "data_files": {d.path: d.columns for d in ctx.data_columns},
+        "group_column": _group_columns(ctx),
         "arg_tokens": ARG_TOKENS,
-        "data_step": ["existing"] + [n for n, (_, s) in funcs.items() if not _params(s)[1]],
+        # a no-argument function in a data/feature script that builds the processed data
+        "data_step": ["existing"] + [n for n, (path, s) in funcs.items()
+                                     if path in data_roles and not _params(s)[1]],
     }
+
+
+def _group_columns(ctx: RepoContext) -> list[str]:
+    """Columns present in every data file that has the top target column, targets excluded."""
+    target = next((c.column for c in ctx.target_candidates if c.in_data), None)
+    headers = [d.columns for d in ctx.data_columns if target and target in d.columns]
+    if not headers:
+        return []
+    targets = {c.column for c in ctx.target_candidates if c.score >= 3}
+    common = set.intersection(*(set(h) for h in headers))
+    return [c for c in headers[0] if c in common and c not in targets]
 
 
 # --- validation ------------------------------------------------------------
