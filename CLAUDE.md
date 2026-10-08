@@ -10,6 +10,8 @@ Full team architecture: docs/architecture.html
 - Three layers: scan (facts, no LLM) -> decide (facts + contracts.yaml) -> render (Jinja2 templates).
 - Team decisions live in contracts.yaml, never hard-coded in Python.
 - LLM only for planning and failure diagnosis; strict JSON output (pydantic), chosen from an action menu.
+- The LLM never writes whole files. It only fills template slots as JSON, choosing from
+  candidate lists the scanner provides (see docs/llm-spike-1.md).
 - Free/local LLM via Ollama. Few calls, small context. All state stays in Python, not in the LLM.
 - Sandbox: docker build + `make all SAMPLE=1` in a throwaway container. Max 3 fixes, every fix verified.
 - Store both successful and failed fixes in memory.
@@ -28,11 +30,19 @@ Details: docs/reference-run-taxi.md
 - Scanner should later find or build a sample request for the smoke test
   (for taxi it came from a notebook cell and the test.csv header).
 
+## Lessons from LLM spike 1
+Details: docs/llm-spike-1.md
+- Run pyflakes on generated code before the sandbox (both spike adapters parsed but had undefined names).
+- Smoke test must compare a known prediction from the reference run, not only the response shape
+  (taxi: row 1 of data/processed/test.csv -> about 531 s); a dropped inverse transform still returns 200.
+
 ## Decisions
 - needs_llm items are filled with thin adapter scripts in the target repo's
   `pipeline/` folder (contracts.yaml paths.adapters_dir, owned by builder):
   train.py, evaluate.py, serve.py, data.py, sample_request.json.
   Adapters only call functions the repo already has; they never modify the repo's files.
+- Adapters are Jinja2 templates. The LLM only fills their slots (e.g. which function to call,
+  target column, inverse transform) as strict JSON, choosing from candidate lists the scanner provides.
 
 ## Current step
 Step 1 done: repo scanner in builder_agent/scan (`python -m builder_agent.scan <repo>`), returns RepoContext + summary().
