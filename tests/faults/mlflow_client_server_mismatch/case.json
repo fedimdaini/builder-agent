@@ -93,11 +93,12 @@
     "summary": "Pin the MLflow client to the server image's version",
     "action": "Install mlflow==<version> where <version> is the tag of the MLflow server image in compose.base.yml (v2.17.2 -> mlflow==2.17.2), derived at render time so the two cannot drift.",
     "rejected_alternative": "Upgrade the server image to 3.x: the tracking server is shared by every agent, so the client follows the server, not the other way round.",
-    "level": 2
+    "level": 2,
+    "implemented_in": "builder_agent/render/configs.py: mlflow_client_spec()"
   },
   "reproduce": {
     "how": "Render the config files with an unpinned MLflow client install and run the sandbox; it fails at the train stage with the error_signature above.",
-    "command": "python -m builder_agent.sandbox ../taxi-trip-regression --slots tests/gold/taxi_slots.json --expected tests/gold/taxi_expected.json",
-    "note": "At the commit that adds this case the default render is still unpinned (`pip install mlflow`), so the plain command reproduces it."
+    "command": "python -m builder_agent.sandbox ../taxi-trip-regression --slots tests/gold/taxi_slots.json --expected tests/gold/taxi_expected.json --mlflow-client mlflow",
+    "note": "Since the fix, the default render pins mlflow==<server image version>; --mlflow-client mlflow restores the unpinned install. Test: tests/test_configs.py::test_mlflow_client_override_reproduces_fault_001."
   }
 }

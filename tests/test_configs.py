@@ -55,7 +55,7 @@ def test_taxi_dockerfile(taxi_render):
     install = next(i for i, (k, a) in enumerate(ins) if k == "RUN" and "pipenv install --deploy --system" in a)
     code = ins.index(("COPY", ". ."))
     assert deps < install < code                                   # dependencies cached before code
-    assert "pip install mlflow" in ins[install][1]
+    assert "pip install mlflow==2.17.2" in ins[install][1]          # pinned to the server image (fault-001)
     assert kinds.count("COPY") == 2                                # nothing else copied (no data)
     assert ("EXPOSE", "8000") in ins
     assert ins[-1] == ("CMD", '["gunicorn", "--bind", "0.0.0.0:8000", "pipeline.serve:app"]')
@@ -82,7 +82,8 @@ def test_taxi_makefile(taxi_render):
                         ("serve", "gunicorn --bind 0.0.0.0:8000 pipeline.serve:app"),
                         ("all", "$(MAKE) install data train evaluate test")]:
         assert f"\n{target}:\n\t{cmd}\n" in make, target
-    assert "\ninstall:\n\tpip install pipenv==2023.12.1\n\tpipenv install --deploy --system\n\tpip install mlflow\n" in make
+    assert ("\ninstall:\n\tpip install pipenv==2023.12.1\n\tpipenv install --deploy --system\n"
+            "\tpip install mlflow==2.17.2\n") in make
     assert "\ntest:\n\t$(PYTHON) pipeline/smoke_test.py\n" in make
 
 
@@ -116,7 +117,7 @@ def test_manifest_covers_adapters_and_configs(taxi_render):
     ("Dockerfile", "COPY . .\n", "COPY . .\nCOPY data/processed ./data/processed\n", "copies data (data/processed)"),
     ("Dockerfile", "EXPOSE 8000", "EXPOSE 9696", "EXPOSE 8000 missing"),
     (".dockerignore", "\ndata/\n", "\n", ".dockerignore: data dir data/ is not excluded"),
-    ("Makefile", "\tpip install mlflow", "    pip install mlflow", "recipe line must start with a tab"),
+    ("Makefile", "\tpip install mlflow==2.17.2", "    pip install mlflow==2.17.2", "recipe line must start with a tab"),
     ("Makefile", "\nevaluate:\n", "\nevaluation:\n", "no rule for contract target evaluate"),
     ("Makefile", "export SAMPLE\n", "", "SAMPLE is not exported"),
     ("compose.base.yml", "./data:/app/data:ro", "./data:/app/data", "data dir data is not mounted read-only"),
@@ -150,7 +151,7 @@ def test_mini_requirements_and_generated_service(mini, contracts, tmp_path):  # 
     assert "FROM python:3.11-slim" in docker
     assert "COPY requirements.txt ./\nRUN pip install -r requirements.txt \\\n && pip install " in docker
     install = next(line for line in docker.splitlines() if line.startswith(" && pip install"))
-    assert {"mlflow", "gunicorn"} <= set(install.split()) and "flask" not in install.split()  # flask declared
+    assert {"mlflow==2.17.2", "gunicorn"} <= set(install.split()) and "flask" not in install.split()  # flask declared
     assert "\nserve:\n\tgunicorn --bind 0.0.0.0:8000 pipeline.serve:app\n" in read(tmp_path, "Makefile")
 
 
@@ -171,3 +172,30 @@ def test_never_overwrites_a_hand_written_dockerfile(mini, contracts, tmp_path): 
         render_all(mini, contracts, MINI_GOLD, tmp_path)
     assert read(tmp_path, "Dockerfile") == "FROM scratch\n"
     assert not (tmp_path / "Makefile").exists()
+
+
+# --- MLflow client pinned to the server image (tests/faults/mlflow_client_server_mismatch) ----
+
+@pytest.mark.parametrize("image,spec", [
+    ("ghcr.io/mlflow/mlflow:v2.17.2", "mlflow==2.17.2"),
+    ("ghcr.io/mlflow/mlflow:3.1.4", "mlflow==3.1.4"),
+    ("localhost:5000/mlflow:v2.16.2", "mlflow==2.16.2"),   # registry port is not the tag
+])
+def test_mlflow_client_spec_from_image_tag(image, spec):
+    from builder_agent.render.configs import mlflow_client_spec
+    assert mlflow_client_spec(image) == spec
+
+
+@pytest.mark.parametrize("image", ["ghcr.io/mlflow/mlflow:latest", "ghcr.io/mlflow/mlflow"])
+def test_mlflow_client_spec_needs_a_version_tag(image):
+    from builder_agent.render.configs import mlflow_client_spec
+    with pytest.raises(RenderError, match="use a vX.Y.Z tag"):
+        mlflow_client_spec(image)
+
+
+def test_mlflow_client_override_reproduces_fault_001(mini, contracts, tmp_path):  # noqa: F811
+    plan = plan_build(mini, contracts)
+    render_adapters(mini, contracts, MINI_GOLD, tmp_path)
+    render_configs(mini, contracts, plan, MINI_GOLD, tmp_path, mlflow_client="mlflow")
+    install = next(line for line in read(tmp_path, "Dockerfile").splitlines() if line.startswith(" && pip install"))
+    assert "mlflow" in install.split() and "mlflow==2.17.2" not in install

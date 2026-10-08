@@ -8,6 +8,7 @@ Nothing is built or run here; lint_configs() checks the files statically.
 from __future__ import annotations
 
 import posixpath
+import re
 import shlex
 import shutil
 import subprocess
@@ -29,6 +30,19 @@ WORKDIR = "/app"
 ADAPTER_SCRIPTS = {"data": "data.py", "train": "train.py", "evaluate": "evaluate.py"}
 ADAPTER_PACKAGES = ["mlflow", "pandas", "numpy", "flask", "gunicorn"]   # what the adapters import
 TEST_STUB = ['@echo "make test: no smoke test: the adapters were not rendered" >&2', "@exit 1"]
+
+
+def mlflow_client_spec(image: str) -> str:
+    """mlflow==X.Y.Z from the MLflow server image tag, so client and server can't drift apart.
+
+    See tests/faults/mlflow_client_server_mismatch: an unpinned 3.x client can't log models
+    to a 2.17.2 server.
+    """
+    tag = image.rsplit("/", 1)[-1].partition(":")[2]
+    m = re.fullmatch(r"v?(\d+\.\d+\.\d+)", tag)
+    if not m:
+        raise RenderError(f"can't derive the MLflow client version from image {image!r}: use a vX.Y.Z tag")
+    return f"mlflow=={m.group(1)}"
 
 
 class MakeRule(BaseModel):
@@ -96,7 +110,9 @@ def _make_rules(plan: BuildPlan, c: Contracts, adapters: str | None, serve_cmd: 
     return rules
 
 
-def config_context(ctx: RepoContext, c: Contracts, plan: BuildPlan, slots: SlotAnswers | None) -> dict:
+def config_context(ctx: RepoContext, c: Contracts, plan: BuildPlan, slots: SlotAnswers | None,
+                   mlflow_client: str | None = None) -> dict:
+    """mlflow_client overrides the derived client pin (e.g. "mlflow" to reproduce fault-001)."""
     if plan.python.status != "decided":
         raise RenderError(f"Python version not decided: {plan.python.reason}")
     if plan.install.status != "decided":
@@ -120,6 +136,10 @@ def config_context(ctx: RepoContext, c: Contracts, plan: BuildPlan, slots: SlotA
         for pkg in ADAPTER_PACKAGES + [FLAVOR_DIST[slots.model_flavor]]:
             if normalize(pkg) not in declared and pkg not in extras:
                 extras.append(pkg)
+    # the MLflow client always matches the server image (fault-001)
+    if slots or any(normalize(e) == "mlflow" for e in extras):
+        spec = mlflow_client_spec(MLFLOW_IMAGE) if mlflow_client is None else mlflow_client
+        extras = [spec] + [e for e in extras if normalize(e) != "mlflow"]
     install = plan.install.commands + ([f"pip install {' '.join(extras)}"] if extras else [])
 
     mlflow = urlparse(c.paths["mlflow_uri"])
@@ -167,7 +187,8 @@ def config_context(ctx: RepoContext, c: Contracts, plan: BuildPlan, slots: SlotA
 
 
 def render_configs(ctx: RepoContext, contracts: Contracts, plan: BuildPlan,
-                   slots: dict | SlotAnswers | None, out_root: str | Path) -> RenderResult:
+                   slots: dict | SlotAnswers | None, out_root: str | Path,
+                   mlflow_client: str | None = None) -> RenderResult:
     """Render Dockerfile, .dockerignore, Makefile and the compose base file into out_root."""
     answers = None
     if slots is not None:
@@ -175,7 +196,7 @@ def render_configs(ctx: RepoContext, contracts: Contracts, plan: BuildPlan,
         if not v.ok:
             raise RenderError("invalid slot answers: " + "; ".join(v.reasons))
         answers = v.slots
-    tctx = config_context(ctx, contracts, plan, answers)
+    tctx = config_context(ctx, contracts, plan, answers, mlflow_client)
     env = _env()
     rendered = {
         "Dockerfile": env.get_template("Dockerfile.j2").render(**tctx),

@@ -45,8 +45,13 @@ Details: docs/llm-spike-1.md
   target column, inverse transform) as strict JSON, choosing from candidate lists the scanner provides.
 - The message board service will be added to compose.base.yml once the board owner provides it
   (contracts.yaml compose.base_file lists it; not there yet).
-- The MLflow client stays unpinned on purpose (server image is v2.17.2): the sandbox should
-  reveal whether that breaks.
+- The MLflow client is pinned to the server image's version, derived from its tag at render time
+  (v2.17.2 -> mlflow==2.17.2). Fault case 1 (tests/faults/mlflow_client_server_mismatch): the
+  unpinned 3.x client got 404 from the 2.17.2 server when logging the model.
+
+## Fault cases
+Recorded failures live in tests/faults/<name>/case.json (stage, error tail, cause, fix,
+how to reproduce); tests/test_faults.py checks their shape. They will seed the incident memory.
 
 ## Current step
 Step 1 done: repo scanner in builder_agent/scan (`python -m builder_agent.scan <repo>`), returns RepoContext + summary().
@@ -55,6 +60,9 @@ Step 3 done: adapters in builder_agent/render: SlotAnswers + slot_candidates() +
   Jinja2 templates for pipeline/{train,evaluate,serve,data}.py and sample_request.json, pyflakes on output.
   Gold answers for taxi: tests/gold/taxi_slots.json (validate and render cleanly; adapters not run yet).
 Step 4 done: config templates in builder_agent/render/configs.py: Dockerfile, .dockerignore, Makefile,
-  compose.base.yml, with static lint + `docker compose config`. Not built yet; `make test` fails on purpose
-  until the smoke test exists.
-Step 5: sandbox runner (docker build + `make all SAMPLE=1` in a throwaway container).
+  compose.base.yml, with static lint + `docker compose config`.
+Step 5 done: sandbox runner in builder_agent/sandbox (`python -m builder_agent.sandbox <repo> --slots ... --expected ...`):
+  temp copy (real data mounted read-only), render, build, mlflow, data/train/evaluate with SAMPLE=1, serve,
+  health, predict; stops at the first failure; attempts in logs/sandbox_attempts.jsonl.
+  pipeline/smoke_test.py runs the contract's smoke_test (in-process for `make test`, --url over HTTP).
+  Taxi with the gold slots: all stages ok (prediction 472 s for the reference row; expected 531 s +-50%).

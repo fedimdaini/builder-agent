@@ -146,7 +146,9 @@ _Dumper.add_representer(_Tagged, _represent_tagged)
 
 def run_sandbox(repo: str | Path, slots: dict, expected: dict | None = None,
                 contracts_path: str | Path = DEFAULT_CONTRACTS, log_path: str | Path | None = DEFAULT_LOG,
-                keep: bool = False, runner: Runner = subprocess_runner) -> SandboxResult:
+                keep: bool = False, runner: Runner = subprocess_runner,
+                mlflow_client: str | None = None) -> SandboxResult:
+    """mlflow_client overrides the MLflow client install spec (fault injection, e.g. "mlflow")."""
     repo = Path(repo).resolve()
     started = time.monotonic()
     attempt_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:6]
@@ -183,14 +185,14 @@ def run_sandbox(repo: str | Path, slots: dict, expected: dict | None = None,
         v = validate_slots(ctx, slots)
         if not v.ok:
             raise ValueError("invalid slot answers: " + "; ".join(v.reasons))
-        tctx = config_context(ctx, c, plan, v.slots)
+        tctx = config_context(ctx, c, plan, v.slots, mlflow_client)
         names = {"compose_file": tctx["compose_file"], "model": tctx["model_service"],
                  "mlflow": tctx["mlflow_service"], "mlflow_port": tctx["mlflow_port"],
                  "port": tctx["port"], "adapters": c.paths["adapters_dir"].strip("/"),
                  "sample": c.sample_mode.variable}
         copy_repo(repo, workdir, set(_top_dirs(ctx, c)[0]))
         a = render_adapters(ctx, c, v.slots, workdir, expected=Expected.model_validate(expected) if expected else None)
-        cfg = render_configs(ctx, c, plan, v.slots, workdir)
+        cfg = render_configs(ctx, c, plan, v.slots, workdir, mlflow_client)
         write_override(workdir, names["compose_file"], names["model"], repo)
         lint = a.lint + cfg.lint
         ok = record("render", t0, 1 if lint else 0,
