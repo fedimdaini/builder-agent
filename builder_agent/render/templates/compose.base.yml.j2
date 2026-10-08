@@ -1,0 +1,38 @@
+{{ marker }}
+# Base services for {{ repo }} (owner: builder). The router, replicas, the candidate
+# service and the traffic split belong in {{ deploy_file }} (owner: deployer).
+services:
+  {{ mlflow_service }}:
+    image: {{ mlflow_image }}
+    command: >-
+      mlflow server --host 0.0.0.0 --port {{ mlflow_port }}
+      --backend-store-uri sqlite:////mlflow/mlflow.db
+      --artifacts-destination /mlflow/artifacts
+    volumes:
+      - mlflow-data:/mlflow
+    ports:
+      - "{{ mlflow_port }}:{{ mlflow_port }}"
+
+  {{ model_service }}:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      MLFLOW_TRACKING_URI: {{ mlflow_uri }}
+      {{ model_uri_env }}: ${{ '{' }}{{ model_uri_env }}:-{{ '}' }}
+    volumes:
+{% for m in mounts %}
+      - {{ m }}
+{% endfor %}
+    ports:
+      - "{{ port }}:{{ port }}"
+    depends_on:
+      - {{ mlflow_service }}
+    healthcheck:
+      test: {{ healthcheck | json }}
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mlflow-data:

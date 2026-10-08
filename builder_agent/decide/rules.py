@@ -140,9 +140,10 @@ def plan_serving(ctx: RepoContext, c: Contracts) -> tuple[ServingPlan, NeedsLLM 
     if mode == "generate" or (mode == "auto" and not apps):
         why = "forced by contracts.yaml" if mode == "generate" else "repo has no Flask/FastAPI app"
         target = f"{c.paths['adapters_dir'].strip('/').replace('/', '.')}.serve:app"
+        # the generated service is the Flask serve.py adapter template
         return ServingPlan(
-            status="decided", mode="generate", framework="fastapi", app_target=target,
-            port=port, command=f"uvicorn {target} --host 0.0.0.0 --port {port}",
+            status="decided", mode="generate", framework="flask", app_target=target,
+            port=port, command=f"gunicorn --bind 0.0.0.0:{port} {target}",
             reason=f"generate a service: {why}",
         ), None
 
@@ -197,7 +198,7 @@ def plan_install(ctx: RepoContext, c: Contracts, serving: ServingPlan) -> tuple[
     extras: list[str] = []
     wanted = []
     if serving.mode == "generate":
-        wanted += ["fastapi", "uvicorn"]
+        wanted += ["flask", "gunicorn"]
     elif serving.framework == "flask":
         wanted.append("gunicorn")
     elif serving.framework == "fastapi":

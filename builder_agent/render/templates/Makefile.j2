@@ -1,0 +1,23 @@
+{{ marker }}
+# Pipeline commands for {{ repo }}. Target names and meanings: contracts.yaml make_targets.
+# `make all {{ sample_var }}=1` runs on a {{ fraction }} sample of the rows (contracts.yaml sample_mode).
+
+{{ sample_var }} ?= 0
+export {{ sample_var }}
+PYTHON ?= python
+
+.PHONY: {{ targets | map(attribute="name") | join(" ") }}
+# `all` runs its steps in the contract's order, never in parallel
+.NOTPARALLEL:
+
+{% for t in targets %}
+## {{ t.name }}: {{ t.description }}
+{% if t.note %}
+# {{ t.note }}
+{% endif %}
+{{ t.name }}:
+{% for cmd in t.commands %}
+{{ tab }}{{ cmd }}
+{% endfor %}
+
+{% endfor %}

@@ -1,0 +1,33 @@
+{{ marker }}
+# Model image for {{ repo }}. Data is never copied in: it is mounted at runtime
+# (contracts.yaml compose.data), see .dockerignore and {{ compose_file }}.
+FROM python:{{ python_version }}-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# make runs the pipeline targets (`make all {{ sample_var }}=1` in the sandbox)
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends make \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR {{ workdir }}
+
+{% if deps_files %}
+# 1. Dependencies only: this layer stays cached until {{ deps_files | join(" or ") }} change.
+COPY {{ deps_files | join(" ") }} ./
+RUN {{ install_commands | join(" \\\n && ") }}
+
+# 2. Code (data, notebooks and model artifacts are excluded by .dockerignore).
+COPY . .
+{% else %}
+# The install needs the package source ({{ install_source }}), so dependencies
+# can't be cached separately from the code.
+COPY . .
+RUN {{ install_commands | join(" \\\n && ") }}
+{% endif %}
+
+ENV MLFLOW_TRACKING_URI={{ mlflow_uri }}
+EXPOSE {{ port }}
+CMD {{ serve_cmd | json }}

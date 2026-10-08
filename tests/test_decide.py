@@ -92,8 +92,8 @@ def test_unquoted_python_version_is_rejected(tmp_path):
 
 def test_serving_generates_when_repo_has_no_app(contracts):
     s = plan_build(ctx(), contracts).serving
-    assert (s.status, s.mode, s.framework) == ("decided", "generate", "fastapi")
-    assert s.command == "uvicorn pipeline.serve:app --host 0.0.0.0 --port 8000"
+    assert (s.status, s.mode, s.framework) == ("decided", "generate", "flask")
+    assert s.command == "gunicorn --bind 0.0.0.0:8000 pipeline.serve:app"
 
 
 def test_serving_uses_conforming_repo_app(contracts):

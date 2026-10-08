@@ -31,6 +31,7 @@ def mini(tmp_path_factory):
     root = tmp_path_factory.mktemp("mini")
     write(root, {
         "requirements.txt": "xgboost\nscikit-learn\npandas\nnumpy\nflask\n",
+        ".python-version": "3.11\n",
         "data/processed/train.csv": "a,b,flag,price\n1,2.5,True,100\n",
         "data/processed/test.csv": "a,b,flag,price\n3,0.5,False,40\n",
         "data/processed/other.csv": "a,b\n1,2\n",

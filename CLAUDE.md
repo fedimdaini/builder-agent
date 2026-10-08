@@ -43,6 +43,10 @@ Details: docs/llm-spike-1.md
   Adapters only call functions the repo already has; they never modify the repo's files.
 - Adapters are Jinja2 templates. The LLM only fills their slots (e.g. which function to call,
   target column, inverse transform) as strict JSON, choosing from candidate lists the scanner provides.
+- The message board service will be added to compose.base.yml once the board owner provides it
+  (contracts.yaml compose.base_file lists it; not there yet).
+- The MLflow client stays unpinned on purpose (server image is v2.17.2): the sandbox should
+  reveal whether that breaks.
 
 ## Current step
 Step 1 done: repo scanner in builder_agent/scan (`python -m builder_agent.scan <repo>`), returns RepoContext + summary().
@@ -50,5 +54,7 @@ Step 2 done: decide layer in builder_agent/decide (`python -m builder_agent.deci
 Step 3 done: adapters in builder_agent/render: SlotAnswers + slot_candidates() + validate_slots() (slots.py),
   Jinja2 templates for pipeline/{train,evaluate,serve,data}.py and sample_request.json, pyflakes on output.
   Gold answers for taxi: tests/gold/taxi_slots.json (validate and render cleanly; adapters not run yet).
-Step 4: config templates for the [ok] items: Dockerfile, .dockerignore, Makefile, compose.base.yml.
+Step 4 done: config templates in builder_agent/render/configs.py: Dockerfile, .dockerignore, Makefile,
+  compose.base.yml, with static lint + `docker compose config`. Not built yet; `make test` fails on purpose
+  until the smoke test exists.
 Step 5: sandbox runner (docker build + `make all SAMPLE=1` in a throwaway container).

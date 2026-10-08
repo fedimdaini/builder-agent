@@ -1,0 +1,30 @@
+{{ marker }}
+
+# Version control and local environments
+.git
+.venv
+venv
+**/__pycache__
+**/*.egg-info
+
+# Data: mounted at runtime, never copied into the image (contracts.yaml compose.data)
+{% for d in data_dirs %}
+{{ d }}/
+{% endfor %}
+
+# Model artifacts live in MLflow; {{ models_dir }}/ is mounted for the model handoff file
+{% for d in model_dirs %}
+{{ d }}/
+{% endfor %}
+
+# Notebooks and pipeline outputs
+**/*.ipynb
+{% for d in output_dirs %}
+{{ d }}/
+{% endfor %}
+mlruns/
+
+# Builder config files (not needed inside the image)
+Dockerfile
+.dockerignore
+{{ compose_file }}
