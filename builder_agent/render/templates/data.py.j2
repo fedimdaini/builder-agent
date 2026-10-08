@@ -1,0 +1,50 @@
+{{ marker }}
+"""Data step: make sure the processed data the pipeline needs is there.
+
+Run from anywhere: python {{ adapters_dir }}/data.py
+{% if data_step == "existing" %}
+The repo ships its processed data, so this step checks it instead of rebuilding it.
+{{ sample_var }} has no effect here; train and evaluate sample the rows themselves.
+{% else %}
+Calls the repo's own {{ data_fn_name }}().
+{% endif %}
+"""
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[{{ depth }}]
+{% if data_step != "existing" %}
+sys.path.insert(0, str(ROOT))
+
+from {{ data_fn_module }} import {{ data_fn_name }}  # noqa: E402
+{% endif %}
+
+REQUIRED = {{ required_files | py }}
+LFS_POINTER = b"version https://git-lfs.github.com/spec/v1"
+
+
+def check():
+    problems = []
+    for rel in REQUIRED:
+        path = ROOT / rel
+        if not path.exists():
+            problems.append(f"{rel} is missing")
+            continue
+        with path.open("rb") as f:
+            if f.read(len(LFS_POINTER)) == LFS_POINTER:
+                problems.append(f"{rel} is a Git LFS pointer (run git lfs pull)")
+    return problems
+
+
+def main():
+{% if data_step != "existing" %}
+    {{ data_fn_name }}()
+{% endif %}
+    problems = check()
+    if problems:
+        sys.exit("data step failed: " + "; ".join(problems))
+    print("processed data ready: " + ", ".join(REQUIRED))
+
+
+if __name__ == "__main__":
+    main()

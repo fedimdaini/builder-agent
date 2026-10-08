@@ -221,3 +221,12 @@ def test_taxi_plan(contracts):
     assert {n.item for n in plan.needs_llm} == {"serving", "target:data", "target:train",
                                                 "target:evaluate", "target:test"}
     assert len(plan.summary()) < 3000
+
+    ctx_of = {n.item: n.context for n in plan.needs_llm}
+    for item in ("target:train", "target:evaluate", "target:test", "serving"):
+        assert any(c.startswith("target candidates: trip_duration") for c in ctx_of[item]), item
+        assert any(c.startswith("target transform: log1p on trip_duration") and "expm1 in src/models/predict_model.py" in c
+                   for c in ctx_of[item]), item
+    assert any("train_xgboost(train_path, target_col, num_rounds=371)" in c for c in ctx_of["target:train"])
+    assert any("single_prediction(features, model)" in c for c in ctx_of["serving"])
+    assert any(c.startswith("columns of data/processed/") and "trip_duration" in c for c in ctx_of["target:test"])

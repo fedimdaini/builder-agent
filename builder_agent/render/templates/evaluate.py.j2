@@ -1,0 +1,76 @@
+{{ marker }}
+"""Evaluate the model on {{ eval_file }} and write {{ eval_report }}.
+
+Run from anywhere: python {{ adapters_dir }}/evaluate.py
+Model: ${{ model_uri_env }}, else the last one {{ adapters_dir }}/train.py logged.
+{{ sample_var }}=1 evaluates on a {{ fraction }} sample of the rows.
+"""
+import json
+import os
+from pathlib import Path
+
+import mlflow
+import mlflow.{{ flavor }}
+import numpy as np
+import pandas as pd
+{% if model_input == "dmatrix" %}
+import xgboost as xgb
+{% endif %}
+
+ROOT = Path(__file__).resolve().parents[{{ depth }}]
+
+EVAL_FILE = {{ eval_file | py }}
+TARGET = {{ target | py }}
+FEATURES = {{ features | py }}
+GROUP_COLUMN = {{ group_column | py }}
+SAMPLE = os.environ.get({{ sample_var | py }}, "0") == "1"
+SAMPLE_FRACTION = {{ fraction | py }}
+MLFLOW_URI = os.environ.get("MLFLOW_TRACKING_URI", {{ mlflow_uri | py }})
+MODEL_URI_ENV = {{ model_uri_env | py }}
+MODEL_URI_FILE = {{ model_uri_file | py }}
+EVAL_REPORT = {{ eval_report | py }}
+
+
+{% include "_model.py.j2" %}
+
+
+def metrics(y_true, y_pred):
+    err = y_pred - y_true
+    total = float(np.sum((y_true - y_true.mean()) ** 2))
+    return {
+        "rmse": float(np.sqrt(np.mean(err ** 2))),
+        "mae": float(np.mean(np.abs(err))),
+        "r2": float(1 - np.sum(err ** 2) / total) if total > 0 else 0.0,
+    }
+
+
+def main():
+    mlflow.set_tracking_uri(MLFLOW_URI)
+    uri = model_uri()
+    model = mlflow.{{ flavor }}.load_model(uri)
+    version = model_version(uri)
+
+    df = pd.read_csv(ROOT / EVAL_FILE)
+    if SAMPLE:
+        df = df.sample(frac=SAMPLE_FRACTION, random_state=42)
+    y_true = df[TARGET].to_numpy(dtype=float)
+    y_pred = predict(model, df)
+
+    per_group = {}
+    for group, idx in df.groupby(GROUP_COLUMN).indices.items():
+        m = metrics(y_true[idx], y_pred[idx])
+        per_group[str(group)] = {"rmse": m["rmse"], "mae": m["mae"], "n": int(len(idx))}
+    report = {"model_version": version, "metrics": metrics(y_true, y_pred), "per_group": per_group}
+
+    out = ROOT / EVAL_REPORT
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    if version != uri:  # a run id: attach the metrics to the training run
+        with mlflow.start_run(run_id=version):
+            mlflow.log_metrics({f"eval_{k}": v for k, v in report["metrics"].items()})
+            mlflow.log_dict(report, "builder/eval.json")
+    print(json.dumps(report["metrics"]))
+
+
+if __name__ == "__main__":
+    main()

@@ -128,9 +128,13 @@ def plan_serving(ctx: RepoContext, c: Contracts) -> tuple[ServingPlan, NeedsLLM 
     app_lines = [f"{a.framework} {a.target} routes: "
                  + ", ".join(f"{'/'.join(r.methods)} {r.path}" for r in a.routes) for a in apps]
 
+    app_paths = {a.path for a in apps}
+    app_modules = [_entry_line(e) for e in ctx.entry_points if e.path in app_paths]
+
     def fail(reason: str, **kw) -> tuple[ServingPlan, NeedsLLM]:
+        context = app_lines + app_modules + kw.get("contract_gaps", []) + target_facts(ctx)
         return (ServingPlan(status="needs_llm", reason=reason, port=port, **kw),
-                NeedsLLM(item="serving", reason=reason, context=app_lines + kw.get("contract_gaps", [])))
+                NeedsLLM(item="serving", reason=reason, context=context))
 
     mode = c.serving.mode
     if mode == "generate" or (mode == "auto" and not apps):
@@ -262,6 +266,27 @@ def _requirement(name: str, e: EntryPoint, ctx: RepoContext, c: Contracts) -> st
     return None
 
 
+def target_facts(ctx: RepoContext, n: int = 3) -> list[str]:
+    """Target candidates and transforms, one line each, for needs_llm contexts."""
+    lines = []
+    if ctx.target_candidates:
+        lines.append("target candidates: " + ", ".join(
+            f"{c.column} (score {c.score}{'' if c.in_data else ', not in data headers'})"
+            for c in ctx.target_candidates[:n]))
+    for t in ctx.target_transforms:
+        inverse = ", ".join(t.inverse_files) or "NOWHERE"
+        lines.append(f"target transform: {t.forward} on {', '.join(t.applied_to)} "
+                     f"in {', '.join(t.forward_files)}; inverse {t.inverse} in {inverse}")
+    return lines
+
+
+def _columns_line(ctx: RepoContext, under: str | None) -> list[str]:
+    files = [d for d in ctx.data_columns if under and d.path.startswith(under + "/")]
+    if not files:
+        return []
+    return [f"columns of {', '.join(d.path for d in files)}: {', '.join(files[0].columns)}"]
+
+
 def _entry_line(e: EntryPoint) -> str:
     main = "__main__" if e.has_main_guard else "no __main__"
     if e.signatures:
@@ -282,7 +307,7 @@ def _script_target(name: str, desc: str, ctx: RepoContext, c: Contracts) -> tupl
         if name == "data":
             extra = [f"data dir {d.path}/ subdirs: {', '.join(d.subdirs)}" for d in ctx.data_dirs]
         elif name in {"train", "evaluate"}:
-            extra = [f"model file {m.path}" for m in ctx.model_files]
+            extra = [f"model file {m.path}" for m in ctx.model_files] + target_facts(ctx)
         return (MakeTarget(name=name, description=desc, status="needs_llm", command=command, reason=reason),
                 NeedsLLM(item=f"target:{name}", reason=reason, context=context + extra))
 
@@ -324,7 +349,8 @@ def plan_targets(ctx: RepoContext, c: Contracts, install: InstallPlan,
             processed = c.paths.get("processed_data")
             item = NeedsLLM(item="target:test", reason=reason, context=[
                 f"path in code: {r.resolved}" for r in ctx.path_references
-                if processed and r.resolved and r.resolved.startswith(processed + "/")][:4])
+                if processed and r.resolved and r.resolved.startswith(processed + "/")][:4]
+                + _columns_line(ctx, processed) + target_facts(ctx))
         elif name == "all":
             # order comes from the contract's own wording, e.g. "install, data, train, ... in order"
             words = re.findall(r"[A-Za-z_]+", desc)

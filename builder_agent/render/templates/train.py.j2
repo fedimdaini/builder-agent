@@ -1,0 +1,92 @@
+{{ marker }}
+"""Train with the repo's own {{ fn_name }}() and log the model to MLflow.
+
+Run from anywhere: python {{ adapters_dir }}/train.py
+{{ sample_var }}=1 trains on a {{ fraction }} sample of the rows.
+"""
+import json
+import os
+import sys
+{% if uses_train_path %}
+import tempfile
+{% endif %}
+from pathlib import Path
+
+import mlflow
+import mlflow.{{ flavor }}
+{% if y_forward_fn %}
+import numpy as np
+{% endif %}
+import pandas as pd
+
+ROOT = Path(__file__).resolve().parents[{{ depth }}]
+sys.path.insert(0, str(ROOT))
+
+from {{ fn_module }} import {{ fn_name }}  # noqa: E402
+
+TRAIN_FILE = {{ train_file | py }}
+TARGET = {{ target | py }}
+FEATURES = {{ features | py }}
+TARGET_TRANSFORM = {{ transform | py }}
+SAMPLE = os.environ.get({{ sample_var | py }}, "0") == "1"
+SAMPLE_FRACTION = {{ fraction | py }}
+MLFLOW_URI = os.environ.get("MLFLOW_TRACKING_URI", {{ mlflow_uri | py }})
+EXPERIMENT = {{ experiment | py }}
+MODEL_URI_FILE = {{ model_uri_file | py }}
+
+
+def training_data():
+    df = pd.read_csv(ROOT / TRAIN_FILE)
+    if SAMPLE:
+        df = df.sample(frac=SAMPLE_FRACTION, random_state=42)
+    return df
+
+
+def main():
+    mlflow.set_tracking_uri(MLFLOW_URI)
+    mlflow.set_experiment(EXPERIMENT)
+    df = training_data()
+{% if uses_train_path %}
+    if SAMPLE:
+        fd, train_path = tempfile.mkstemp(suffix=".csv")
+        os.close(fd)
+        df.to_csv(train_path, index=False)
+    else:
+        train_path = str(ROOT / TRAIN_FILE)
+{% endif %}
+{% if uses_x %}
+    X = df[FEATURES]
+{% endif %}
+{% if uses_y %}
+{% if y_forward_fn %}
+    y = {{ y_forward_fn }}(df[TARGET])  # {{ transform }} applied here; {{ fn_name }}() doesn't
+{% else %}
+    y = df[TARGET]
+{% endif %}
+{% endif %}
+
+    with mlflow.start_run() as run:
+{% if uses_train_path %}
+        try:
+            model = {{ fn_name }}({{ call_args }})
+        finally:
+            if SAMPLE:
+                os.unlink(train_path)
+{% else %}
+        model = {{ fn_name }}({{ call_args }})
+{% endif %}
+        mlflow.log_params({"train_file": TRAIN_FILE, "target": TARGET, "target_transform": TARGET_TRANSFORM,
+                           "sample": SAMPLE, "n_rows": len(df)})
+        mlflow.log_dict({"features": FEATURES, "target": TARGET, "target_transform": TARGET_TRANSFORM},
+                        "builder/schema.json")
+        mlflow.{{ flavor }}.log_model(model, "model")
+
+    uri = f"runs:/{run.info.run_id}/model"
+    out = ROOT / MODEL_URI_FILE
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(uri + "\n", encoding="utf-8")
+    print(json.dumps({"model_uri": uri, "n_rows": len(df), "sample": SAMPLE}))
+
+
+if __name__ == "__main__":
+    main()

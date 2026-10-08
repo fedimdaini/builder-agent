@@ -59,6 +59,7 @@ paths:
   raw_data: data/raw
   processed_data: data/processed
   models: models
+  latest_model_uri: models/latest_model_uri.txt   # written by `make train` (MLflow URI of the new model); read by evaluate and serve when MODEL_URI is unset
   eval_report: reports/eval.json
   predictions_log: logs/predictions.jsonl
   mlflow_uri: http://mlflow:5000

@@ -1,0 +1,19 @@
+{
+  "target_column": "trip_duration",
+  "target_transform": "log1p",
+  "transform_inside_train_fn": true,
+  "model_flavor": "xgboost",
+  "model_input": "dmatrix",
+  "train": {
+    "train_function": "src.models.train_model:train_xgboost",
+    "train_file": "data/processed/train_large.csv",
+    "arg_map": {"train_path": "$train_path", "target_col": "$target_column"}
+  },
+  "evaluate": {
+    "eval_file": "data/processed/test.csv",
+    "group_column": "vendor_id"
+  },
+  "data": {
+    "data_step": "existing"
+  }
+}

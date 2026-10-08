@@ -11,6 +11,8 @@ dependencies = [
     "pydantic>=2",
     "pyyaml>=6",
     "packaging>=23",
+    "jinja2>=3.1",
+    "pyflakes>=3",
 ]
 
 [project.optional-dependencies]
@@ -18,6 +20,9 @@ dev = ["pytest>=8"]
 
 [tool.setuptools.packages.find]
 include = ["builder_agent*"]
+
+[tool.setuptools.package-data]
+"builder_agent.render" = ["templates/*.j2"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

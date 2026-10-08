@@ -1,0 +1,31 @@
+def model_uri():
+    """The model to use: ${{ model_uri_env }} if set, else the last one {{ adapters_dir }}/train.py logged."""
+    uri = os.environ.get(MODEL_URI_ENV)
+    if uri:
+        return uri
+    path = ROOT / MODEL_URI_FILE
+    if path.exists():
+        return path.read_text(encoding="utf-8").strip()
+    raise RuntimeError(f"no model: set ${MODEL_URI_ENV} or run {{ adapters_dir }}/train.py first")
+
+
+def model_version(uri):
+    """MLflow run id of the model, used as its version."""
+    return getattr(mlflow.models.Model.load(uri), "run_id", None) or uri
+
+
+def predict(model, X):
+    """Predictions on the original target scale. Features are taken by name, in training order."""
+    X = X[FEATURES]
+{% if model_input == "dmatrix" %}
+    raw = model.predict(xgb.DMatrix(X.values))
+{% elif model_input == "numpy" %}
+    raw = model.predict(X.values)
+{% else %}
+    raw = model.predict(X)
+{% endif %}
+{% if inverse_fn %}
+    return {{ inverse_fn }}(np.asarray(raw, dtype=float))  # undo {{ transform }} from training
+{% else %}
+    return np.asarray(raw, dtype=float)
+{% endif %}
