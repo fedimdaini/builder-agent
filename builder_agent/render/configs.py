@@ -28,7 +28,7 @@ MLFLOW_IMAGE = "ghcr.io/mlflow/mlflow:v2.17.2"   # tag checked to exist; Builder
 WORKDIR = "/app"
 ADAPTER_SCRIPTS = {"data": "data.py", "train": "train.py", "evaluate": "evaluate.py"}
 ADAPTER_PACKAGES = ["mlflow", "pandas", "numpy", "flask", "gunicorn"]   # what the adapters import
-TEST_STUB = ['@echo "make test: the smoke test is not generated yet (Builder step 5)" >&2', "@exit 1"]
+TEST_STUB = ['@echo "make test: no smoke test: the adapters were not rendered" >&2', "@exit 1"]
 
 
 class MakeRule(BaseModel):
@@ -82,8 +82,11 @@ def _make_rules(plan: BuildPlan, c: Contracts, adapters: str | None, serve_cmd: 
         elif name in ADAPTER_SCRIPTS and adapters:
             cmds = [f"$(PYTHON) {adapters}/{ADAPTER_SCRIPTS[name]}"]
             note = f"adapter, because {planned.reason}" if planned else None
+        elif name == "test" and adapters:
+            cmds = [f"$(PYTHON) {adapters}/smoke_test.py"]
+            note = "in-process (Flask test client); the sandbox also runs it over HTTP with --url"
         elif name == "test":
-            cmds, note = TEST_STUB, "fails on purpose until the smoke test exists"
+            cmds, note = TEST_STUB, "fails on purpose: no smoke test without the adapters"
         else:
             missing.append(f"{name} ({planned.reason if planned else 'no rule'})")
             continue

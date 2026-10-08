@@ -1,0 +1,5 @@
+{
+  "prediction": 531,
+  "rel_tolerance": 0.5,
+  "source": "docs/reference-run-taxi.md: the repo's original model on row 1 of data/processed/test.csv (actual 700 s). The sandbox retrains on a 1% sample (SAMPLE=1), so the tolerance is wide; it still catches log-scale output (about 6.3) or wrong units."
+}

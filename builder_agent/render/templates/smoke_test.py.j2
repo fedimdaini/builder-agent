@@ -1,0 +1,138 @@
+{{ marker }}
+"""Smoke test for the model service (contracts.yaml smoke_test).
+
+    python {{ adapters_dir }}/smoke_test.py                      # in-process (Flask test client): `make test`
+    python {{ adapters_dir }}/smoke_test.py --url http://localhost:{{ port }} [--check health|predict|all] [--wait 60]
+
+Checks: {{ health_method }} {{ health_path }} returns {{ health_status }}; {{ predict_method }} {{ predict_path }} with
+{{ adapters_dir }}/sample_request.json returns {{ predict_status }} with "{{ body_has }}" and without "{{ body_has_not }}".
+{% if expected is not none %}
+The prediction must be within {{ (expected_rel_tol * 100) | round(1) }}% of {{ expected }}.
+{% endif %}
+Exit code 0 when every check passes.
+"""
+import argparse
+import json
+import sys
+import time
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[{{ depth }}]
+SAMPLE_REQUEST = ROOT / {{ (adapters_dir ~ "/sample_request.json") | py }}
+
+HEALTH = ({{ health_method | py }}, {{ health_path | py }})
+PREDICT = ({{ predict_method | py }}, {{ predict_path | py }})
+HEALTH_STATUS = {{ health_status | py }}
+PREDICT_STATUS = {{ predict_status | py }}
+BODY_HAS = {{ body_has | py }}
+BODY_HAS_NOT = {{ body_has_not | py }}
+EXPECTED = {{ expected | py }}
+EXPECTED_REL_TOL = {{ expected_rel_tol | py }}
+
+
+def http_caller(base_url):
+    def call(method, path, body=None):
+        data = json.dumps(body).encode() if body is not None else None
+        req = urllib.request.Request(base_url.rstrip("/") + path, data=data, method=method,
+                                     headers={"Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=30) as r:
+                return r.status, _json(r.read())
+        except urllib.error.HTTPError as e:
+            return e.code, _json(e.read())
+    return call
+
+
+def local_caller():
+    sys.path.insert(0, str(ROOT))
+    from {{ serve_module }} import app  # loads the model, like the real service
+
+    client = app.test_client()
+
+    def call(method, path, body=None):
+        r = client.open(path, method=method, json=body)
+        return r.status_code, r.get_json(silent=True)
+    return call
+
+
+def _json(raw):
+    try:
+        return json.loads(raw)
+    except ValueError:
+        return None
+
+
+def status_ok(status, wanted):
+    if isinstance(wanted, int):
+        return status == wanted
+    return str(status)[0] == str(wanted)[0]   # "2xx" -> any 2.. status
+
+
+def check_health(call):
+    status, body = call(*HEALTH)
+    if not status_ok(status, HEALTH_STATUS):
+        return [f"{HEALTH[0]} {HEALTH[1]}: status {status}, expected {HEALTH_STATUS}; body {body}"]
+    return []
+
+
+def check_predict(call):
+    record = json.loads(SAMPLE_REQUEST.read_text(encoding="utf-8"))
+    status, body = call(*PREDICT, record)
+    problems = []
+    if not status_ok(status, PREDICT_STATUS):
+        problems.append(f"{PREDICT[0]} {PREDICT[1]}: status {status}, expected {PREDICT_STATUS}")
+    if not isinstance(body, dict):
+        return problems + [f"{PREDICT[0]} {PREDICT[1]}: body is not a JSON object: {body!r}"]
+    if BODY_HAS_NOT in body:
+        problems.append(f'response has "{BODY_HAS_NOT}": {body[BODY_HAS_NOT]}')
+    if BODY_HAS not in body:
+        problems.append(f'response has no "{BODY_HAS}": {body}')
+    elif EXPECTED is not None:
+        value = body[BODY_HAS]
+        if not isinstance(value, (int, float)) or abs(value - EXPECTED) > EXPECTED_REL_TOL * abs(EXPECTED):
+            problems.append(f"{BODY_HAS} {value} is not within {EXPECTED_REL_TOL:.0%} of {EXPECTED}")
+    print(f"prediction: {body.get(BODY_HAS)}")
+    return problems
+
+
+def wait_until_up(call, seconds):
+    deadline = time.monotonic() + seconds
+    while True:
+        try:
+            if not check_health(call):
+                return
+        except OSError:
+            pass   # not listening yet
+        if time.monotonic() > deadline:
+            return
+        time.sleep(2)
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Smoke test for the model service.")
+    parser.add_argument("--url", help="test a running service at this URL instead of in-process")
+    parser.add_argument("--check", choices=["health", "predict", "all"], default="all")
+    parser.add_argument("--wait", type=float, default=0, help="seconds to wait for the service to come up")
+    args = parser.parse_args()
+
+    call = http_caller(args.url) if args.url else local_caller()
+    if args.wait:
+        wait_until_up(call, args.wait)
+    checks = {"health": [check_health], "predict": [check_predict],
+              "all": [check_health, check_predict]}[args.check]
+    problems = []
+    for check in checks:
+        try:
+            problems += check(call)
+        except OSError as e:
+            problems.append(f"{check.__name__}: can't reach the service: {e}")
+    for p in problems:
+        print(f"FAIL {p}", file=sys.stderr)
+    print("smoke test " + ("failed" if problems else "passed"))
+    sys.exit(1 if problems else 0)
+
+
+if __name__ == "__main__":
+    main()

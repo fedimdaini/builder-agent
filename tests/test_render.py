@@ -202,6 +202,25 @@ def test_unsupported_contract_metric(mini, tmp_path):
         render_adapters(mini, load_contracts(p), MINI_GOLD, tmp_path / "out")
 
 
+def test_smoke_test_follows_contract(mini, contracts, tmp_path):
+    r = render_adapters(mini, contracts, MINI_GOLD, tmp_path)
+    assert r.ok, r.lint
+    smoke = render_text(r, tmp_path)["smoke_test.py"]
+    assert 'HEALTH = ("GET", "/health")' in smoke and 'PREDICT = ("POST", "/predict")' in smoke
+    assert 'HEALTH_STATUS = 200' in smoke and 'PREDICT_STATUS = "2xx"' in smoke
+    assert 'BODY_HAS = "prediction"' in smoke and 'BODY_HAS_NOT = "error"' in smoke
+    assert "EXPECTED = None" in smoke
+    assert "from pipeline.serve import app" in smoke
+
+
+def test_smoke_test_with_expected_value(mini, contracts, tmp_path):
+    r = render_adapters(mini, contracts, MINI_GOLD, tmp_path, expected={"prediction": 531, "rel_tolerance": 0.5})
+    assert r.ok, r.lint
+    smoke = render_text(r, tmp_path)["smoke_test.py"]
+    assert "EXPECTED = 531.0" in smoke and "EXPECTED_REL_TOL = 0.5" in smoke
+    assert "within 50.0% of 531.0" in smoke
+
+
 def test_py_literal():
     assert py_literal("it's") == '"it\'s"'
     assert py_literal(["a", 1, True, None]) == '["a", 1, True, None]'
@@ -229,7 +248,7 @@ def test_taxi_gold_renders_clean(taxi, contracts, tmp_path):
     r = render_adapters(taxi, contracts, TAXI_GOLD, tmp_path)
     assert r.ok, r.lint
     assert r.files == ["pipeline/train.py", "pipeline/evaluate.py", "pipeline/serve.py",
-                       "pipeline/data.py", "pipeline/sample_request.json"]
+                       "pipeline/data.py", "pipeline/sample_request.json", "pipeline/smoke_test.py"]
     f = render_text(r, tmp_path)
 
     header = next(d.columns for d in taxi.data_columns if d.path == "data/processed/train_large.csv")

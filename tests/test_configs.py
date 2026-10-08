@@ -83,7 +83,7 @@ def test_taxi_makefile(taxi_render):
                         ("all", "$(MAKE) install data train evaluate test")]:
         assert f"\n{target}:\n\t{cmd}\n" in make, target
     assert "\ninstall:\n\tpip install pipenv==2023.12.1\n\tpipenv install --deploy --system\n\tpip install mlflow\n" in make
-    assert "\ntest:\n\t@echo" in make and "\t@exit 1\n" in make   # fails until the smoke test exists
+    assert "\ntest:\n\t$(PYTHON) pipeline/smoke_test.py\n" in make
 
 
 @taxi_only
@@ -105,7 +105,7 @@ def test_manifest_covers_adapters_and_configs(taxi_render):
     files = json.loads(read(root, "pipeline/.builder-manifest.json"))["files"]
     assert set(files) == {"Dockerfile", ".dockerignore", "Makefile", "compose.base.yml", "pipeline/train.py",
                           "pipeline/evaluate.py", "pipeline/serve.py", "pipeline/data.py",
-                          "pipeline/sample_request.json"}
+                          "pipeline/sample_request.json", "pipeline/smoke_test.py"}
 
 
 # --- the linter catches broken files -------------------------------------------

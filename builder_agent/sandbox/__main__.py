@@ -1,0 +1,31 @@
+"""python -m builder_agent.sandbox <repo> --slots slots.json [--expected expected.json] [--keep]"""
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+from . import DEFAULT_CONTRACTS, DEFAULT_LOG, run_sandbox
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(prog="python -m builder_agent.sandbox", description=__doc__)
+    parser.add_argument("repo")
+    parser.add_argument("--slots", required=True, help="slot answers JSON")
+    parser.add_argument("--expected", help="expected prediction JSON for the smoke test")
+    parser.add_argument("--contracts", default=DEFAULT_CONTRACTS)
+    parser.add_argument("--log", default=DEFAULT_LOG, help="attempts log (JSON lines)")
+    parser.add_argument("--keep", action="store_true", help="keep containers and the temp copy for debugging")
+    args = parser.parse_args()
+
+    load = lambda p: json.loads(Path(p).read_text(encoding="utf-8"))  # noqa: E731
+    result = run_sandbox(args.repo, slots=load(args.slots),
+                         expected=load(args.expected) if args.expected else None,
+                         contracts_path=args.contracts, log_path=args.log, keep=args.keep)
+    sys.stdout.reconfigure(encoding="utf-8")
+    print(result.summary())
+    sys.exit(0 if result.ok else 1)
+
+
+if __name__ == "__main__":
+    main()

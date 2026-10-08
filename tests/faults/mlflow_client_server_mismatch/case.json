@@ -1,0 +1,103 @@
+{
+  "id": "fault-001",
+  "name": "mlflow_client_server_mismatch",
+  "title": "MLflow client 3.x cannot log models to a 2.17.2 tracking server",
+  "found_by": {
+    "attempt_id": "20261008T143315Z-520d64",
+    "repo": "taxi-trip-regression",
+    "date": "2026-10-08",
+    "log": "logs/sandbox_attempts.jsonl"
+  },
+  "stage": "train",
+  "command": "docker compose -p builder-sbx-taxi-trip-regression -f compose.base.yml -f compose.sandbox.yml run --rm -T --no-deps serving-current make train SAMPLE=1",
+  "exit_code": 2,
+  "stages": {
+    "render": "ok",
+    "build": "ok",
+    "mlflow": "ok",
+    "data": "ok",
+    "train": "failed",
+    "evaluate": "skipped",
+    "serve": "skipped",
+    "health": "skipped",
+    "predict": "skipped"
+  },
+  "error_signature": "API request to endpoint /api/2.0/mlflow/logged-models failed with error code 404",
+  "error_tail": [
+    "python pipeline/train.py",
+    "2026/10/08 14:37:39 INFO mlflow.tracking.fluent: Experiment with name 'taxi-duration' does not exist. Creating a new experiment.",
+    "2026/10/08 14:37:42 WARNING mlflow.utils.git_utils: Failed to import Git (the Git executable is probably not on your PATH), so Git SHA is not available. Error: Failed to initialize: Bad git executable.",
+    "The git executable must be specified in one of the following ways:",
+    "    - be included in your $PATH",
+    "    - be set via $GIT_PYTHON_GIT_EXECUTABLE",
+    "    - explicitly set via git.refresh(<full-path-to-git-executable>)",
+    "All git commands will error until this is rectified.",
+    "This initial message can be silenced or aggravated in the future by setting the",
+    "$GIT_PYTHON_REFRESH environment variable. Use one of the following values:",
+    "    - quiet|q|silence|s|silent|none|n|0: for no message or exception",
+    "    - warn|w|warning|log|l|1: for a warning message (logging level CRITICAL, displayed by default)",
+    "    - error|e|exception|raise|r|2: for a raised exception",
+    "Example:",
+    "    export GIT_PYTHON_REFRESH=quiet",
+    "2026/10/08 14:37:43 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.",
+    "🏃 View run capable-toad-945 at: http://mlflow:5000/#/experiments/1/runs/59edbefcfc9a42bd81fdace2341cb7fa",
+    "🧪 View experiment at: http://mlflow:5000/#/experiments/1",
+    "Traceback (most recent call last):",
+    "  File \"/app/pipeline/train.py\", line 96, in <module>",
+    "    main()",
+    "  File \"/app/pipeline/train.py\", line 86, in main",
+    "    mlflow.xgboost.log_model(model, \"model\")",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/xgboost/__init__.py\", line 278, in log_model",
+    "    return Model.log(",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/models/model.py\", line 1161, in log",
+    "    model = mlflow.initialize_logged_model(",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/tracking/fluent.py\", line 2130, in initialize_logged_model",
+    "    model = _create_logged_model(",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/tracking/fluent.py\", line 2257, in _create_logged_model",
+    "    return MlflowClient().create_logged_model(",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/tracking/client.py\", line 5369, in create_logged_model",
+    "    return self._tracking_client.create_logged_model(",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/tracking/_tracking_service/client.py\", line 824, in create_logged_model",
+    "    return self.store.create_logged_model(",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/store/tracking/rest_store.py\", line 936, in create_logged_model",
+    "    response_proto = self._call_endpoint(CreateLoggedModel, req_body)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/store/tracking/rest_store.py\", line 135, in _call_endpoint",
+    "    return call_endpoint(",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/utils/rest_utils.py\", line 594, in call_endpoint",
+    "    response = verify_rest_response(response, endpoint)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/utils/rest_utils.py\", line 314, in verify_rest_response",
+    "    raise MlflowException(",
+    "mlflow.exceptions.MlflowException: API request to endpoint /api/2.0/mlflow/logged-models failed with error code 404 != 200. Response body: '<!doctype html>",
+    "<html lang=en>",
+    "<title>404 Not Found</title>",
+    "<h1>Not Found</h1>",
+    "<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.</p>",
+    "'",
+    "make: *** [Makefile:27: train] Error 1"
+  ],
+  "cause": {
+    "summary": "Unpinned MLflow client 3.x against an MLflow 2.17.2 server",
+    "details": [
+      "The Dockerfile installed the MLflow client with `pip install mlflow` (no version), which resolved to mlflow 3.1.4 on Python 3.9.",
+      "compose.base.yml runs the tracking server from ghcr.io/mlflow/mlflow:v2.17.2.",
+      "mlflow.xgboost.log_model() in the 3.x client first calls POST /api/2.0/mlflow/logged-models, an endpoint added in MLflow 3; the 2.17.2 server answers 404.",
+      "Training itself succeeded: the run and the experiment were created; only the model upload failed."
+    ],
+    "versions": {
+      "client": "mlflow 3.1.4",
+      "server": "ghcr.io/mlflow/mlflow:v2.17.2",
+      "python": "3.9"
+    }
+  },
+  "fix": {
+    "summary": "Pin the MLflow client to the server image's version",
+    "action": "Install mlflow==<version> where <version> is the tag of the MLflow server image in compose.base.yml (v2.17.2 -> mlflow==2.17.2), derived at render time so the two cannot drift.",
+    "rejected_alternative": "Upgrade the server image to 3.x: the tracking server is shared by every agent, so the client follows the server, not the other way round.",
+    "level": 2
+  },
+  "reproduce": {
+    "how": "Render the config files with an unpinned MLflow client install and run the sandbox; it fails at the train stage with the error_signature above.",
+    "command": "python -m builder_agent.sandbox ../taxi-trip-regression --slots tests/gold/taxi_slots.json --expected tests/gold/taxi_expected.json",
+    "note": "At the commit that adds this case the default render is still unpinned (`pip install mlflow`), so the plain command reproduces it."
+  }
+}
