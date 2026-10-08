@@ -1,0 +1,111 @@
+# contracts.yaml — shared agreements for the six-agent MLOps pipeline (v1)
+#
+# This file says WHERE things are: commands, ports, files, owners.
+# It does not say how any agent works inside.
+# The Builder reads it to generate the pipeline; every other agent reads it
+# to know where to look. Need something different? Change the line here and
+# tell the team. Never hard-code these values in agent code.
+
+contract_version: 1
+
+# ---------------------------------------------------------------- project
+project:
+  main_repo: null            # set once the team picks the main project (must use NYC TLC monthly parquet data)
+  dev_repos: [taxi-trip-regression]   # Builder development only
+  python_version: auto       # Builder picks it from the repo; set e.g. "3.11" to force one
+
+# ---------------------------------------------------------------- serving
+# The model runs as a small web service that answers prediction requests.
+serving:
+  mode: auto                 # auto: use the repo's own API if it has one, otherwise the Builder generates one
+  port: 8000                 # every agent calls the model on this port, whatever port the repo uses inside
+  endpoints:
+    predict: {method: POST, path: /predict}
+    health:  {method: GET,  path: /health}
+  request:
+    format: json             # one record per request, features sent BY NAME, never by position
+  response:
+    prediction_field: prediction
+    model_version_field: model_version
+  errors:
+    status: 4xx_or_5xx       # an error must never come back as HTTP 200
+  model_uri_env: MODEL_URI   # the service loads its model from MLflow using this environment variable
+
+# ---------------------------------------------------------------- router
+# Splits live traffic between the current model and a candidate model.
+router:
+  owner: deployer
+  config_file: router.yaml
+  services:
+    current: serving-current
+    candidate: serving-candidate
+
+# ---------------------------------------------------------------- commands
+# Fixed command names. What runs behind each one is the Builder's job.
+make_targets:
+  install:  install dependencies
+  data:     build features from raw data into paths.processed_data
+  train:    train a model and log it to MLflow                     # used by Trainer
+  evaluate: evaluate a model and write paths.eval_report           # used by Trainer
+  serve:    start the model service on serving.port                # used by Deployer
+  test:     run the smoke test
+  all:      install, data, train, evaluate, test in order
+sample_mode:
+  variable: SAMPLE           # `make all SAMPLE=1` runs on a small slice of the data (fast tests)
+  fraction: 0.01
+
+# ---------------------------------------------------------------- files and folders
+paths:
+  raw_data: data/raw
+  processed_data: data/processed
+  models: models
+  eval_report: reports/eval.json
+  predictions_log: logs/predictions.jsonl
+  mlflow_uri: http://mlflow:5000
+  mlflow_experiment: taxi-duration
+
+# Formats other agents read
+formats:
+  eval_report:               # written by `make evaluate`, read by Trainer
+    model_version: string
+    metrics: {rmse: float, mae: float, r2: float}
+    per_group: {group_name: {rmse: float, mae: float, n: int}}
+  predictions_log:           # one JSON line per prediction, read by Monitor
+    time: ISO-8601 string
+    model_version: string
+    features: object         # the input record, by feature name
+    prediction: float
+    request_id: string       # lets late labels be joined back later
+
+# ---------------------------------------------------------------- containers
+compose:
+  base_file: compose.base.yml       # Builder: model services, MLflow, message board
+  deploy_file: compose.deploy.yml   # Deployer: router, replicas, traffic split
+  data: mounted                     # data is mounted into containers, never copied into images
+
+# ---------------------------------------------------------------- "it works"
+# The Builder's build is finished only when all of these pass.
+smoke_test:
+  health_status: 200
+  predict_status: 2xx
+  predict_body_has: prediction
+  predict_body_has_not: error
+
+# ---------------------------------------------------------------- ownership
+# Who maintains each file after the Builder creates it.
+ownership:
+  Makefile: builder
+  Dockerfile: builder
+  .dockerignore: builder
+  compose.base.yml: builder
+  compose.deploy.yml: deployer
+  router.yaml: deployer
+  .github/workflows/ci.yml: builder    # what blocks a pull request is the Reviewer's decision
+  schema.py: inspector                 # Builder writes a first draft only
+  agents.yaml: board                   # Builder writes it once
+  lineage_map: [reviewer, trainer]     # Builder creates it
+  contracts.yaml: team
+
+# ---------------------------------------------------------------- team repository
+team_repo:
+  layout: monorepo           # one repository: shared/ for common code, agents/<name>/ for each agent
