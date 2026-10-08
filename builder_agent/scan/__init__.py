@@ -12,7 +12,7 @@ import sys
 from collections import defaultdict
 from pathlib import Path, PurePosixPath
 
-from . import code, deps, hints, layout
+from . import code, deps, hints, layout, targets
 from .known import FRAMEWORKS, IMPORT_TO_DIST
 from .models import (
     EntryPoint, Framework, Notebook, ParseError, PathReference, RepoContext, ThirdPartyImport,
@@ -156,6 +156,7 @@ def scan_repo(path: str | Path) -> RepoContext:
             entry_points.append(EntryPoint(
                 path=facts.path, role=role, has_main_guard=facts.has_main_guard,
                 cli=facts.cli, functions=facts.functions,
+                signatures=facts.signatures[:code.MAX_FUNCTIONS],
             ))
     port_hints += hints.infra_port_hints(root, files)
 
@@ -170,6 +171,19 @@ def scan_repo(path: str | Path) -> RepoContext:
     # --- layout ---
     data_dirs = layout.find_data_dirs(files)
     model_dirs = layout.find_model_dirs(files)
+    lfs = layout.scan_lfs(root, files)
+
+    # --- slot candidates: data columns, target, target transforms ---
+    data_columns = layout.read_headers(root, files, data_dirs, {p.path for p in lfs.pointer_files})
+    sigs: dict = {}
+    for facts in module_facts:
+        if facts.path not in test_files:
+            for sig in facts.signatures:
+                sigs.setdefault(sig.name, sig)
+    target_candidates, target_transforms = targets.aggregate(
+        [(f.path, f.target) for f in module_facts + notebook_facts], sigs,
+        {c for d in data_columns for c in d.columns},
+    )
 
     return RepoContext(
         root=root.as_posix(),
@@ -191,9 +205,12 @@ def scan_repo(path: str | Path) -> RepoContext:
         model_files=layout.find_model_files(files, model_dirs),
         loose_data_files=layout.find_loose_data_files(files, data_dirs),
         notebooks=notebooks,
-        lfs=layout.scan_lfs(root, files),
+        lfs=lfs,
         existing_pipeline_files=layout.find_pipeline_files(files),
         test_files=sorted(test_files),
         has_pytest_config=layout.has_pytest_config(root, files),
         parse_errors=errors,
+        data_columns=data_columns,
+        target_candidates=target_candidates,
+        target_transforms=target_transforms,
     )

@@ -25,6 +25,38 @@ def _cap(items: list[str], n: int, sep: str = ", ") -> str:
     return sep.join(items[:n]) + more
 
 
+def _slot_candidates(ctx: RepoContext, add, n: int) -> None:
+    # columns: group files with the same header; show processed data in full, count the rest
+    groups: dict[tuple[str, ...], list[str]] = defaultdict(list)
+    for d in ctx.data_columns:
+        groups[tuple(d.columns)].append(d.path)
+    shown = {cols: paths for cols, paths in groups.items()
+             if any("/processed/" in f"/{p}" for p in paths)} or dict(list(groups.items())[:2])
+    for cols, paths in shown.items():
+        add(f"COLUMNS of {_cap(paths, 4)} ({len(cols)}): {_cap(list(cols), 40)}")
+    if len(groups) > len(shown):
+        add(f"  (+{len(groups) - len(shown)} other header groups in other data files)")
+    if not groups:
+        add("COLUMNS: no CSV/TSV headers in data folders")
+
+    if ctx.target_candidates:
+        def fmt(c):
+            kinds = sorted({e.split(":")[0] for e in c.evidence})
+            where = "" if c.in_data else ", not in data headers"
+            return f"{c.column} (score {c.score}{where}; {', '.join(kinds)})"
+        add("TARGET CANDIDATES: " + _cap([fmt(c) for c in ctx.target_candidates], 3, "; "))
+    else:
+        add("TARGET CANDIDATES: none")
+
+    for t in ctx.target_transforms:
+        inv = (f"inverse {t.inverse} in {_cap(t.inverse_files, n)}" if t.inverse_files
+               else f"inverse {t.inverse} NEVER applied")
+        add(f"TARGET TRANSFORM: {t.forward} on {', '.join(t.applied_to)} "
+            f"(in {_cap(t.forward_files, n)}) | {inv}")
+    if not ctx.target_transforms:
+        add("TARGET TRANSFORM: none found")
+
+
 def render_summary(ctx: RepoContext, n: int = 8) -> str:
     out: list[str] = []
     add = out.append
@@ -63,8 +95,10 @@ def render_summary(ctx: RepoContext, n: int = 8) -> str:
         bits = [f"[{e.role}]", "__main__" if e.has_main_guard else "no __main__"]
         if e.cli:
             bits.append(f"cli={e.cli}")
-        if e.functions:
-            bits.append("defs=" + ",".join(e.functions[:4]))
+        if e.signatures:
+            bits.append("defs: " + "; ".join(sig.render() for sig in e.signatures[:4]))
+        elif e.functions:
+            bits.append("defs: " + ", ".join(e.functions[:4]))
         add(f"  - {e.path} " + " ".join(bits))
     if len(ctx.entry_points) > n:
         add(f"  - +{len(ctx.entry_points) - n} more")
@@ -96,6 +130,8 @@ def render_summary(ctx: RepoContext, n: int = 8) -> str:
     add("PATHS IN CODE (found): " + _cap(found, n))
     if missing:
         add("PATHS IN CODE (MISSING): " + _cap(missing, n))
+
+    _slot_candidates(ctx, add, n)
 
     add("NOTEBOOKS: " + _cap([f"{nb.path} ({nb.n_code_cells} code cells)" for nb in ctx.notebooks], n))
 

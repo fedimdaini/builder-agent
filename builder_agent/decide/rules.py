@@ -264,7 +264,10 @@ def _requirement(name: str, e: EntryPoint, ctx: RepoContext, c: Contracts) -> st
 
 def _entry_line(e: EntryPoint) -> str:
     main = "__main__" if e.has_main_guard else "no __main__"
-    defs = f", defs: {', '.join(e.functions)}" if e.functions else ""
+    if e.signatures:
+        defs = f", defs: {'; '.join(s.render() for s in e.signatures)}"
+    else:
+        defs = f", defs: {', '.join(e.functions)}" if e.functions else ""
     return f"{e.path} [{e.role}] {main}{defs}"
 
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import fnmatch
 import os
 import re
@@ -9,7 +10,7 @@ from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
-from .models import ArtifactDir, FileInfo, LfsInfo, LfsPointer
+from .models import ArtifactDir, DataColumns, FileInfo, LfsInfo, LfsPointer
 
 PRUNE_DIRS = {
     ".git", ".hg", ".svn", ".venv", "venv", "node_modules", "__pycache__",
@@ -116,6 +117,36 @@ def find_model_files(files: dict[str, int], model_dirs: list[ArtifactDir]) -> li
 def find_loose_data_files(files: dict[str, int], data_dirs: list[ArtifactDir]) -> list[FileInfo]:
     return [FileInfo(path=f, size_bytes=s) for f, s in files.items()
             if _suffix(f) in DATA_EXTS and not any(f.startswith(d.path + "/") for d in data_dirs)]
+
+
+MAX_HEADER_FILES = 100
+MAX_HEADER_BYTES = 65_536
+MAX_COLUMNS = 300
+
+
+def read_headers(root: Path, files: dict[str, int], data_dirs: list[ArtifactDir],
+                 lfs_pointers: set[str]) -> list[DataColumns]:
+    """Column names from the first line of each CSV/TSV in the data folders (never the rows)."""
+    out = []
+    for f in files:
+        if len(out) >= MAX_HEADER_FILES:
+            break
+        ext = _suffix(f)
+        if ext not in {".csv", ".tsv"} or f in lfs_pointers:
+            continue
+        if not any(f.startswith(d.path + "/") for d in data_dirs):
+            continue
+        try:
+            with open(root / f, encoding="utf-8-sig", errors="replace", newline="") as fh:
+                line = fh.readline(MAX_HEADER_BYTES)
+        except OSError:
+            continue
+        delimiter = "\t" if ext == ".tsv" else ","
+        cols = next(csv.reader([line], delimiter=delimiter), [])
+        cols = [c.strip() for c in cols]
+        if cols and any(cols):
+            out.append(DataColumns(path=f, columns=cols[:MAX_COLUMNS], n_columns=len(cols)))
+    return out
 
 
 # --- Git LFS --------------------------------------------------------------

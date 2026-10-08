@@ -8,8 +8,9 @@ import re
 from dataclasses import dataclass, field
 from pathlib import PurePosixPath
 
+from . import targets
 from .layout import DATA_EXTS, MODEL_EXTS
-from .models import EntryRole, PortHint, Route, WebApp
+from .models import EntryRole, FunctionSig, PortHint, Route, WebApp
 
 MAX_FUNCTIONS = 10
 CLI_LIBS = ("typer", "click", "fire", "argparse")
@@ -37,6 +38,8 @@ class ModuleFacts:
     has_main_guard: bool = False
     cli: str | None = None
     functions: list[str] = field(default_factory=list)
+    signatures: list[FunctionSig] = field(default_factory=list)   # all top-level defs
+    target: targets.TargetFacts = field(default_factory=targets.TargetFacts)
     web_apps: list[WebApp] = field(default_factory=list)
     ports: list[PortHint] = field(default_factory=list)
     path_literals: set[str] = field(default_factory=set)
@@ -142,12 +145,13 @@ def analyze_tree(tree: ast.Module, path: str, *, is_notebook: bool = False) -> M
             facts.path_literals.add(node.value.replace("\\", "/"))
 
     top = {i.split(".")[0] for i in facts.imports}
+    facts.target = targets.collect(tree)
     if is_notebook:
         return facts
 
     facts.has_main_guard = any(_is_main_guard(n) for n in tree.body)
-    facts.functions = [n.name for n in tree.body
-                       if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))][:MAX_FUNCTIONS]
+    facts.signatures = targets.signatures(tree)
+    facts.functions = [s.name for s in facts.signatures][:MAX_FUNCTIONS]
     facts.cli = next((lib for lib in CLI_LIBS if lib in top), None)
     if facts.cli is None and any(isinstance(n, ast.Attribute) and n.attr == "argv"
                                  and isinstance(n.value, ast.Name) and n.value.id == "sys"
@@ -160,8 +164,8 @@ def analyze_tree(tree: ast.Module, path: str, *, is_notebook: bool = False) -> M
     for node in tree.body:
         if isinstance(node, (ast.Assign, ast.AnnAssign)) and isinstance(node.value, ast.Call):
             cls = _call_name(node.value.func)
-            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
-            names = [t.id for t in targets if isinstance(t, ast.Name)]
+            assigned = node.targets if isinstance(node, ast.Assign) else [node.target]
+            names = [t.id for t in assigned if isinstance(t, ast.Name)]
             if cls in APP_CLASSES and APP_CLASSES[cls] in top:
                 apps.update({n: APP_CLASSES[cls] for n in names})
                 holders.update(names)

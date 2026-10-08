@@ -56,12 +56,43 @@ class Framework(BaseModel):
     via: list[Literal["import", "dependency"]]
 
 
+class FunctionSig(BaseModel):
+    name: str
+    params: list[str] = Field(default_factory=list)  # "target_col", "num_rounds=371", "*args", "**kw"
+    doc: str | None = None                           # first docstring line
+
+    def render(self) -> str:
+        return f"{self.name}({', '.join(self.params)})"
+
+
 class EntryPoint(BaseModel):
     path: str
     role: EntryRole
     has_main_guard: bool
     cli: str | None = None         # argparse, click, typer, fire, sys.argv
     functions: list[str] = Field(default_factory=list)  # top-level defs (capped)
+    signatures: list[FunctionSig] = Field(default_factory=list)  # same defs with parameters
+
+
+class DataColumns(BaseModel):
+    path: str
+    columns: list[str]             # header only (capped)
+    n_columns: int
+
+
+class TargetCandidate(BaseModel):
+    column: str
+    score: int                     # weighted evidence count (drop=1, label/fit/y-assign/target-*=3)
+    in_data: bool                  # appears in a data file header
+    evidence: list[str]            # "label: notebooks/x.ipynb", "drop: src/train.py", ...
+
+
+class TargetTransform(BaseModel):
+    forward: str                   # "log1p"
+    inverse: str                   # "expm1"
+    applied_to: list[str]          # target columns, or "via <variable>" if not resolvable
+    forward_files: list[str]
+    inverse_files: list[str]       # empty: inverse never applied (e.g. serving returns log values)
 
 
 class Route(BaseModel):
@@ -154,6 +185,11 @@ class RepoContext(BaseModel):
     loose_data_files: list[FileInfo] = Field(default_factory=list)  # data files outside data dirs
     notebooks: list[Notebook] = Field(default_factory=list)
     lfs: LfsInfo = Field(default_factory=LfsInfo)
+
+    # slot candidates for the LLM
+    data_columns: list[DataColumns] = Field(default_factory=list)   # CSV/TSV headers in data dirs
+    target_candidates: list[TargetCandidate] = Field(default_factory=list)  # best first
+    target_transforms: list[TargetTransform] = Field(default_factory=list)
 
     existing_pipeline_files: list[str] = Field(default_factory=list)  # Dockerfile, Makefile, CI, ...
     test_files: list[str] = Field(default_factory=list)
