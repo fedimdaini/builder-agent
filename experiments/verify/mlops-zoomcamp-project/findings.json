@@ -1,0 +1,159 @@
+{
+  "repo": "mlops-zoomcamp-project",
+  "source": "git HEAD (e157717)",
+  "generated_at": "2026-10-08T20:48:12+00:00",
+  "rules": {
+    "floating-image-tag": "fault-002",
+    "postgres18-mount-path": "fault-003",
+    "crlf-shell-script": "fault-004",
+    "mlflow-local-artifact-root": "fault-005",
+    "service-without-healthcheck": "fault-006"
+  },
+  "findings": [
+    {
+      "rule": "floating-image-tag",
+      "fault_id": "fault-002",
+      "severity": "error",
+      "file": "docker-compose.yaml",
+      "line": 263,
+      "message": "localstack/localstack:stable has a floating tag (stable): it changes under you (fault-002: localstack:stable started requiring an account)",
+      "evidence": "image: localstack/localstack:stable",
+      "fix": "pin it to localstack/localstack:4.12 (known to work, fault-002)",
+      "fix_diff": "diff --git a/docker-compose.yaml b/docker-compose.yaml\n--- a/docker-compose.yaml\n+++ b/docker-compose.yaml\n@@ -260,7 +260,7 @@\n   # LOCALSTACK \n   # ---------------------------------------------------------------------------\n   localstack:\n-    image: localstack/localstack:stable\n+    image: localstack/localstack:4.12\n     container_name: localstack\n     # env_file:\n     #   - .env\n"
+    },
+    {
+      "rule": "floating-image-tag",
+      "fault_id": "fault-002",
+      "severity": "error",
+      "file": "docker-compose.yaml",
+      "line": 309,
+      "message": "postgres:latest has a floating tag (latest): it changes under you (fault-002: localstack:stable started requiring an account)",
+      "evidence": "image: postgres:latest",
+      "fix": "pin it to postgres:16 (known to work, fault-003)",
+      "fix_diff": "diff --git a/docker-compose.yaml b/docker-compose.yaml\n--- a/docker-compose.yaml\n+++ b/docker-compose.yaml\n@@ -306,7 +306,7 @@\n   # ---------------------------------------------------------------------------\n \n   postgresnyc:\n-    image: postgres:latest\n+    image: postgres:16\n     environment:\n       - POSTGRES_USER=${NYC_POSTGRES_USERNAME:-nycpostgres}\n       - POSTGRES_PASSWORD=${NYC_POSTGRES_PASSWORD:-nycpostgres}\n"
+    },
+    {
+      "rule": "postgres18-mount-path",
+      "fault_id": "fault-003",
+      "severity": "error",
+      "file": "docker-compose.yaml",
+      "line": 309,
+      "message": "postgres:latest can resolve to PostgreSQL 18+, which exits when a volume is mounted at /var/lib/postgresql/data (line 315)",
+      "evidence": "image: postgres:latest  +  line 315: postgres-nyc-volume:/var/lib/postgresql/data",
+      "fix": "pin it to postgres:16 (keeps the data path), or move the mount to /var/lib/postgresql before going to 18",
+      "fix_diff": "diff --git a/docker-compose.yaml b/docker-compose.yaml\n--- a/docker-compose.yaml\n+++ b/docker-compose.yaml\n@@ -306,7 +306,7 @@\n   # ---------------------------------------------------------------------------\n \n   postgresnyc:\n-    image: postgres:latest\n+    image: postgres:16\n     environment:\n       - POSTGRES_USER=${NYC_POSTGRES_USERNAME:-nycpostgres}\n       - POSTGRES_PASSWORD=${NYC_POSTGRES_PASSWORD:-nycpostgres}\n"
+    },
+    {
+      "rule": "floating-image-tag",
+      "fault_id": "fault-002",
+      "severity": "error",
+      "file": "docker-compose.yaml",
+      "line": 359,
+      "message": "postgres:latest has a floating tag (latest): it changes under you (fault-002: localstack:stable started requiring an account)",
+      "evidence": "image: postgres:latest",
+      "fix": "pin it to postgres:16 (known to work, fault-003)",
+      "fix_diff": "diff --git a/docker-compose.yaml b/docker-compose.yaml\n--- a/docker-compose.yaml\n+++ b/docker-compose.yaml\n@@ -356,7 +356,7 @@\n     #   - app-network\n \n   postgresmlflow:\n-    image: postgres:latest\n+    image: postgres:16\n     environment:\n       - POSTGRES_USER=$MLFLOW_POSTGRES_USER\n       - POSTGRES_PASSWORD=$MLFLOW_POSTGRES_PASS\n"
+    },
+    {
+      "rule": "postgres18-mount-path",
+      "fault_id": "fault-003",
+      "severity": "error",
+      "file": "docker-compose.yaml",
+      "line": 359,
+      "message": "postgres:latest can resolve to PostgreSQL 18+, which exits when a volume is mounted at /var/lib/postgresql/data (line 365)",
+      "evidence": "image: postgres:latest  +  line 365: postgres-mlflow-volume:/var/lib/postgresql/data",
+      "fix": "pin it to postgres:16 (keeps the data path), or move the mount to /var/lib/postgresql before going to 18",
+      "fix_diff": "diff --git a/docker-compose.yaml b/docker-compose.yaml\n--- a/docker-compose.yaml\n+++ b/docker-compose.yaml\n@@ -356,7 +356,7 @@\n     #   - app-network\n \n   postgresmlflow:\n-    image: postgres:latest\n+    image: postgres:16\n     environment:\n       - POSTGRES_USER=$MLFLOW_POSTGRES_USER\n       - POSTGRES_PASSWORD=$MLFLOW_POSTGRES_PASS\n"
+    },
+    {
+      "rule": "floating-image-tag",
+      "fault_id": "fault-002",
+      "severity": "error",
+      "file": "docker-compose.yaml",
+      "line": 394,
+      "message": "postgres:latest has a floating tag (latest): it changes under you (fault-002: localstack:stable started requiring an account)",
+      "evidence": "image: postgres:latest",
+      "fix": "pin it to postgres:16 (known to work, fault-003)",
+      "fix_diff": "diff --git a/docker-compose.yaml b/docker-compose.yaml\n--- a/docker-compose.yaml\n+++ b/docker-compose.yaml\n@@ -391,7 +391,7 @@\n   # ---------------------------------------------------------------------------\n \n   postgresgrafana:\n-    image: postgres:latest\n+    image: postgres:16\n     environment:\n       - POSTGRES_USER=grafana\n       - POSTGRES_PASSWORD=grafana\n"
+    },
+    {
+      "rule": "postgres18-mount-path",
+      "fault_id": "fault-003",
+      "severity": "error",
+      "file": "docker-compose.yaml",
+      "line": 394,
+      "message": "postgres:latest can resolve to PostgreSQL 18+, which exits when a volume is mounted at /var/lib/postgresql/data (line 400)",
+      "evidence": "image: postgres:latest  +  line 400: postgres-grafana-volume:/var/lib/postgresql/data",
+      "fix": "pin it to postgres:16 (keeps the data path), or move the mount to /var/lib/postgresql before going to 18",
+      "fix_diff": "diff --git a/docker-compose.yaml b/docker-compose.yaml\n--- a/docker-compose.yaml\n+++ b/docker-compose.yaml\n@@ -391,7 +391,7 @@\n   # ---------------------------------------------------------------------------\n \n   postgresgrafana:\n-    image: postgres:latest\n+    image: postgres:16\n     environment:\n       - POSTGRES_USER=grafana\n       - POSTGRES_PASSWORD=grafana\n"
+    },
+    {
+      "rule": "mlflow-local-artifact-root",
+      "fault_id": "fault-005",
+      "severity": "error",
+      "file": "mlflow/Dockerfile",
+      "line": 35,
+      "message": "mlflow server uses a plain local path as --default-artifact-root ($MLFLOW_DEFAULT_ARTIFACT_ROOT = /tmp/artifacts, set by service mlflow in docker-compose.yaml): every client writes artifacts to its own disk, so other containers can't load the models (fault-005). --serve-artifacts alone doesn't help while the root is a local path",
+      "evidence": "CMD [\"sh\", \"-c\", \"mlflow server --backend-store-uri $MLFLOW_BACKEND_STORE_URI --default-artifact-root $MLFLOW_DEFAULT_ARTIFACT_ROOT --host 0.0.0.0 --port 5000\"]",
+      "fix": "let the server store and serve the artifacts: --serve-artifacts --artifacts-destination <path or s3://...> instead of --default-artifact-root; new experiments then get mlflow-artifacts:/ URIs (existing experiments keep their old location)",
+      "fix_diff": "diff --git a/mlflow/Dockerfile b/mlflow/Dockerfile\n--- a/mlflow/Dockerfile\n+++ b/mlflow/Dockerfile\n@@ -32,4 +32,4 @@\n #     \"--port\", \"5000\" \\\n # ]\n \n-CMD [\"sh\", \"-c\", \"mlflow server --backend-store-uri $MLFLOW_BACKEND_STORE_URI --default-artifact-root $MLFLOW_DEFAULT_ARTIFACT_ROOT --host 0.0.0.0 --port 5000\"]\n+CMD [\"sh\", \"-c\", \"mlflow server --backend-store-uri $MLFLOW_BACKEND_STORE_URI --serve-artifacts --artifacts-destination $MLFLOW_DEFAULT_ARTIFACT_ROOT --host 0.0.0.0 --port 5000\"]\n"
+    },
+    {
+      "rule": "crlf-shell-script",
+      "fault_id": "fault-004",
+      "severity": "warning",
+      "file": ".gitattributes",
+      "line": 0,
+      "message": "nothing keeps the shell scripts LF: a Windows checkout with core.autocrlf=true turns them into CRLF and they fail in Linux containers (fault-004)",
+      "evidence": "2 shell script(s) (flask/test_requests.sh, localstack_s3_client/init.sh); no .gitattributes rule with eol=lf for *.sh",
+      "fix": "create .gitattributes with `*.sh text eol=lf` so every checkout keeps them LF, whatever each teammate's git settings",
+      "fix_diff": "diff --git a/.gitattributes b/.gitattributes\nnew file mode 100644\n--- /dev/null\n+++ b/.gitattributes\n@@ -0,0 +1,2 @@\n+# Shell scripts run in Linux containers: keep LF on every checkout (fault-004)\n+*.sh text eol=lf\n"
+    },
+    {
+      "rule": "service-without-healthcheck",
+      "fault_id": "fault-006",
+      "severity": "warning",
+      "file": "docker-compose.yaml",
+      "line": 329,
+      "message": "service mlflow has ports but no healthcheck: nothing can wait for it (depends_on: service_healthy) and a broken service still shows as Up (fault-006)",
+      "evidence": "mlflow: publishes ${MLFLOW_PORT}:5000 and has no healthcheck",
+      "fix": "add a healthcheck on http://localhost:5000/health using python3, which its Dockerfile installs",
+      "fix_diff": "diff --git a/docker-compose.yaml b/docker-compose.yaml\n--- a/docker-compose.yaml\n+++ b/docker-compose.yaml\n@@ -332,6 +332,11 @@\n       dockerfile: Dockerfile\n     ports:\n       - ${MLFLOW_PORT}:5000\n+    healthcheck:\n+      test: [\"CMD\", \"python3\", \"-c\", \"import urllib.request; urllib.request.urlopen('http://localhost:5000/health', timeout=5)\"]\n+      interval: 30s\n+      timeout: 10s\n+      retries: 5\n     environment:\n       # - MLFLOW_DEFAULT_ARTIFACT_ROOT=s3://${MLFLOW_BUCKET}/${PROJECT_NAME}/artifacts\n       - MLFLOW_DEFAULT_ARTIFACT_ROOT=/tmp/artifacts\n"
+    },
+    {
+      "rule": "service-without-healthcheck",
+      "fault_id": "fault-006",
+      "severity": "warning",
+      "file": "docker-compose.yaml",
+      "line": 374,
+      "message": "service flask-app has ports but no healthcheck: nothing can wait for it (depends_on: service_healthy) and a broken service still shows as Up (fault-006)",
+      "evidence": "flask-app: publishes 8000:8000 and has no healthcheck",
+      "fix": "add a healthcheck on http://localhost:8000/ using the healthcheck another compose file already uses for this image",
+      "fix_diff": "diff --git a/docker-compose.yaml b/docker-compose.yaml\n--- a/docker-compose.yaml\n+++ b/docker-compose.yaml\n@@ -377,6 +377,12 @@\n       dockerfile: Dockerfile\n     ports:\n       - \"8000:8000\"\n+    healthcheck:\n+      test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:8000/\"]\n+      interval: 30s\n+      timeout: 10s\n+      retries: 3\n+      start_period: 10s\n     environment:\n       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}\n       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}\n"
+    },
+    {
+      "rule": "service-without-healthcheck",
+      "fault_id": "fault-006",
+      "severity": "warning",
+      "file": "docker-compose.yaml",
+      "line": 408,
+      "message": "service grafana has ports but no healthcheck: nothing can wait for it (depends_on: service_healthy) and a broken service still shows as Up (fault-006)",
+      "evidence": "grafana: publishes ${GRAFANA_PORT}:3000 and has no healthcheck",
+      "fix": "add a healthcheck; its image has neither curl nor python3 visible in this repo, so no command is proposed",
+      "fix_diff": null
+    },
+    {
+      "rule": "floating-image-tag",
+      "fault_id": "fault-002",
+      "severity": "warning",
+      "file": "docker-compose.yaml",
+      "line": 409,
+      "message": "grafana/grafana has a floating tag (no tag): it changes under you (fault-002: localstack:stable started requiring an account)",
+      "evidence": "image: grafana/grafana",
+      "fix": "pin grafana/grafana to the explicit version you run today; no known-good version is recorded, so no diff is proposed",
+      "fix_diff": null
+    }
+  ],
+  "patch_file": "C:\\Users\\mdain\\OneDrive\\Bureau\\adsp-project\\builder-agent\\experiments\\verify\\mlops-zoomcamp-project\\fixes.patch",
+  "patch_check": "applies cleanly to git HEAD (e157717) (git apply --check on a clean export)"
+}

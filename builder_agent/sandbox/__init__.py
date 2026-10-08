@@ -32,6 +32,7 @@ from pydantic import BaseModel, Field
 
 from ..decide import load_contracts, plan_build
 from ..render import Expected, render_adapters, validate_slots
+from ..repo_writer import RepoWriter
 from ..render.configs import _top_dirs, config_context, render_configs
 from ..scan import scan_repo
 
@@ -105,7 +106,8 @@ def copy_repo(src: Path, dst: Path, skip_top: set[str]) -> None:
     shutil.copytree(src, dst, ignore=ignore)
 
 
-def write_override(workdir: Path, compose_file: str, model_service: str, real_repo: Path) -> Path:
+def write_override(workdir: Path, compose_file: str, model_service: str, real_repo: Path,
+                   writer: RepoWriter | None = None) -> Path:
     """compose.sandbox.yml: no host ports, data bind-mounted read-only from the real repo."""
     base = yaml.safe_load((workdir / compose_file).read_text(encoding="utf-8"))
     services = base["services"]
@@ -119,10 +121,10 @@ def write_override(workdir: Path, compose_file: str, model_service: str, real_re
             volumes.append(v)
     override = {"services": {name: {"ports": _Tagged("!reset", [])} for name in services}}
     override["services"][model_service]["volumes"] = _Tagged("!override", volumes)
-    path = workdir / OVERRIDE_FILE
-    path.write_text("# Sandbox only (not a Builder output): no host ports, real data mounted read-only.\n"
-                    + yaml.dump(override, Dumper=_Dumper, sort_keys=False), encoding="utf-8")
-    return path
+    text = ("# Sandbox only (not a Builder output): no host ports, real data mounted read-only.\n"
+            + yaml.dump(override, Dumper=_Dumper, sort_keys=False))
+    (writer or RepoWriter(workdir)).write_new({OVERRIDE_FILE: text})
+    return workdir / OVERRIDE_FILE
 
 
 class _Tagged:
@@ -191,9 +193,11 @@ def run_sandbox(repo: str | Path, slots: dict, expected: dict | None = None,
                  "port": tctx["port"], "adapters": c.paths["adapters_dir"].strip("/"),
                  "sample": c.sample_mode.variable}
         copy_repo(repo, workdir, set(_top_dirs(ctx, c)[0]))
-        a = render_adapters(ctx, c, v.slots, workdir, expected=Expected.model_validate(expected) if expected else None)
-        cfg = render_configs(ctx, c, plan, v.slots, workdir, mlflow_client)
-        write_override(workdir, names["compose_file"], names["model"], repo)
+        writer = RepoWriter(workdir)       # the temp copy has no .git: new files only, no branch
+        a = render_adapters(ctx, c, v.slots, workdir, writer=writer,
+                            expected=Expected.model_validate(expected) if expected else None)
+        cfg = render_configs(ctx, c, plan, v.slots, workdir, mlflow_client, writer=writer)
+        write_override(workdir, names["compose_file"], names["model"], repo, writer=writer)
         lint = a.lint + cfg.lint
         ok = record("render", t0, 1 if lint else 0,
                     "\n".join(lint) or f"rendered {len(a.files) + len(cfg.files)} files into {workdir}", None)

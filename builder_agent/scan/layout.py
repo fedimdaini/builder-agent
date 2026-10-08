@@ -37,6 +37,13 @@ class WalkResult:
     pyc_names: list[str]    # rel paths of .pyc files in __pycache__ (for version hints)
 
 
+def _is_venv(path: Path) -> bool:
+    try:
+        return (path / "pyvenv.cfg").exists()
+    except OSError:
+        return False   # e.g. a Linux symlink written by a container, unreadable on Windows
+
+
 def walk_repo(root: Path) -> WalkResult:
     files: dict[str, int] = {}
     pyc: list[str] = []
@@ -47,7 +54,7 @@ def walk_repo(root: Path) -> WalkResult:
             if d == "__pycache__":
                 rel = (here / d).relative_to(root).as_posix()
                 pyc.extend(f"{rel}/{n}" for n in os.listdir(here / d) if n.endswith(".pyc"))
-            elif d in PRUNE_DIRS or d.endswith(".egg-info") or (here / d / "pyvenv.cfg").exists():
+            elif d in PRUNE_DIRS or d.endswith(".egg-info") or _is_venv(here / d):
                 continue
             else:
                 keep.append(d)

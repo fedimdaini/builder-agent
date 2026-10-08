@@ -22,7 +22,8 @@ from ..decide.contracts import Contracts
 from ..decide.models import BuildPlan
 from ..scan.deps import declared_names, normalize
 from ..scan.models import RepoContext
-from . import MARKER, RenderError, RenderResult, _env, manifest_path, write_guarded
+from ..repo_writer import RepoWriter
+from . import MARKER, RenderError, RenderResult, _env, manifest_path, write_new_files
 from .slots import FLAVOR_DIST, SlotAnswers, validate_slots
 
 MLFLOW_IMAGE = "ghcr.io/mlflow/mlflow:v2.17.2"   # tag checked to exist; Builder-internal default
@@ -188,7 +189,7 @@ def config_context(ctx: RepoContext, c: Contracts, plan: BuildPlan, slots: SlotA
 
 def render_configs(ctx: RepoContext, contracts: Contracts, plan: BuildPlan,
                    slots: dict | SlotAnswers | None, out_root: str | Path,
-                   mlflow_client: str | None = None) -> RenderResult:
+                   mlflow_client: str | None = None, writer: RepoWriter | None = None) -> RenderResult:
     """Render Dockerfile, .dockerignore, Makefile and the compose base file into out_root."""
     answers = None
     if slots is not None:
@@ -205,7 +206,7 @@ def render_configs(ctx: RepoContext, contracts: Contracts, plan: BuildPlan,
         tctx["compose_file"]: env.get_template("compose.base.yml.j2").render(**tctx),
     }
     out_root = Path(out_root)
-    write_guarded(out_root, manifest_path(contracts), rendered)
+    write_new_files(writer or RepoWriter(out_root), manifest_path(contracts), rendered)
     return RenderResult(files=list(rendered), lint=lint_configs(out_root, tctx))
 
 

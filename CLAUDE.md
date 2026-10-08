@@ -17,7 +17,15 @@ Full team architecture: docs/architecture.html
 - Store both successful and failed fixes in memory.
 - Log every LLM call and build attempt (prompt, response, model digest, latency, outcome).
 - Never touch: rollout/router config (Deployer), runtime schema checks (Inspector), PR gating (Reviewer).
-- Never modify the target repo's existing files; only add generated files.
+- HARD RULE: the Builder never modifies a file that exists in a target repo. It only adds new
+  files, and in a git repo only on its own branch `builder/<date>` (created from HEAD, never
+  main, never an existing branch). For problems in existing files it writes a findings report
+  and a patch file, outside the target, and never applies them. Enforced by
+  builder_agent/repo_writer.py (the only module allowed to write into a target repo) and by
+  tests/test_repo_rule.py, which fails if any Builder run changes an existing file or if a new
+  module writes files without going through it.
+- Mode per pipeline artifact (decide/modes.py): create if it doesn't exist, verify if it does.
+  Verify = static rules in builder_agent/verify/, one per fault case (002-006), read-only.
 
 ## Test repos
 - Dev repo: ../taxi-trip-regression (fork; its Dockerfile was removed on purpose)
