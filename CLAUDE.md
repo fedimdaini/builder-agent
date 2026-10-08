@@ -47,4 +47,8 @@ Details: docs/llm-spike-1.md
 ## Current step
 Step 1 done: repo scanner in builder_agent/scan (`python -m builder_agent.scan <repo>`), returns RepoContext + summary().
 Step 2 done: decide layer in builder_agent/decide (`python -m builder_agent.decide <repo>`), RepoContext + contracts.yaml -> BuildPlan, no LLM; marks what rules can't settle as needs_llm.
-Step 3: templates (Jinja2 render layer) for the [ok] (decided) items of the BuildPlan.
+Step 3 done: adapters in builder_agent/render: SlotAnswers + slot_candidates() + validate_slots() (slots.py),
+  Jinja2 templates for pipeline/{train,evaluate,serve,data}.py and sample_request.json, pyflakes on output.
+  Gold answers for taxi: tests/gold/taxi_slots.json (validate and render cleanly; adapters not run yet).
+Step 4: config templates for the [ok] items: Dockerfile, .dockerignore, Makefile, compose.base.yml.
+Step 5: sandbox runner (docker build + `make all SAMPLE=1` in a throwaway container).
