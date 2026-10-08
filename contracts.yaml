@@ -63,6 +63,7 @@ paths:
   predictions_log: logs/predictions.jsonl
   mlflow_uri: http://mlflow:5000
   mlflow_experiment: taxi-duration
+  adapters_dir: pipeline     # Builder's adapter scripts in the target repo (train.py, evaluate.py, serve.py, data.py, sample_request.json)
 
 # Formats other agents read
 formats:
@@ -104,6 +105,7 @@ ownership:
   schema.py: inspector                 # Builder writes a first draft only
   agents.yaml: board                   # Builder writes it once
   lineage_map: [reviewer, trainer]     # Builder creates it
+  pipeline/: builder                   # adapter scripts (paths.adapters_dir)
   contracts.yaml: team
 
 # ---------------------------------------------------------------- team repository

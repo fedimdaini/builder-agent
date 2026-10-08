@@ -20,6 +20,21 @@ Full team architecture: docs/architecture.html
 ## Test repos
 - Dev repo: ../taxi-trip-regression (fork; its Dockerfile was removed on purpose)
 
+## Lessons from the reference run
+Details: docs/reference-run-taxi.md
+- Smoke test must fail on an "error" key in the response body, not only on HTTP status
+  (the taxi app returns errors with HTTP 200).
+- Dockerfiles install dependencies before copying code, so the dependency layer stays cached.
+- Scanner should later find or build a sample request for the smoke test
+  (for taxi it came from a notebook cell and the test.csv header).
+
+## Decisions
+- needs_llm items are filled with thin adapter scripts in the target repo's
+  `pipeline/` folder (contracts.yaml paths.adapters_dir, owned by builder):
+  train.py, evaluate.py, serve.py, data.py, sample_request.json.
+  Adapters only call functions the repo already has; they never modify the repo's files.
+
 ## Current step
 Step 1 done: repo scanner in builder_agent/scan (`python -m builder_agent.scan <repo>`), returns RepoContext + summary().
-Step 2: decide layer (RepoContext facts + contracts.yaml -> build plan, no LLM).
+Step 2 done: decide layer in builder_agent/decide (`python -m builder_agent.decide <repo>`), RepoContext + contracts.yaml -> BuildPlan, no LLM; marks what rules can't settle as needs_llm.
+Step 3: templates (Jinja2 render layer) for the [ok] (decided) items of the BuildPlan.
