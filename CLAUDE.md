@@ -54,6 +54,7 @@ Recorded failures live in tests/faults/<name>/case.json (stage, error tail, caus
 how to reproduce); tests/test_faults.py checks their shape. They will seed the incident memory.
 
 ## Current step
+Plan for the next phase (main project, Builder modes, LLM work): docs/ROADMAP.md
 Step 1 done: repo scanner in builder_agent/scan (`python -m builder_agent.scan <repo>`), returns RepoContext + summary().
 Step 2 done: decide layer in builder_agent/decide (`python -m builder_agent.decide <repo>`), RepoContext + contracts.yaml -> BuildPlan, no LLM; marks what rules can't settle as needs_llm.
 Step 3 done: adapters in builder_agent/render: SlotAnswers + slot_candidates() + validate_slots() (slots.py),
