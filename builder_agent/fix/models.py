@@ -72,6 +72,7 @@ def answer_model(prompt_text: str) -> type[Diagnosis] | type[DiagnosisWithAnalys
 PIP_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 VERSION_RE = re.compile(r"^\d+(\.\d+){1,2}$")
 APT_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9+.-]+$")
+APT_PATTERN_CHARS = set("+*?[]")    # apt-get reads a name with these as a pattern (gen-011: "clang++")
 ENV_NAME_RE = re.compile(r"^[A-Z_][A-Z0-9_]*$")
 PROTECTED_ENV = {"PATH", "HOME", "PYTHONPATH", "LD_LIBRARY_PATH", "PYTHONHOME"}
 
@@ -84,9 +85,10 @@ class FixValidation(BaseModel):
 
 def validate_fix(answer: dict, applied: Overrides, installed: set[str],
                  model: type[Diagnosis] | type[DiagnosisWithAnalysis] = Diagnosis,
-                 python_packages: set[str] = frozenset()) -> FixValidation:
+                 python_packages: set[str] = frozenset(), reverted: list[dict] = ()) -> FixValidation:
     """Check one diagnosis. applied: fixes already in place; installed: pip names already installed;
-    python_packages: names known to be Python packages (installed, imported, or known to the scanner)."""
+    python_packages: names known to be Python packages (installed, imported, or known to the scanner);
+    reverted: fixes the regression guard undid (they made an earlier stage fail)."""
     try:
         d = model.model_validate(answer)
     except ValidationError as e:
@@ -94,6 +96,8 @@ def validate_fix(answer: dict, applied: Overrides, installed: set[str],
                                                 for err in e.errors()])
     f, reasons = d.fix, []
     bad = reasons.append
+    if f.model_dump() in list(reverted):
+        bad(f"{describe(f)} was tried and reverted: it made an earlier stage fail")
     if isinstance(d, DiagnosisWithAnalysis) and not d.analysis.strip():
         bad("analysis is empty: write the steps the prompt asks for before the fix")
     if isinstance(f, PinPackage):
@@ -104,7 +108,11 @@ def validate_fix(answer: dict, applied: Overrides, installed: set[str],
         if applied.pins.get(f.name) == f.version or applied.pins.get(normalize(f.name)) == f.version:
             bad(f"pin_package {f.name}=={f.version} was already applied and the stage still failed")
     elif isinstance(f, AddSystemPackage):
-        if not APT_NAME_RE.match(f.name):
+        if APT_PATTERN_CHARS & set(f.name):
+            bad(f"add_system_package: {f.name!r} contains {' '.join(sorted(APT_PATTERN_CHARS & set(f.name)))}, "
+                "which apt-get reads as a pattern, so it can install unrelated packages or conflict; "
+                "give an exact Debian package name without + * ? [ ] (for a C/C++ compiler: build-essential)")
+        elif not APT_NAME_RE.match(f.name):
             bad(f"add_system_package: {f.name!r} is not a valid Debian package name")
         if f.name in applied.apt or f.name == "make":
             bad(f"add_system_package {f.name} is already installed")

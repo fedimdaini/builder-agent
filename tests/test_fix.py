@@ -252,3 +252,54 @@ def test_score_counts_a_passing_alternative_fix_and_not_fixed_runs():
     failed = score_attempts([{"n": 1, "action": None, "outcome": "not applied: no valid fix after 3 call(s)"},
                              {"n": 2, "action": expected, "outcome": "failed at build"}], expected)
     assert (failed["first_fix_passed"], failed["fixes_to_pass"], failed["exact"]) == (False, None, True)
+
+
+# --- apt pattern names and the regression guard (gen-011: "add_system_package clang++" broke apt) ---------
+
+@pytest.mark.parametrize("name", ["clang++", "lib*", "libfoo?", "lib[ab]"])
+def test_apt_pattern_names_are_rejected(name):
+    v = validate_fix({"fix": {"action": "add_system_package", "name": name}, "reason": "x"}, Overrides(), set())
+    assert not v.ok and "apt-get reads as a pattern" in v.reasons[0] and "build-essential" in v.reasons[0]
+
+
+def test_exact_apt_name_is_accepted():
+    assert validate_fix({"fix": {"action": "add_system_package", "name": "libffi8"}, "reason": "x"},
+                        Overrides(), set()).ok
+
+
+class GuardRunner(Fault001Runner):
+    """The build fails if the Dockerfile installs `breakit`; otherwise like fault-001 (train fails until pinned)."""
+
+    def __call__(self, cmd, cwd, timeout):
+        if cmd[-1] == "build" or "build" in cmd[-2:]:
+            if "breakit" in (Path(cwd) / "Dockerfile").read_text(encoding="utf-8"):
+                return 1, "E: Unable to locate package breakit"
+        return super().__call__(cmd, cwd, timeout)
+
+
+def test_regression_is_reverted_and_counted_as_a_failed_attempt(mini, tmp_path):  # noqa: F811
+    breakit = {"fix": {"action": "add_system_package", "name": "breakit"}, "reason": "x"}
+    runner = GuardRunner()
+    r = loop(mini, FakeModel(breakit, breakit, PIN), runner, fix_log=tmp_path / "fix.jsonl")
+    first, second = r.attempts
+    assert first.action_text == "add_system_package breakit"
+    assert first.outcome == "reverted: regression (failed at build, before train)" and first.sandbox_attempt_id
+    assert second.stage == "train"                                   # diagnosed on the error from before the fix
+    assert second.calls[0].reasons == ["add_system_package breakit was tried and reverted: it made an earlier "
+                                       "stage fail"]
+    assert "- add_system_package breakit: then reverted: regression" in second.calls[0].messages[1]["content"]
+    assert r.final_ok and "breakit" not in r.applied.apt
+    assert "breakit" not in runner.dockerfiles[-1]
+    assert score_fix(r, FAULT_001["expected_fix"])["fixes_to_pass"] == 2
+
+
+def test_failing_at_the_same_or_a_later_stage_is_kept(mini):  # noqa: F811
+    from builder_agent.fix import regressed
+    from builder_agent.sandbox import SandboxResult
+
+    def res(stage):
+        return SandboxResult(attempt_id="a", repo="r", started_at="t", ok=stage is None, failed_stage=stage,
+                             total_s=0, workdir="w", compose_project="p", stages=[])
+    assert regressed(res("train"), res("build")) and regressed(res("evaluate"), res("render"))
+    assert not regressed(res("train"), res("train")) and not regressed(res("train"), res("serve"))
+    assert not regressed(res("train"), res(None))

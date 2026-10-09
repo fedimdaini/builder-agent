@@ -23,7 +23,7 @@ from ..llm.ollama import inline_refs
 from ..llm.prompts import PromptFile, load_prompt
 from ..render import validate_slots
 from ..render.configs import MLFLOW_IMAGE, Overrides, config_context
-from ..sandbox import DEFAULT_CONTRACTS, DEFAULT_LOG, SandboxResult, run_sandbox, subprocess_runner
+from ..sandbox import DEFAULT_CONTRACTS, DEFAULT_LOG, STAGES, SandboxResult, run_sandbox, subprocess_runner
 from ..scan import scan_repo
 from ..scan.deps import declared_names, normalize
 from ..scan.known import FRAMEWORKS, IMPORT_TO_DIST
@@ -63,7 +63,7 @@ class FixAttempt(BaseModel):
     action_text: str | None = None
     analysis: str | None = None       # the accepted answer's step-by-step analysis (prompts that ask for it)
     reason: str | None = None
-    outcome: str                      # "passed", "failed at <stage>", "not applied: ..."
+    outcome: str                      # "passed", "failed at <stage>", "not applied: ...", "reverted: regression ..."
     sandbox_attempt_id: str | None = None
     retrieved: list[dict] | None = None   # RAG: the memory cases put into the prompt (id, variant, score, ranks)
 
@@ -149,10 +149,17 @@ def _python_packages(ctx) -> set[str]:
             | {normalize(d) for d in IMPORT_TO_DIST.values()})
 
 
+def regressed(before: SandboxResult, after: SandboxResult) -> bool:
+    """True if `after` failed at an earlier stage than `before` (a fix made things worse)."""
+    if after.ok or before.ok or before.failed_stage is None:
+        return False
+    return STAGES.index(after.failed_stage) < STAGES.index(before.failed_stage)
+
+
 # --- one diagnosis ------------------------------------------------------------------------------
 
 def diagnose(prompt: PromptFile, client: ChatClient, variables: dict, applied: Overrides,
-             installed: set[str], python_packages: set[str] = frozenset()
+             installed: set[str], python_packages: set[str] = frozenset(), reverted: list[dict] = ()
              ) -> tuple[Diagnosis | DiagnosisWithAnalysis | None, list[Call]]:
     model = answer_model("\n".join(prompt.sections.values()))
     schema = inline_refs(model.model_json_schema())
@@ -169,7 +176,8 @@ def diagnose(prompt: PromptFile, client: ChatClient, variables: dict, applied: O
             return None, calls
         try:
             answer = json.loads(resp.content)
-            v = validate_fix(answer, applied, installed, model, python_packages) if isinstance(answer, dict) else None
+            v = validate_fix(answer, applied, installed, model, python_packages, reverted) \
+                if isinstance(answer, dict) else None
             reasons = v.reasons if v else ["the answer must be one JSON object"]
         except json.JSONDecodeError as e:
             v, reasons = None, [f"the answer is not valid JSON: {e}"]
@@ -202,6 +210,7 @@ def run_fix_loop(repo: str | Path, slots: dict, prompt_version: str, client: Cha
     plan = plan_build(ctx, c)
     answers = validate_slots(ctx, slots).slots
     applied = injection.model_copy(deep=True) if injection else Overrides()
+    reverted: list[dict] = []         # fixes undone by the regression guard; offering one again is rejected
 
     def sandbox(o: Overrides) -> SandboxResult:
         return run_sandbox(repo, slots, expected=expected, contracts_path=contracts_path, log_path=sandbox_log,
@@ -225,7 +234,8 @@ def run_fix_loop(repo: str | Path, slots: dict, prompt_version: str, client: Cha
             hits = retriever(stage.name, stage.output_tail)
             variables["retrieved_text"] = render_retrieved(hits)
             retrieved = [{"id": h.doc.id, "variant": h.doc.variant, "score": h.score, "ranks": h.ranks} for h in hits]
-        diag, calls = diagnose(prompt, client, variables, applied, _installed(ctx, tctx), _python_packages(ctx))
+        diag, calls = diagnose(prompt, client, variables, applied, _installed(ctx, tctx), _python_packages(ctx),
+                               reverted)
         attempt = FixAttempt(n=n, stage=stage.name, error_tail=stage.output_tail, calls=calls, outcome="",
                              retrieved=retrieved)
         if diag is None:
@@ -240,9 +250,17 @@ def run_fix_loop(repo: str | Path, slots: dict, prompt_version: str, client: Cha
                 attempt.outcome = "not applied: the LLM gave up"
                 stopped = "give_up"
             else:
-                applied = apply_fix(applied, diag.fix)
-                r = sandbox(applied)
-                attempt.outcome, attempt.sandbox_attempt_id = _outcome(r), r.attempt_id
+                trial = sandbox(apply_fix(applied, diag.fix))
+                attempt.sandbox_attempt_id = trial.attempt_id
+                if regressed(r, trial):
+                    # the fix broke an earlier stage than the one it was meant to fix: undo it and keep
+                    # the previous state (and its error) for the next diagnosis; the attempt counts as failed
+                    attempt.outcome = (f"reverted: regression (failed at {trial.failed_stage}, "
+                                       f"before {r.failed_stage})")
+                    reverted.append(diag.fix.model_dump())
+                else:
+                    applied, r = apply_fix(applied, diag.fix), trial
+                    attempt.outcome = _outcome(r)
         attempts.append(attempt)
         _log(fix_log, ctx.name, prompt, client, digest, attempt)
         if diag is None or isinstance(diag.fix, GiveUp):
