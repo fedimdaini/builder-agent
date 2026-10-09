@@ -102,17 +102,21 @@ CATALOG: dict[str, Variant] = {v.name: v for v in [
 
 # --- error signature ----------------------------------------------------------------------------
 
-_BUILDKIT = re.compile(r"^#\d+ \d+(\.\d+)? ")          # "#12 34.5 " before each docker build line
-_NOISE = re.compile(r"^(#\d+ |make(\[\d+\])?: \*\*\*|failed to solve|ERROR: failed to |------|\s*>|Dockerfile:\d+)")
-_ERROR = re.compile(r"\b\w*(Error|Exception)\b:|\bERROR:|\berror:|No such file|cannot open shared object", re.I)
+# prefixes before the message: "#12 34.5 " (docker build), "34.5 " (its error summary), "[pipenv...Error]: "
+_PREFIX = re.compile(r"^(#\d+ )?(\d+\.\d+ )?(\[[\w.]+\]:)?\s*")
+_NOISE = re.compile(r"^(#\d+ |make(\[\d+\])?: \*\*\*|failed to solve|ERROR: failed to |------|>|Dockerfile:\d+)")
+_EXCEPTION = re.compile(r"\b\w*(Error|Exception)\b: ")           # a Python exception: the most specific
+_ERROR = re.compile(r"\bERROR:|\berror:|No such file|cannot open shared object", re.I)
 
 
 def error_signature(tail: list[str]) -> str:
-    """The last line that names an error, without docker build prefixes or make's own summary."""
-    lines = [_BUILDKIT.sub("", line).strip() for line in tail]
+    """The last Python exception line, else the last line that names an error; without docker build
+    prefixes or make's own summary."""
+    lines = [_PREFIX.sub("", line, count=1).strip() for line in tail]
     lines = [line for line in lines if line and not _NOISE.match(line)]
-    found = [line for line in lines if _ERROR.search(line)]
-    return (found or lines or [""])[-1][:200]
+    found = ([line for line in lines if _EXCEPTION.search(line)] or [line for line in lines if _ERROR.search(line)]
+             or lines or [""])
+    return found[-1][:200]
 
 
 # --- one case -------------------------------------------------------------------------------------

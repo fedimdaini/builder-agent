@@ -1,0 +1,111 @@
+{
+  "id": "gen-004",
+  "name": "python_3_12",
+  "title": "Image on Python 3.12, the repo asks for 3.9",
+  "family": "python_version",
+  "variant": "python_3_12",
+  "generated": true,
+  "split": null,
+  "injection": {
+    "python_version": "3.12"
+  },
+  "found_by": {
+    "attempt_id": "20261009T190402Z-dd1706",
+    "repo": "taxi-trip-regression",
+    "date": "2026-10-09",
+    "log": "logs/sandbox_attempts.jsonl"
+  },
+  "stage": "build",
+  "command": "docker compose -p builder-sbx-taxi-trip-regression -f compose.base.yml -f compose.sandbox.yml --progress plain build",
+  "exit_code": 1,
+  "stages": {
+    "render": "ok",
+    "build": "failed",
+    "mlflow": "skipped",
+    "data": "skipped",
+    "train": "skipped",
+    "evaluate": "skipped",
+    "serve": "skipped",
+    "health": "skipped",
+    "predict": "skipped"
+  },
+  "error_signature": "AttributeError: module 'pkgutil' has no attribute 'ImpImporter'. Did you mean: 'zipimporter'?",
+  "error_tail": [
+    "#10 38.17 [pipenv.exceptions.InstallError]:           import setuptools.version",
+    "#10 38.17 [pipenv.exceptions.InstallError]:         File \"/tmp/pip-build-env-2uvfee6d/overlay/lib/python3.12/site-packages/setuptools/version.py\", line 1, in <module>",
+    "#10 38.17 [pipenv.exceptions.InstallError]:           import pkg_resources",
+    "#10 38.17 [pipenv.exceptions.InstallError]:         File \"/tmp/pip-build-env-2uvfee6d/overlay/lib/python3.12/site-packages/pkg_resources/__init__.py\", line 2172, in <module>",
+    "#10 38.17 [pipenv.exceptions.InstallError]:           register_finder(pkgutil.ImpImporter, find_on_path)",
+    "#10 38.17 [pipenv.exceptions.InstallError]:                           ^^^^^^^^^^^^^^^^^^^",
+    "#10 38.17 [pipenv.exceptions.InstallError]:       AttributeError: module 'pkgutil' has no attribute 'ImpImporter'. Did you mean: 'zipimporter'?",
+    "#10 38.17 [pipenv.exceptions.InstallError]:       [end of output]",
+    "#10 38.17 [pipenv.exceptions.InstallError]:   ",
+    "#10 38.17 [pipenv.exceptions.InstallError]:   note: This error originates from a subprocess, and is likely not a problem with pip.",
+    "#10 38.17 [pipenv.exceptions.InstallError]: error: subprocess-exited-with-error",
+    "#10 38.17 [pipenv.exceptions.InstallError]: ",
+    "#10 38.17 [pipenv.exceptions.InstallError]: × Getting requirements to build wheel did not run successfully.",
+    "#10 38.17 [pipenv.exceptions.InstallError]: │ exit code: 1",
+    "#10 38.17 [pipenv.exceptions.InstallError]: ╰─> See above for output.",
+    "#10 38.17 [pipenv.exceptions.InstallError]: ",
+    "#10 38.17 [pipenv.exceptions.InstallError]: note: This error originates from a subprocess, and is likely not a problem with pip.",
+    "#10 38.17 ERROR: Couldn't install package: {}",
+    "#10 38.17  Package installation failed...",
+    "#10 38.17 /usr/local/lib/python3.12/subprocess.py:1127: ResourceWarning: subprocess 17 is still running",
+    "#10 38.17   _warn(\"subprocess %s is still running\" % self.pid,",
+    "#10 38.17 ResourceWarning: Enable tracemalloc to get the object allocation traceback",
+    "#10 38.17 sys:1: ResourceWarning: unclosed file <_io.TextIOWrapper name=4 encoding='utf-8'>",
+    "#10 38.17 ResourceWarning: Enable tracemalloc to get the object allocation traceback",
+    "#10 38.17 sys:1: ResourceWarning: unclosed file <_io.TextIOWrapper name=7 encoding='utf-8'>",
+    "#10 38.17 ResourceWarning: Enable tracemalloc to get the object allocation traceback",
+    "#10 ERROR: process \"/bin/sh -c pip install pipenv==2023.12.1  && pipenv install --deploy --system  && pip install mlflow==2.17.2\" did not complete successfully: exit code: 1",
+    "------",
+    " > [5/6] RUN pip install pipenv==2023.12.1  && pipenv install --deploy --system  && pip install mlflow==2.17.2:",
+    "38.17 [pipenv.exceptions.InstallError]: note: This error originates from a subprocess, and is likely not a problem with pip.",
+    "38.17 ERROR: Couldn't install package: {}",
+    "38.17  Package installation failed...",
+    "38.17 /usr/local/lib/python3.12/subprocess.py:1127: ResourceWarning: subprocess 17 is still running",
+    "38.17   _warn(\"subprocess %s is still running\" % self.pid,",
+    "38.17 ResourceWarning: Enable tracemalloc to get the object allocation traceback",
+    "38.17 sys:1: ResourceWarning: unclosed file <_io.TextIOWrapper name=4 encoding='utf-8'>",
+    "38.17 ResourceWarning: Enable tracemalloc to get the object allocation traceback",
+    "38.17 sys:1: ResourceWarning: unclosed file <_io.TextIOWrapper name=7 encoding='utf-8'>",
+    "38.17 ResourceWarning: Enable tracemalloc to get the object allocation traceback",
+    "------",
+    "Dockerfile:19",
+    "--------------------",
+    "  18 |     COPY Pipfile Pipfile.lock ./",
+    "  19 | >>> RUN pip install pipenv==2023.12.1 \\",
+    "  20 | >>>  && pipenv install --deploy --system \\",
+    "  21 | >>>  && pip install mlflow==2.17.2",
+    "  22 |     ",
+    "--------------------",
+    "failed to solve: process \"/bin/sh -c pip install pipenv==2023.12.1  && pipenv install --deploy --system  && pip install mlflow==2.17.2\" did not complete successfully: exit code: 1",
+    "View build details: docker-desktop://dashboard/build/default/default/y28s787edprpgqost4mqr66vu"
+  ],
+  "cause": {
+    "summary": "The Pipfile requires python_version 3.9 and Pipfile.lock pins packages for it; the image is python:3.12-slim."
+  },
+  "fix": {
+    "summary": "set_python_version 3.9",
+    "verified_by": {
+      "attempt_id": "20261009T190445Z-b9fb5b",
+      "ok": true
+    }
+  },
+  "expected_fix": {
+    "action": "set_python_version",
+    "version": "3.9"
+  },
+  "static_check": {
+    "catchable_before_run": true,
+    "rule": "the base image's Python version differs from the repo's",
+    "evidence": [
+      "Pipfile: python_version = \"3.9\"",
+      "Dockerfile: FROM python:3.12-slim"
+    ]
+  },
+  "reproduce": {
+    "how": "Run the generator for this variant; it injects the fault into the Builder's generated files only, then runs the sandbox.",
+    "command": "python -m builder_agent.faults ../taxi-trip-regression --slots tests/gold/taxi_slots.json --expected tests/gold/taxi_expected.json --variant python_3_12"
+  }
+}

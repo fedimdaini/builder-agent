@@ -101,6 +101,9 @@ def test_uninstalled_package_is_not_installed_for_the_fix_menu(mini, contracts, 
     (["#9 41.2 ImportError: libffi.so.8: cannot open shared object file", "#9 ERROR: process did not complete",
       "------", "failed to solve: process \"/bin/sh -c pip install\" did not complete successfully: exit code: 1"],
      "ImportError: libffi.so.8: cannot open shared object file"),
+    (["#10 38.17 [pipenv.exceptions.InstallError]:       AttributeError: module 'pkgutil' has no attribute 'ImpImporter'",
+      "#10 38.17 [pipenv.exceptions.InstallError]: error: subprocess-exited-with-error",
+      "38.17 ERROR: Couldn't install package: {}"], "AttributeError: module 'pkgutil' has no attribute 'ImpImporter'"),
     (["no error words here", "last line"], "last line"),
 ])
 def test_error_signature(tail, sig):
