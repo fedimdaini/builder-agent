@@ -1,5 +1,5 @@
 {
-  "id": "gen-012",
+  "id": "gen-011",
   "name": "python_3_13",
   "title": "Image on Python 3.13, the repo asks for 3.9",
   "family": "python_version",
@@ -29,7 +29,7 @@
     "health": "skipped",
     "predict": "skipped"
   },
-  "error_signature": "ERROR: Couldn't install package: {}",
+  "error_signature": "error: metadata-generation-failed",
   "error_tail": [
     "#10 12.89 [pipenv.exceptions.InstallError]:       Running `clang++ --version` gave \"[Errno 2] No such file or directory: 'clang++'\"",
     "#10 12.89 [pipenv.exceptions.InstallError]:       Running `nvc++ --version` gave \"[Errno 2] No such file or directory: 'nvc++'\"",

@@ -104,6 +104,8 @@ def test_uninstalled_package_is_not_installed_for_the_fix_menu(mini, contracts, 
     (["#10 38.17 [pipenv.exceptions.InstallError]:       AttributeError: module 'pkgutil' has no attribute 'ImpImporter'",
       "#10 38.17 [pipenv.exceptions.InstallError]: error: subprocess-exited-with-error",
       "38.17 ERROR: Couldn't install package: {}"], "AttributeError: module 'pkgutil' has no attribute 'ImpImporter'"),
+    (["#10 12.89 [pipenv.exceptions.InstallError]: error: metadata-generation-failed",
+      "#10 12.89 ERROR: Couldn't install package: {}"], "error: metadata-generation-failed"),
     (["no error words here", "last line"], "last line"),
 ])
 def test_error_signature(tail, sig):

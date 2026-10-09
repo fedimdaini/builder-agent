@@ -89,9 +89,22 @@ Each technique is measured against a baseline on the same faults, with the same 
   | 5 missing environment variable | tracking URI: wrong host, wrong port, empty | `set_env_var <name> <value>` |
   | 6 missing system library | libffi8 (ctypes), libsqlite3-0 (sqlite3) removed; not libgomp1 (xgboost wheels bundle it) and not libssl3/libbz2 (apt needs them) | `add_system_package <name>` |
 
-- Generated so far (one per family, `tests/faults/generated/`, gen-001..006): all six break the taxi
-  sandbox and pass with their expected fix. Injections before `pip install mlflow==...` are undone
+- Generated so far (`tests/faults/generated/`, gen-001..013, taxi dev repo): every saved case breaks the
+  sandbox and passes with its expected fix. Injections before `pip install mlflow==...` are undone
   when they touch MLflow's dependencies, so version faults are injected as Builder pins.
+- Tried and not saved (second batch, 2026-10-09):
+
+  | Variant | Why not saved |
+  |---|---|
+  | `flask_uninstalled` | didn't break: `pip install mlflow==2.17.2` reinstalls flask (an MLflow dependency) |
+  | `gunicorn_uninstalled` | inconclusive: the build failed on a PyPI read timeout, not on the fault, so the case was removed; MLflow also requires gunicorn, so it likely doesn't break |
+  | `python_3_8` | didn't break: every stage passed on python:3.8-slim |
+  | `libsqlite3_removed` | bad injection: removing libsqlite3-0 breaks apt (liblastlog2-2 depends on it), so the fault is an apt error, and the fix run failed at evaluate |
+
+  On the taxi path, family 2 has only one variant that breaks (xgboost): everything else it imports is
+  in MLflow's dependency closure. Family 6 has only libffi8: no other removable library breaks
+  the taxi imports without also breaking apt. More variants for these families need another repo or
+  a different injection.
 - Later: split by **variant** into RAG memory and a held-out test set, with no variant in both, so
   RAG is never tested on a fault it has stored.
 

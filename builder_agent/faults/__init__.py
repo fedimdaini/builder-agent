@@ -185,7 +185,8 @@ CATALOG: dict[str, Variant] = {v.name: v for v in [
 
 # prefixes before the message: "#12 34.5 " (docker build), "34.5 " (its error summary), "[pipenv...Error]: "
 _PREFIX = re.compile(r"^(#\d+ )?(\d+\.\d+ )?(\[[\w.]+\]:)?\s*")
-_NOISE = re.compile(r"^(#\d+ |make(\[\d+\])?: \*\*\*|failed to solve|ERROR: failed to |------|>|Dockerfile:\d+)")
+_NOISE = re.compile(r"^(#\d+ |make(\[\d+\])?: \*\*\*|failed to solve|ERROR: failed to |------|>|Dockerfile:\d+"
+                    r"|ERROR: process |ERROR: Couldn't install package)")  # docker's and pipenv's wrapper lines
 _EXCEPTION = re.compile(r"\b\w*(Error|Exception)\b: ")           # a Python exception: the most specific
 _ERROR = re.compile(r"\bERROR:|\berror:|No such file|cannot open shared object", re.I)
 

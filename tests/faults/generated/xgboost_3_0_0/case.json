@@ -1,5 +1,5 @@
 {
-  "id": "gen-010",
+  "id": "gen-009",
   "name": "xgboost_3_0_0",
   "title": "xgboost 3.0.0 pinned on Python 3.9",
   "family": "incompatible_pin",
