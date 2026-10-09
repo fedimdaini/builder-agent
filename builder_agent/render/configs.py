@@ -53,7 +53,10 @@ class Overrides(BaseModel):
     dependencies: list[str] = Field(default_factory=list)  # extra pip packages, unpinned
     apt: list[str] = Field(default_factory=list)          # extra system packages
     python_version: str | None = None
-    env: dict[str, str] = Field(default_factory=dict)
+    env: dict[str, str] = Field(default_factory=dict)     # Dockerfile ENV and the model service's compose env
+    # Fault injection only (builder_agent/faults); no menu action sets these:
+    pre_apt_commands: list[str] = Field(default_factory=list)       # before the system-package install
+    post_install_commands: list[str] = Field(default_factory=list)  # after the repo's install, before extras
 
 
 def _pip_name(spec: str) -> str:
@@ -161,7 +164,8 @@ def config_context(ctx: RepoContext, c: Contracts, plan: BuildPlan, slots: SlotA
             extras.append(dep)
     for name, version in o.pins.items():                 # a pin replaces any other spec for that package
         extras = [e for e in extras if _pip_name(e) != normalize(name)] + [f"{name}=={version}"]
-    install = plan.install.commands + ([f"pip install {' '.join(extras)}"] if extras else [])
+    # order: the repo's install, injected commands, then the Builder's extras (where fixes land)
+    install = plan.install.commands + o.post_install_commands + ([f"pip install {' '.join(extras)}"] if extras else [])
 
     mlflow = urlparse(c.paths["mlflow_uri"])
     if not mlflow.hostname or mlflow.hostname in {"localhost", "127.0.0.1"}:
@@ -180,7 +184,11 @@ def config_context(ctx: RepoContext, c: Contracts, plan: BuildPlan, slots: SlotA
         "repo": ctx.name,
         "python_version": o.python_version or plan.python.version,
         "apt_packages": ["make"] + [p for p in o.apt if p != "make"],
+        "pre_apt_commands": o.pre_apt_commands,
         "env": o.env,
+        # the model service's environment; compose wins over Dockerfile ENV, so overrides go here too
+        "compose_env": {"MLFLOW_TRACKING_URI": c.paths["mlflow_uri"],
+                        c.serving.model_uri_env: "${" + c.serving.model_uri_env + ":-}"} | o.env,
         "deps_files": _deps_files(plan),
         "install_source": plan.install.source,
         "install_commands": install,

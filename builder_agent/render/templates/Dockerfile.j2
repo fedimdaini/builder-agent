@@ -7,6 +7,9 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
+{% for cmd in pre_apt_commands %}
+RUN {{ cmd }}
+{% endfor %}
 # make runs the pipeline targets (`make all {{ sample_var }}=1` in the sandbox)
 RUN apt-get update \
  && apt-get install -y --no-install-recommends {{ apt_packages | join(" ") }} \
@@ -31,6 +34,8 @@ COPY . .
 RUN {{ install_commands | join(" \\\n && ") }}
 {% endif %}
 
+{% if "MLFLOW_TRACKING_URI" not in env %}
 ENV MLFLOW_TRACKING_URI={{ mlflow_uri }}
+{% endif %}
 EXPOSE {{ port }}
 CMD {{ serve_cmd | json }}

@@ -18,8 +18,9 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
-      MLFLOW_TRACKING_URI: {{ mlflow_uri }}
-      {{ model_uri_env }}: ${{ '{' }}{{ model_uri_env }}:-{{ '}' }}
+{% for k, v in compose_env.items() %}
+      {{ k }}: {{ v | json }}
+{% endfor %}
     volumes:
 {% for m in mounts %}
       - {{ m }}

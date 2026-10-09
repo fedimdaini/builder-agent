@@ -129,9 +129,12 @@ def prompt_variables(ctx, r: SandboxResult, tctx: dict, attempt: int, history: l
 
 def _installed(ctx, tctx: dict) -> set[str]:
     names = set(declared_names(ctx.dependency_files))
-    for cmd in tctx["install_commands"]:
+    for cmd in tctx["install_commands"]:      # in order: a later uninstall removes, a later install adds back
+        words = cmd.split()
         if cmd.startswith("pip install "):
-            names |= {normalize(t.split("==")[0]) for t in cmd.split()[2:] if not t.startswith("-")}
+            names |= {normalize(t.split("==")[0]) for t in words[2:] if not t.startswith("-")}
+        elif cmd.startswith("pip uninstall "):
+            names -= {normalize(t) for t in words[2:] if not t.startswith("-")}
     return names
 
 
