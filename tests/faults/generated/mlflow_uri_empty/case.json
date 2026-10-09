@@ -1,0 +1,91 @@
+{
+  "id": "gen-014",
+  "name": "mlflow_uri_empty",
+  "title": "MLFLOW_TRACKING_URI set to an empty string",
+  "family": "env_var",
+  "variant": "mlflow_uri_empty",
+  "generated": true,
+  "split": null,
+  "injection": {
+    "env": {
+      "MLFLOW_TRACKING_URI": ""
+    }
+  },
+  "found_by": {
+    "attempt_id": "20261009T201040Z-cf726f",
+    "repo": "taxi-trip-regression",
+    "date": "2026-10-09",
+    "log": "logs/sandbox_attempts.jsonl"
+  },
+  "stage": "evaluate",
+  "command": "docker compose -p builder-sbx-taxi-trip-regression -f compose.base.yml -f compose.sandbox.yml run --rm -T --no-deps serving-current make evaluate SAMPLE=1",
+  "exit_code": 2,
+  "stages": {
+    "render": "ok",
+    "build": "ok",
+    "mlflow": "ok",
+    "data": "ok",
+    "train": "ok",
+    "evaluate": "failed",
+    "serve": "skipped",
+    "health": "skipped",
+    "predict": "skipped"
+  },
+  "error_signature": "mlflow.exceptions.MlflowException: Run 'c755d485cbcd4b2eb93d599c0fb91aec' not found",
+  "error_tail": [
+    " Container builder-sbx-taxi-trip-regression-serving-current-run-1c89383f30ee Creating ",
+    " Container builder-sbx-taxi-trip-regression-serving-current-run-1c89383f30ee Created ",
+    "python pipeline/evaluate.py",
+    "Traceback (most recent call last):",
+    "  File \"/app/pipeline/evaluate.py\", line 119, in <module>",
+    "    main()",
+    "  File \"/app/pipeline/evaluate.py\", line 93, in main",
+    "    model = mlflow.xgboost.load_model(uri)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/xgboost/__init__.py\", line 337, in load_model",
+    "    local_model_path = _download_artifact_from_uri(artifact_uri=model_uri, output_path=dst_path)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/tracking/artifact_utils.py\", line 108, in _download_artifact_from_uri",
+    "    repo = get_artifact_repository(artifact_uri=root_uri)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/store/artifact/artifact_repository_registry.py\", line 132, in get_artifact_repository",
+    "    return _artifact_repository_registry.get_artifact_repository(artifact_uri)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/store/artifact/artifact_repository_registry.py\", line 77, in get_artifact_repository",
+    "    return repository(artifact_uri)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/store/artifact/runs_artifact_repo.py\", line 26, in __init__",
+    "    uri = RunsArtifactRepository.get_underlying_uri(artifact_uri)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/store/artifact/runs_artifact_repo.py\", line 39, in get_underlying_uri",
+    "    uri = get_artifact_uri(run_id, artifact_path, tracking_uri)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/tracking/artifact_utils.py\", line 52, in get_artifact_uri",
+    "    run = store.get_run(run_id)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/store/tracking/file_store.py\", line 693, in get_run",
+    "    run_info = self._get_run_info(run_id)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/store/tracking/file_store.py\", line 718, in _get_run_info",
+    "    raise MlflowException(",
+    "mlflow.exceptions.MlflowException: Run 'c755d485cbcd4b2eb93d599c0fb91aec' not found",
+    "make: *** [Makefile:32: evaluate] Error 1"
+  ],
+  "cause": {
+    "summary": "An empty tracking URI makes MLflow fall back to a local ./mlruns folder instead of the server."
+  },
+  "fix": {
+    "summary": "set_env_var MLFLOW_TRACKING_URI=http://mlflow:5000",
+    "verified_by": {
+      "attempt_id": "20261009T201407Z-983f95",
+      "ok": true
+    }
+  },
+  "expected_fix": {
+    "action": "set_env_var",
+    "name": "MLFLOW_TRACKING_URI",
+    "value": "http://mlflow:5000"
+  },
+  "static_check": {
+    "catchable_before_run": true,
+    "rule": "the tracking URI is empty",
+    "evidence": [
+      "compose.base.yml: MLFLOW_TRACKING_URI: \"\""
+    ]
+  },
+  "reproduce": {
+    "how": "Run the generator for this variant; it injects the fault into the Builder's generated files only, then runs the sandbox.",
+    "command": "python -m builder_agent.faults ../taxi-trip-regression --slots tests/gold/taxi_slots.json --expected tests/gold/taxi_expected.json --variant mlflow_uri_empty"
+  }
+}
