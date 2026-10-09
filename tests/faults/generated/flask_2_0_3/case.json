@@ -1,0 +1,108 @@
+{
+  "id": "gen-011",
+  "name": "flask_2_0_3",
+  "title": "flask 2.0.3 pinned next to werkzeug 3.0.1",
+  "family": "incompatible_pin",
+  "variant": "flask_2_0_3",
+  "generated": true,
+  "split": null,
+  "injection": {
+    "pins": {
+      "flask": "2.0.3"
+    }
+  },
+  "found_by": {
+    "attempt_id": "20261009T195159Z-cc5186",
+    "repo": "taxi-trip-regression",
+    "date": "2026-10-09",
+    "log": "logs/sandbox_attempts.jsonl"
+  },
+  "stage": "health",
+  "command": "docker compose -p builder-sbx-taxi-trip-regression -f compose.base.yml -f compose.sandbox.yml exec -T serving-current python pipeline/smoke_test.py --url http://localhost:8000 --check health --wait 90",
+  "exit_code": 137,
+  "stages": {
+    "render": "ok",
+    "build": "ok",
+    "mlflow": "ok",
+    "data": "ok",
+    "train": "ok",
+    "evaluate": "ok",
+    "serve": "ok",
+    "health": "failed",
+    "predict": "skipped"
+  },
+  "error_signature": "serving-current-1  | ImportError: cannot import name 'url_quote' from 'werkzeug.urls' (/usr/local/lib/python3.9/site-packages/werkzeug/urls.py)",
+  "error_tail": [
+    "[sandbox] logs of serving-current:",
+    "serving-current-1  | [2026-10-09 19:55:40 +0000] [1] [INFO] Starting gunicorn 21.2.0",
+    "serving-current-1  | [2026-10-09 19:55:40 +0000] [1] [INFO] Listening at: http://0.0.0.0:8000 (1)",
+    "serving-current-1  | [2026-10-09 19:55:40 +0000] [1] [INFO] Using worker: sync",
+    "serving-current-1  | [2026-10-09 19:55:40 +0000] [7] [INFO] Booting worker with pid: 7",
+    "serving-current-1  | [2026-10-09 19:55:41 +0000] [7] [ERROR] Exception in worker process",
+    "serving-current-1  | Traceback (most recent call last):",
+    "serving-current-1  |   File \"/usr/local/lib/python3.9/site-packages/gunicorn/arbiter.py\", line 609, in spawn_worker",
+    "serving-current-1  |     worker.init_process()",
+    "serving-current-1  |   File \"/usr/local/lib/python3.9/site-packages/gunicorn/workers/base.py\", line 134, in init_process",
+    "serving-current-1  |     self.load_wsgi()",
+    "serving-current-1  |   File \"/usr/local/lib/python3.9/site-packages/gunicorn/workers/base.py\", line 146, in load_wsgi",
+    "serving-current-1  |     self.wsgi = self.app.wsgi()",
+    "serving-current-1  |   File \"/usr/local/lib/python3.9/site-packages/gunicorn/app/base.py\", line 67, in wsgi",
+    "serving-current-1  |     self.callable = self.load()",
+    "serving-current-1  |   File \"/usr/local/lib/python3.9/site-packages/gunicorn/app/wsgiapp.py\", line 58, in load",
+    "serving-current-1  |     return self.load_wsgiapp()",
+    "serving-current-1  |   File \"/usr/local/lib/python3.9/site-packages/gunicorn/app/wsgiapp.py\", line 48, in load_wsgiapp",
+    "serving-current-1  |     return util.import_app(self.app_uri)",
+    "serving-current-1  |   File \"/usr/local/lib/python3.9/site-packages/gunicorn/util.py\", line 371, in import_app",
+    "serving-current-1  |     mod = importlib.import_module(module)",
+    "serving-current-1  |   File \"/usr/local/lib/python3.9/importlib/__init__.py\", line 127, in import_module",
+    "serving-current-1  |     return _bootstrap._gcd_import(name[level:], package, level)",
+    "serving-current-1  |   File \"<frozen importlib._bootstrap>\", line 1030, in _gcd_import",
+    "serving-current-1  |   File \"<frozen importlib._bootstrap>\", line 1007, in _find_and_load",
+    "serving-current-1  |   File \"<frozen importlib._bootstrap>\", line 986, in _find_and_load_unlocked",
+    "serving-current-1  |   File \"<frozen importlib._bootstrap>\", line 680, in _load_unlocked",
+    "serving-current-1  |   File \"<frozen importlib._bootstrap_external>\", line 850, in exec_module",
+    "serving-current-1  |   File \"<frozen importlib._bootstrap>\", line 228, in _call_with_frames_removed",
+    "serving-current-1  |   File \"/app/pipeline/serve.py\", line 22, in <module>",
+    "serving-current-1  |     from flask import Flask, jsonify, request",
+    "serving-current-1  |   File \"/usr/local/lib/python3.9/site-packages/flask/__init__.py\", line 7, in <module>",
+    "serving-current-1  |     from .app import Flask as Flask",
+    "serving-current-1  |   File \"/usr/local/lib/python3.9/site-packages/flask/app.py\", line 28, in <module>",
+    "serving-current-1  |     from . import cli",
+    "serving-current-1  |   File \"/usr/local/lib/python3.9/site-packages/flask/cli.py\", line 18, in <module>",
+    "serving-current-1  |     from .helpers import get_debug_flag",
+    "serving-current-1  |   File \"/usr/local/lib/python3.9/site-packages/flask/helpers.py\", line 16, in <module>",
+    "serving-current-1  |     from werkzeug.urls import url_quote",
+    "serving-current-1  | ImportError: cannot import name 'url_quote' from 'werkzeug.urls' (/usr/local/lib/python3.9/site-packages/werkzeug/urls.py)",
+    "serving-current-1  | [2026-10-09 19:55:41 +0000] [7] [INFO] Worker exiting (pid: 7)",
+    "serving-current-1  | [2026-10-09 19:55:41 +0000] [1] [ERROR] Worker (pid:7) exited with code 3",
+    "serving-current-1  | [2026-10-09 19:55:41 +0000] [1] [ERROR] Shutting down: Master",
+    "serving-current-1  | [2026-10-09 19:55:41 +0000] [1] [ERROR] Reason: Worker failed to boot."
+  ],
+  "cause": {
+    "summary": "flask 2.0.3 imports werkzeug.urls.url_quote, which werkzeug 3 removed; Pipfile.lock pins werkzeug 3.0.1 and flask 3.0.1."
+  },
+  "fix": {
+    "summary": "pin_package flask==3.0.1",
+    "verified_by": {
+      "attempt_id": "20261009T195543Z-856e3e",
+      "ok": true
+    }
+  },
+  "expected_fix": {
+    "action": "pin_package",
+    "name": "flask",
+    "version": "3.0.1"
+  },
+  "static_check": {
+    "catchable_before_run": true,
+    "rule": "an installed version differs from the one Pipfile.lock pins",
+    "evidence": [
+      "Pipfile.lock: flask ==3.0.1, werkzeug ==3.0.1",
+      "Dockerfile: pip install ... flask==2.0.3"
+    ]
+  },
+  "reproduce": {
+    "how": "Run the generator for this variant; it injects the fault into the Builder's generated files only, then runs the sandbox.",
+    "command": "python -m builder_agent.faults ../taxi-trip-regression --slots tests/gold/taxi_slots.json --expected tests/gold/taxi_expected.json --variant flask_2_0_3"
+  }
+}
