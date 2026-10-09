@@ -1,0 +1,345 @@
+{
+  "embed_model": "nomic-embed-text",
+  "rows": [
+    {
+      "case": "gen-010",
+      "variant": "flask_2_0_3",
+      "family": "incompatible_pin",
+      "stage": "health",
+      "retriever": "naive",
+      "top3": [
+        {
+          "id": "gen-004",
+          "variant": "python_3_12",
+          "family": "python_version",
+          "stage": "build",
+          "score": 0.6306,
+          "ranks": {
+            "vector": 1
+          }
+        },
+        {
+          "id": "fault-001",
+          "variant": "mlflow_client_server_mismatch",
+          "family": "version_mismatch",
+          "stage": "train",
+          "score": 0.6294,
+          "ranks": {
+            "vector": 2
+          }
+        },
+        {
+          "id": "gen-008",
+          "variant": "mlflow_client_unpinned",
+          "family": "version_mismatch",
+          "stage": "train",
+          "score": 0.6247,
+          "ranks": {
+            "vector": 3
+          }
+        }
+      ],
+      "same_family": false,
+      "same_family_rank": null
+    },
+    {
+      "case": "gen-010",
+      "variant": "flask_2_0_3",
+      "family": "incompatible_pin",
+      "stage": "health",
+      "retriever": "advanced",
+      "top3": [
+        {
+          "id": "gen-006",
+          "variant": "libffi8_removed",
+          "family": "system_library",
+          "stage": "train",
+          "score": 0.03252,
+          "ranks": {
+            "vector": 2,
+            "bm25": 1
+          }
+        },
+        {
+          "id": "gen-004",
+          "variant": "python_3_12",
+          "family": "python_version",
+          "stage": "build",
+          "score": 0.03202,
+          "ranks": {
+            "vector": 1,
+            "bm25": 4
+          }
+        },
+        {
+          "id": "gen-003",
+          "variant": "numpy_2_0_2",
+          "family": "incompatible_pin",
+          "stage": "train",
+          "score": 0.03175,
+          "ranks": {
+            "vector": 4,
+            "bm25": 2
+          }
+        }
+      ],
+      "same_family": true,
+      "same_family_rank": 3
+    },
+    {
+      "case": "gen-001",
+      "variant": "mlflow_client_3_1_4",
+      "family": "version_mismatch",
+      "stage": "train",
+      "retriever": "naive",
+      "top3": [
+        {
+          "id": "gen-008",
+          "variant": "mlflow_client_unpinned",
+          "family": "version_mismatch",
+          "stage": "train",
+          "score": 0.7788,
+          "ranks": {
+            "vector": 1
+          }
+        },
+        {
+          "id": "gen-007",
+          "variant": "mlflow_client_3_0_1",
+          "family": "version_mismatch",
+          "stage": "train",
+          "score": 0.7612,
+          "ranks": {
+            "vector": 2
+          }
+        },
+        {
+          "id": "fault-001",
+          "variant": "mlflow_client_server_mismatch",
+          "family": "version_mismatch",
+          "stage": "train",
+          "score": 0.7457,
+          "ranks": {
+            "vector": 3
+          }
+        }
+      ],
+      "same_family": true,
+      "same_family_rank": 1
+    },
+    {
+      "case": "gen-001",
+      "variant": "mlflow_client_3_1_4",
+      "family": "version_mismatch",
+      "stage": "train",
+      "retriever": "advanced",
+      "top3": [
+        {
+          "id": "gen-007",
+          "variant": "mlflow_client_3_0_1",
+          "family": "version_mismatch",
+          "stage": "train",
+          "score": 0.04098,
+          "ranks": {
+            "vector": 1,
+            "bm25": 1
+          }
+        },
+        {
+          "id": "gen-008",
+          "variant": "mlflow_client_unpinned",
+          "family": "version_mismatch",
+          "stage": "train",
+          "score": 0.04045,
+          "ranks": {
+            "vector": 2,
+            "bm25": 2
+          }
+        },
+        {
+          "id": "fault-001",
+          "variant": "mlflow_client_server_mismatch",
+          "family": "version_mismatch",
+          "stage": "train",
+          "score": 0.03994,
+          "ranks": {
+            "vector": 3,
+            "bm25": 3
+          }
+        }
+      ],
+      "same_family": true,
+      "same_family_rank": 1
+    },
+    {
+      "case": "gen-013",
+      "variant": "mlflow_uri_empty",
+      "family": "env_var",
+      "stage": "evaluate",
+      "retriever": "naive",
+      "top3": [
+        {
+          "id": "gen-008",
+          "variant": "mlflow_client_unpinned",
+          "family": "version_mismatch",
+          "stage": "train",
+          "score": 0.7166,
+          "ranks": {
+            "vector": 1
+          }
+        },
+        {
+          "id": "gen-007",
+          "variant": "mlflow_client_3_0_1",
+          "family": "version_mismatch",
+          "stage": "train",
+          "score": 0.7043,
+          "ranks": {
+            "vector": 2
+          }
+        },
+        {
+          "id": "gen-012",
+          "variant": "mlflow_uri_wrong_port",
+          "family": "env_var",
+          "stage": "train",
+          "score": 0.7033,
+          "ranks": {
+            "vector": 3
+          }
+        }
+      ],
+      "same_family": true,
+      "same_family_rank": 3
+    },
+    {
+      "case": "gen-013",
+      "variant": "mlflow_uri_empty",
+      "family": "env_var",
+      "stage": "evaluate",
+      "retriever": "advanced",
+      "top3": [
+        {
+          "id": "gen-007",
+          "variant": "mlflow_client_3_0_1",
+          "family": "version_mismatch",
+          "stage": "train",
+          "score": 0.03178,
+          "ranks": {
+            "vector": 1,
+            "bm25": 5
+          }
+        },
+        {
+          "id": "gen-012",
+          "variant": "mlflow_uri_wrong_port",
+          "family": "env_var",
+          "stage": "train",
+          "score": 0.03175,
+          "ranks": {
+            "vector": 3,
+            "bm25": 3
+          }
+        },
+        {
+          "id": "gen-008",
+          "variant": "mlflow_client_unpinned",
+          "family": "version_mismatch",
+          "stage": "train",
+          "score": 0.03128,
+          "ranks": {
+            "vector": 2,
+            "bm25": 6
+          }
+        }
+      ],
+      "same_family": true,
+      "same_family_rank": 2
+    },
+    {
+      "case": "gen-011",
+      "variant": "python_3_13",
+      "family": "python_version",
+      "stage": "build",
+      "retriever": "naive",
+      "top3": [
+        {
+          "id": "gen-008",
+          "variant": "mlflow_client_unpinned",
+          "family": "version_mismatch",
+          "stage": "train",
+          "score": 0.6577,
+          "ranks": {
+            "vector": 1
+          }
+        },
+        {
+          "id": "gen-009",
+          "variant": "xgboost_3_0_0",
+          "family": "incompatible_pin",
+          "stage": "build",
+          "score": 0.613,
+          "ranks": {
+            "vector": 2
+          }
+        },
+        {
+          "id": "gen-007",
+          "variant": "mlflow_client_3_0_1",
+          "family": "version_mismatch",
+          "stage": "train",
+          "score": 0.6084,
+          "ranks": {
+            "vector": 3
+          }
+        }
+      ],
+      "same_family": false,
+      "same_family_rank": null
+    },
+    {
+      "case": "gen-011",
+      "variant": "python_3_13",
+      "family": "python_version",
+      "stage": "build",
+      "retriever": "advanced",
+      "top3": [
+        {
+          "id": "gen-009",
+          "variant": "xgboost_3_0_0",
+          "family": "incompatible_pin",
+          "stage": "build",
+          "score": 0.03882,
+          "ranks": {
+            "vector": 9,
+            "bm25": 2
+          }
+        },
+        {
+          "id": "gen-004",
+          "variant": "python_3_12",
+          "family": "python_version",
+          "stage": "build",
+          "score": 0.03763,
+          "ranks": {
+            "vector": 10,
+            "bm25": 6
+          }
+        },
+        {
+          "id": "fault-001",
+          "variant": "mlflow_client_server_mismatch",
+          "family": "version_mismatch",
+          "stage": "train",
+          "score": 0.03279,
+          "ranks": {
+            "vector": 1,
+            "bm25": 1
+          }
+        }
+      ],
+      "same_family": true,
+      "same_family_rank": 2
+    }
+  ]
+}

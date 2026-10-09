@@ -1,7 +1,8 @@
 """python -m builder_agent.fix <repo> --slots S --prompt diagnose_v1 --model M [--expected E] [--mlflow-client mlflow]
     [--fault tests/faults/<name>/case.json]   # score the first fix against the case's expected_fix
     [--case tests/faults/generated/<variant>/case.json]   # start from a generated fault, score against it
-    [--out experiments/fixes/<run>]           # copy this run's logs and summary there"""
+    [--out experiments/fixes/<run>]           # copy this run's logs and summary there
+    [--retriever naive|advanced]              # RAG over the fix memory (prompts with {{ retrieved_text }})"""
 
 import argparse
 import json
@@ -26,6 +27,8 @@ def main() -> None:
     p.add_argument("--fault", help="fault case.json with an expected_fix to score against")
     p.add_argument("--case", help="generated fault case.json: inject its fault, score against its expected_fix")
     p.add_argument("--out", help="folder for this run's logs and summary")
+    p.add_argument("--retriever", choices=["naive", "advanced"], help="RAG retriever over the fix memory")
+    p.add_argument("--embed-model", default="nomic-embed-text", help="Ollama embedding model for --retriever")
     args = p.parse_args()
 
     slots, _ = load_answer(args.slots)
@@ -37,8 +40,14 @@ def main() -> None:
         fault = dict(case["injection"])
         mlflow_client = fault.pop("mlflow_client", mlflow_client)
         injection = Overrides(**fault)
+    retrieve = None
+    if args.retriever:
+        from ..llm.ollama import OllamaEmbedder
+        from ..memory import FixMemory, retriever
+        retrieve = retriever(FixMemory.build(OllamaEmbedder(args.embed_model)), args.retriever)
     result = run_fix_loop(args.repo, slots, args.prompt, OllamaClient(args.model), expected=expected,
-                          mlflow_client=mlflow_client, injection=injection)
+                          mlflow_client=mlflow_client, injection=injection, retriever=retrieve,
+                          retriever_name=args.retriever)
     sys.stdout.reconfigure(encoding="utf-8")
     text = result.text()
     score = score_fix(result, case["expected_fix"]) | {"case": case["id"]} if case else None

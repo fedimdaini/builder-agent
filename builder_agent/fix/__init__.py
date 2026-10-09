@@ -65,6 +65,7 @@ class FixAttempt(BaseModel):
     reason: str | None = None
     outcome: str                      # "passed", "failed at <stage>", "not applied: ..."
     sandbox_attempt_id: str | None = None
+    retrieved: list[dict] | None = None   # RAG: the memory cases put into the prompt (id, variant, score, ranks)
 
 
 class FixLoopResult(BaseModel):
@@ -80,6 +81,7 @@ class FixLoopResult(BaseModel):
     stopped_because: str
     applied: Overrides                # the injected fault (if any) plus the fixes on top
     injection: Overrides | None = None
+    retriever: str | None = None      # RAG retriever name (builder_agent.memory), if any
 
     def text(self) -> str:
         out = [f"FIX LOOP {self.repo} ({self.prompt_version} x {self.model}): "
@@ -87,6 +89,8 @@ class FixLoopResult(BaseModel):
                f"  initial run: {self.initial}"]
         for a in self.attempts:
             out.append(f"  fix {a.n}: stage {a.stage} -> {a.action_text or 'no valid action'} -> {a.outcome}")
+            if a.retrieved is not None:
+                out.append("         retrieved: " + ", ".join(f"{r['id']} {r['variant']}" for r in a.retrieved))
             if a.analysis:
                 out.append(f"         analysis: {a.analysis}")
             if a.reason:
@@ -188,8 +192,10 @@ def run_fix_loop(repo: str | Path, slots: dict, prompt_version: str, client: Cha
                  expected: dict | None = None, mlflow_client: str | None = None, max_fixes: int = MAX_FIXES,
                  contracts_path: str | Path = DEFAULT_CONTRACTS, prompts_dir: str | Path | None = None,
                  runner=subprocess_runner, sandbox_log: str | Path | None = DEFAULT_LOG,
-                 fix_log: str | Path | None = DEFAULT_FIX_LOG, injection: Overrides | None = None) -> FixLoopResult:
-    """injection: a generated fault (builder_agent/faults) the loop starts from; fixes are applied on top."""
+                 fix_log: str | Path | None = DEFAULT_FIX_LOG, injection: Overrides | None = None,
+                 retriever=None, retriever_name: str | None = None) -> FixLoopResult:
+    """injection: a generated fault (builder_agent/faults) the loop starts from; fixes are applied on top.
+    retriever: (stage, error_tail) -> memory hits (builder_agent.memory), rendered into {{ retrieved_text }}."""
     prompt = load_prompt(prompt_version, prompts_dir) if prompts_dir else load_prompt(prompt_version)
     ctx = scan_repo(repo)
     c = load_contracts(contracts_path)
@@ -213,8 +219,15 @@ def run_fix_loop(repo: str | Path, slots: dict, prompt_version: str, client: Cha
         tctx = config_context(ctx, c, plan, answers, mlflow_client, applied)
         variables = prompt_variables(ctx, r, tctx, n, attempts)
         stage = _failed(r)
+        retrieved = None
+        if retriever is not None:
+            from ..memory import render_retrieved      # chromadb only when RAG is used
+            hits = retriever(stage.name, stage.output_tail)
+            variables["retrieved_text"] = render_retrieved(hits)
+            retrieved = [{"id": h.doc.id, "variant": h.doc.variant, "score": h.score, "ranks": h.ranks} for h in hits]
         diag, calls = diagnose(prompt, client, variables, applied, _installed(ctx, tctx), _python_packages(ctx))
-        attempt = FixAttempt(n=n, stage=stage.name, error_tail=stage.output_tail, calls=calls, outcome="")
+        attempt = FixAttempt(n=n, stage=stage.name, error_tail=stage.output_tail, calls=calls, outcome="",
+                             retrieved=retrieved)
         if diag is None:
             attempt.outcome = "not applied: " + ("LLM call failed" if calls and calls[-1].error else
                                                  f"no valid fix after {len(calls)} call(s)")
@@ -239,7 +252,7 @@ def run_fix_loop(repo: str | Path, slots: dict, prompt_version: str, client: Cha
     return FixLoopResult(repo=ctx.name, prompt_version=prompt.version, prompt_sha256=prompt.sha256,
                          model=client.model, model_digest=digest, initial=initial, initial_attempt_id=initial_id,
                          attempts=attempts, final_ok=r.ok, stopped_because=stopped, applied=applied,
-                         injection=injection)
+                         injection=injection, retriever=retriever_name)
 
 
 def _log(path, repo: str, prompt: PromptFile, client, digest: str, a: FixAttempt) -> None:

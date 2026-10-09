@@ -13,6 +13,8 @@ dependencies = [
     "packaging>=23",
     "jinja2>=3.1",
     "pyflakes>=3",
+    "chromadb==1.0.15",      # fix memory (RAG); 0.6.x needs a C++ build of hnswlib on Windows/3.12
+    "rank-bm25==0.2.2",
 ]
 
 [project.optional-dependencies]

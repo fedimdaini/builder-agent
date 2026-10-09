@@ -105,3 +105,22 @@ class OllamaClient:
         return ChatResponse(content=resp["message"]["content"], latency_s=round(time.perf_counter() - t0, 2),
                             prompt_tokens=resp.get("prompt_eval_count"), output_tokens=resp.get("eval_count"),
                             transport_errors=list(errors))
+
+
+class OllamaEmbedder:
+    """Embeddings through Ollama's /api/embed (local model, unloaded after each call by default).
+    nomic-embed-text expects a task prefix on every text: "search_document: " or "search_query: "."""
+
+    PREFIXES = {"nomic-embed-text": {"document": "search_document: ", "query": "search_query: "}}
+
+    def __init__(self, model: str = "nomic-embed-text", host: str = DEFAULT_HOST, timeout: float = 300,
+                 keep_alive: int | str = DEFAULT_KEEP_ALIVE):
+        self.model, self.host, self.timeout, self.keep_alive = model, host.rstrip("/"), timeout, keep_alive
+
+    def embed(self, texts: list[str], kind: str = "document") -> list[list[float]]:
+        prefix = self.PREFIXES.get(self.model.split(":")[0], {}).get(kind, "")
+        body = {"model": self.model, "input": [prefix + t for t in texts], "keep_alive": self.keep_alive}
+        req = urllib.request.Request(f"{self.host}/api/embed", data=json.dumps(body).encode(),
+                                     headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=self.timeout) as r:
+            return json.load(r)["embeddings"]
