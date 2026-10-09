@@ -38,8 +38,8 @@ class Fault001Runner:
         return 0, "prediction: 98.5\nsmoke test passed" if "predict" in cmd else "ok"
 
 
-def loop(mini, model, runner=None, **kw):  # noqa: F811
-    return run_fix_loop(mini.root, MINI_GOLD, "diagnose_v1", model, mlflow_client="mlflow",
+def loop(mini, model, runner=None, prompt="diagnose_v1", **kw):  # noqa: F811
+    return run_fix_loop(mini.root, MINI_GOLD, prompt, model, mlflow_client="mlflow",
                         runner=runner or Fault001Runner(), sandbox_log=None, **kw)
 
 
@@ -164,3 +164,43 @@ def test_the_draft_prompt_renders(mini):  # noqa: F811
     assert "pin_package {name, version}" in msgs[0]["content"]        # menu in the system section
     assert "FIXES ALREADY TRIED:\nnone" in msgs[1]["content"]
     assert "MLflow server image" not in msgs[1]["content"]            # draft uses the error alone
+
+
+# --- Chain-of-Thought prompts: "analysis" first, only when the prompt asks for it ---------------
+
+COT = {"analysis": "Step 1: 'API request to endpoint /api/2.0/mlflow/logged-models failed with error code 404'. "
+                   "Step 2: the server lacks the endpoint the client calls. Step 3: the mlflow package version. "
+                   "Step 4: pin_package.",
+       "fix": PIN["fix"], "reason": PIN["reason"]}
+
+
+def test_v2_asks_for_analysis_first_and_logs_it(mini, tmp_path):  # noqa: F811
+    model = FakeModel(COT)
+    log = tmp_path / "fix.jsonl"
+    r = loop(mini, model, prompt="diagnose_v2", fix_log=log)
+    assert r.final_ok and r.prompt_version == "diagnose_v2"
+    assert list(model.schema["properties"]) == ["analysis", "fix", "reason"]
+    assert model.schema["required"][0] == "analysis"
+    assert r.attempts[0].analysis == COT["analysis"]
+    entry = json.loads(log.read_text(encoding="utf-8").splitlines()[0])
+    assert entry["analysis"] == COT["analysis"] and entry["action"] == PIN["fix"]
+    system, user = (m["content"] for m in r.attempts[0].calls[0].messages)
+    assert "think step by step in the \"analysis\" field" in system and "{{" not in system + user
+    assert '{"analysis": "Step 1: ... Step 2:' in user
+
+
+def test_v2_rejects_an_answer_without_analysis(mini):  # noqa: F811
+    model = FakeModel(PIN, {**COT, "analysis": "  "}, COT)
+    r = loop(mini, model, prompt="diagnose_v2")
+    calls = r.attempts[0].calls
+    assert any("analysis: Field required" in reason for reason in calls[0].reasons)
+    assert calls[1].reasons == ["analysis is empty: write the steps the prompt asks for before the fix"]
+    assert calls[2].valid and r.final_ok
+    assert "analysis first" in model.sent[1][-1]["content"]          # v2's retry wording
+
+
+def test_v1_schema_is_unchanged(mini):  # noqa: F811
+    model = FakeModel(PIN)
+    r = loop(mini, model)
+    assert list(model.schema["properties"]) == ["fix", "reason"] and r.attempts[0].analysis is None
+    assert not validate_fix(COT, Overrides(), set()).ok             # v1 doesn't accept extra fields

@@ -86,3 +86,4 @@ Each technique is measured against a baseline on the same faults, with the same 
 - Generated knowledge and prompt chaining: RAG and the small action menu cover them.
 - Full fine-tuning and prompt tuning: QLoRA is enough for a small local model.
 - PPO: DPO gets the preference signal without a reward model.
+- No multimodal in the Builder.

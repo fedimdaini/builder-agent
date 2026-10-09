@@ -56,6 +56,19 @@ class Diagnosis(_Strict):
     reason: str = Field(max_length=400)        # short: why this fix, from the error
 
 
+class DiagnosisWithAnalysis(_Strict):
+    """For prompts that ask for step-by-step reasoning (Chain-of-Thought): "analysis" is the FIRST
+    property, so the model writes it before choosing the fix."""
+    analysis: str
+    fix: Fix
+    reason: str = Field(max_length=400)
+
+
+def answer_model(prompt_text: str) -> type[Diagnosis] | type[DiagnosisWithAnalysis]:
+    """The schema a prompt asks for: with "analysis" only if the prompt names that field."""
+    return DiagnosisWithAnalysis if '"analysis"' in prompt_text else Diagnosis
+
+
 PIP_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 VERSION_RE = re.compile(r"^\d+(\.\d+){1,2}$")
 APT_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9+.-]+$")
@@ -66,18 +79,21 @@ PROTECTED_ENV = {"PATH", "HOME", "PYTHONPATH", "LD_LIBRARY_PATH", "PYTHONHOME"}
 class FixValidation(BaseModel):
     ok: bool
     reasons: list[str]
-    diagnosis: Diagnosis | None = None
+    diagnosis: Diagnosis | DiagnosisWithAnalysis | None = None
 
 
-def validate_fix(answer: dict, applied: Overrides, installed: set[str]) -> FixValidation:
+def validate_fix(answer: dict, applied: Overrides, installed: set[str],
+                 model: type[Diagnosis] | type[DiagnosisWithAnalysis] = Diagnosis) -> FixValidation:
     """Check one diagnosis. applied: fixes already in place; installed: pip names already installed."""
     try:
-        d = Diagnosis.model_validate(answer)
+        d = model.model_validate(answer)
     except ValidationError as e:
         return FixValidation(ok=False, reasons=[f"{'.'.join(str(p) for p in err['loc']) or 'answer'}: {err['msg']}"
                                                 for err in e.errors()])
     f, reasons = d.fix, []
     bad = reasons.append
+    if isinstance(d, DiagnosisWithAnalysis) and not d.analysis.strip():
+        bad("analysis is empty: write the steps the prompt asks for before the fix")
     if isinstance(f, PinPackage):
         if not PIP_NAME_RE.match(f.name):
             bad(f"pin_package: {f.name!r} is not a valid package name")

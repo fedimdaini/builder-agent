@@ -26,7 +26,7 @@ from ..render.configs import MLFLOW_IMAGE, Overrides, config_context
 from ..sandbox import DEFAULT_CONTRACTS, DEFAULT_LOG, SandboxResult, run_sandbox, subprocess_runner
 from ..scan import scan_repo
 from ..scan.deps import declared_names, normalize
-from .models import Diagnosis, GiveUp, apply_fix, describe, validate_fix
+from .models import Diagnosis, DiagnosisWithAnalysis, GiveUp, answer_model, apply_fix, describe, validate_fix
 
 MAX_FIXES = 3
 MAX_CALLS = 3                         # LLM calls per diagnosis (rejected answers are retried with reasons)
@@ -60,6 +60,7 @@ class FixAttempt(BaseModel):
     calls: list[Call]
     action: dict | None = None        # the accepted fix
     action_text: str | None = None
+    analysis: str | None = None       # the accepted answer's step-by-step analysis (prompts that ask for it)
     reason: str | None = None
     outcome: str                      # "passed", "failed at <stage>", "not applied: ..."
     sandbox_attempt_id: str | None = None
@@ -84,6 +85,8 @@ class FixLoopResult(BaseModel):
                f"  initial run: {self.initial}"]
         for a in self.attempts:
             out.append(f"  fix {a.n}: stage {a.stage} -> {a.action_text or 'no valid action'} -> {a.outcome}")
+            if a.analysis:
+                out.append(f"         analysis: {a.analysis}")
             if a.reason:
                 out.append(f"         reason: {a.reason}")
             for i, c in enumerate(a.calls, 1):
@@ -134,8 +137,9 @@ def _installed(ctx, tctx: dict) -> set[str]:
 # --- one diagnosis ------------------------------------------------------------------------------
 
 def diagnose(prompt: PromptFile, client: ChatClient, variables: dict, applied: Overrides,
-             installed: set[str]) -> tuple[Diagnosis | None, list[Call]]:
-    schema = inline_refs(Diagnosis.model_json_schema())
+             installed: set[str]) -> tuple[Diagnosis | DiagnosisWithAnalysis | None, list[Call]]:
+    model = answer_model("\n".join(prompt.sections.values()))
+    schema = inline_refs(model.model_json_schema())
     messages = [{"role": "system", "content": prompt.render("system", variables)},
                 {"role": "user", "content": prompt.render("user", variables)}]
     calls: list[Call] = []
@@ -149,7 +153,7 @@ def diagnose(prompt: PromptFile, client: ChatClient, variables: dict, applied: O
             return None, calls
         try:
             answer = json.loads(resp.content)
-            v = validate_fix(answer, applied, installed) if isinstance(answer, dict) else None
+            v = validate_fix(answer, applied, installed, model) if isinstance(answer, dict) else None
             reasons = v.reasons if v else ["the answer must be one JSON object"]
         except json.JSONDecodeError as e:
             v, reasons = None, [f"the answer is not valid JSON: {e}"]
@@ -205,6 +209,7 @@ def run_fix_loop(repo: str | Path, slots: dict, prompt_version: str, client: Cha
         else:
             attempt.action, attempt.action_text, attempt.reason = (diag.fix.model_dump(), describe(diag.fix),
                                                                    diag.reason)
+            attempt.analysis = getattr(diag, "analysis", None)
             if isinstance(diag.fix, GiveUp):
                 attempt.outcome = "not applied: the LLM gave up"
                 stopped = "give_up"
