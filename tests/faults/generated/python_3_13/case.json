@@ -1,0 +1,111 @@
+{
+  "id": "gen-012",
+  "name": "python_3_13",
+  "title": "Image on Python 3.13, the repo asks for 3.9",
+  "family": "python_version",
+  "variant": "python_3_13",
+  "generated": true,
+  "split": null,
+  "injection": {
+    "python_version": "3.13"
+  },
+  "found_by": {
+    "attempt_id": "20261009T195856Z-1bd104",
+    "repo": "taxi-trip-regression",
+    "date": "2026-10-09",
+    "log": "logs/sandbox_attempts.jsonl"
+  },
+  "stage": "build",
+  "command": "docker compose -p builder-sbx-taxi-trip-regression -f compose.base.yml -f compose.sandbox.yml --progress plain build",
+  "exit_code": 1,
+  "stages": {
+    "render": "ok",
+    "build": "failed",
+    "mlflow": "skipped",
+    "data": "skipped",
+    "train": "skipped",
+    "evaluate": "skipped",
+    "serve": "skipped",
+    "health": "skipped",
+    "predict": "skipped"
+  },
+  "error_signature": "ERROR: Couldn't install package: {}",
+  "error_tail": [
+    "#10 12.89 [pipenv.exceptions.InstallError]:       Running `clang++ --version` gave \"[Errno 2] No such file or directory: 'clang++'\"",
+    "#10 12.89 [pipenv.exceptions.InstallError]:       Running `nvc++ --version` gave \"[Errno 2] No such file or directory: 'nvc++'\"",
+    "#10 12.89 [pipenv.exceptions.InstallError]:       Running `pgc++ --version` gave \"[Errno 2] No such file or directory: 'pgc++'\"",
+    "#10 12.89 [pipenv.exceptions.InstallError]:       Running `icpc --version` gave \"[Errno 2] No such file or directory: 'icpc'\"",
+    "#10 12.89 [pipenv.exceptions.InstallError]:       Running `icpx --version` gave \"[Errno 2] No such file or directory: 'icpx'\"",
+    "#10 12.89 [pipenv.exceptions.InstallError]:       ",
+    "#10 12.89 [pipenv.exceptions.InstallError]:       A full log can be found at /tmp/pip-install-3z6vydn_/contourpy_204ccd14e485425fad1c1e0b4e1f9dc0/.mesonpy-itndcb8e/meson-logs/meson-log.txt",
+    "#10 12.89 [pipenv.exceptions.InstallError]:       [end of output]",
+    "#10 12.89 [pipenv.exceptions.InstallError]:   ",
+    "#10 12.89 [pipenv.exceptions.InstallError]:   note: This error originates from a subprocess, and is likely not a problem with pip.",
+    "#10 12.89 [pipenv.exceptions.InstallError]: error: metadata-generation-failed",
+    "#10 12.89 [pipenv.exceptions.InstallError]: ",
+    "#10 12.89 [pipenv.exceptions.InstallError]: × Encountered error while generating package metadata.",
+    "#10 12.89 [pipenv.exceptions.InstallError]: ╰─> See above for output.",
+    "#10 12.89 [pipenv.exceptions.InstallError]: ",
+    "#10 12.89 [pipenv.exceptions.InstallError]: note: This is an issue with the package mentioned above, not pip.",
+    "#10 12.89 [pipenv.exceptions.InstallError]: hint: See above for details.",
+    "#10 12.89 ERROR: Couldn't install package: {}",
+    "#10 12.89  Package installation failed...",
+    "#10 12.89 /usr/local/lib/python3.13/subprocess.py:1141: ResourceWarning: subprocess 18 is still running",
+    "#10 12.89   _warn(\"subprocess %s is still running\" % self.pid,",
+    "#10 12.89 ResourceWarning: Enable tracemalloc to get the object allocation traceback",
+    "#10 12.89 <sys>:0: ResourceWarning: unclosed file <_io.TextIOWrapper name=4 encoding='utf-8'>",
+    "#10 12.89 ResourceWarning: Enable tracemalloc to get the object allocation traceback",
+    "#10 12.89 <sys>:0: ResourceWarning: unclosed file <_io.TextIOWrapper name=7 encoding='utf-8'>",
+    "#10 12.89 ResourceWarning: Enable tracemalloc to get the object allocation traceback",
+    "#10 ERROR: process \"/bin/sh -c pip install pipenv==2023.12.1  && pipenv install --deploy --system  && pip install mlflow==2.17.2\" did not complete successfully: exit code: 1",
+    "------",
+    " > [5/6] RUN pip install pipenv==2023.12.1  && pipenv install --deploy --system  && pip install mlflow==2.17.2:",
+    "12.89 [pipenv.exceptions.InstallError]: hint: See above for details.",
+    "12.89 ERROR: Couldn't install package: {}",
+    "12.89  Package installation failed...",
+    "12.89 /usr/local/lib/python3.13/subprocess.py:1141: ResourceWarning: subprocess 18 is still running",
+    "12.89   _warn(\"subprocess %s is still running\" % self.pid,",
+    "12.89 ResourceWarning: Enable tracemalloc to get the object allocation traceback",
+    "12.89 <sys>:0: ResourceWarning: unclosed file <_io.TextIOWrapper name=4 encoding='utf-8'>",
+    "12.89 ResourceWarning: Enable tracemalloc to get the object allocation traceback",
+    "12.89 <sys>:0: ResourceWarning: unclosed file <_io.TextIOWrapper name=7 encoding='utf-8'>",
+    "12.89 ResourceWarning: Enable tracemalloc to get the object allocation traceback",
+    "------",
+    "Dockerfile:19",
+    "--------------------",
+    "  18 |     COPY Pipfile Pipfile.lock ./",
+    "  19 | >>> RUN pip install pipenv==2023.12.1 \\",
+    "  20 | >>>  && pipenv install --deploy --system \\",
+    "  21 | >>>  && pip install mlflow==2.17.2",
+    "  22 |     ",
+    "--------------------",
+    "failed to solve: process \"/bin/sh -c pip install pipenv==2023.12.1  && pipenv install --deploy --system  && pip install mlflow==2.17.2\" did not complete successfully: exit code: 1",
+    "View build details: docker-desktop://dashboard/build/default/default/8gy2pywa60w7w0fmh5wzui36m"
+  ],
+  "cause": {
+    "summary": "The Pipfile requires python_version 3.9 and Pipfile.lock pins packages for it; the image is python:3.13-slim."
+  },
+  "fix": {
+    "summary": "set_python_version 3.9",
+    "verified_by": {
+      "attempt_id": "20261009T195919Z-8bf761",
+      "ok": true
+    }
+  },
+  "expected_fix": {
+    "action": "set_python_version",
+    "version": "3.9"
+  },
+  "static_check": {
+    "catchable_before_run": true,
+    "rule": "the base image's Python version differs from the repo's",
+    "evidence": [
+      "Pipfile: python_version = \"3.9\"",
+      "Dockerfile: FROM python:3.13-slim"
+    ]
+  },
+  "reproduce": {
+    "how": "Run the generator for this variant; it injects the fault into the Builder's generated files only, then runs the sandbox.",
+    "command": "python -m builder_agent.faults ../taxi-trip-regression --slots tests/gold/taxi_slots.json --expected tests/gold/taxi_expected.json --variant python_3_13"
+  }
+}
