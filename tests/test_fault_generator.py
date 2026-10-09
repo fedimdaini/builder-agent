@@ -17,7 +17,9 @@ from builder_agent.render.configs import Overrides, config_context, render_confi
 from test_render import MINI_GOLD, contracts, mini  # noqa: F401 (fixtures)
 from test_repo_rule import snapshot
 
-PANDAS = CATALOG["pandas_uninstalled"]
+PANDAS = Variant(name="pandas_uninstalled", family="missing_dependency", title="pandas missing",
+                 injection=Overrides(post_install_commands=["pip uninstall -y pandas"]),
+                 expected_fix={"action": "add_dependency", "name": "pandas"}, cause="pandas uninstalled")
 
 
 class InjectionRunner:

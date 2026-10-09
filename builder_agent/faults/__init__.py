@@ -58,11 +58,13 @@ CATALOG: dict[str, Variant] = {v.name: v for v in [
             static_rule="the MLflow client version differs from the server image's tag",
             static_evidence=["Dockerfile: pip install ... mlflow==3.1.4",
                              "compose.base.yml: image: ghcr.io/mlflow/mlflow:v2.17.2"]),
-    Variant(name="pandas_uninstalled", family="missing_dependency",
-            title="pandas missing from the image",
-            injection=Overrides(post_install_commands=["pip uninstall -y pandas"]),
-            expected_fix={"action": "add_dependency", "name": "pandas"},
-            cause="pandas is not installed in the image, but the adapters and the repo import it."),
+    # not pandas, flask or gunicorn: the Builder's `pip install mlflow==...` reinstalls them as MLflow's
+    # own dependencies, so uninstalling them before it breaks nothing (tried for pandas, 2026-10-09)
+    Variant(name="xgboost_uninstalled", family="missing_dependency",
+            title="xgboost missing from the image",
+            injection=Overrides(post_install_commands=["pip uninstall -y xgboost"]),
+            expected_fix={"action": "add_dependency", "name": "xgboost"},
+            cause="xgboost is not installed in the image, but the repo's training code and the adapters import it."),
     Variant(name="numpy_2_0_2", family="incompatible_pin",
             title="numpy 2.0.2 installed over pandas 2.0.3, which is built for numpy 1.x",
             injection=Overrides(post_install_commands=["pip install numpy==2.0.2"]),

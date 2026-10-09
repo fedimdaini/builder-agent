@@ -1,0 +1,72 @@
+{
+  "id": "gen-002",
+  "name": "xgboost_uninstalled",
+  "title": "xgboost missing from the image",
+  "family": "missing_dependency",
+  "variant": "xgboost_uninstalled",
+  "generated": true,
+  "split": null,
+  "injection": {
+    "post_install_commands": [
+      "pip uninstall -y xgboost"
+    ]
+  },
+  "found_by": {
+    "attempt_id": "20261009T184240Z-0eecf1",
+    "repo": "taxi-trip-regression",
+    "date": "2026-10-09",
+    "log": "logs/sandbox_attempts.jsonl"
+  },
+  "stage": "train",
+  "command": "docker compose -p builder-sbx-taxi-trip-regression -f compose.base.yml -f compose.sandbox.yml run --rm -T --no-deps serving-current make train SAMPLE=1",
+  "exit_code": 2,
+  "stages": {
+    "render": "ok",
+    "build": "ok",
+    "mlflow": "ok",
+    "data": "ok",
+    "train": "failed",
+    "evaluate": "skipped",
+    "serve": "skipped",
+    "health": "skipped",
+    "predict": "skipped"
+  },
+  "error_signature": "ModuleNotFoundError: No module named 'xgboost'",
+  "error_tail": [
+    " Container builder-sbx-taxi-trip-regression-serving-current-run-dd120377dcd1 Creating ",
+    " Container builder-sbx-taxi-trip-regression-serving-current-run-dd120377dcd1 Created ",
+    "python pipeline/train.py",
+    "Traceback (most recent call last):",
+    "  File \"/app/pipeline/train.py\", line 20, in <module>",
+    "    from src.models.train_model import train_xgboost  # noqa: E402",
+    "  File \"/app/src/models/train_model.py\", line 3, in <module>",
+    "    import xgboost as xgb",
+    "ModuleNotFoundError: No module named 'xgboost'",
+    "make: *** [Makefile:28: train] Error 1"
+  ],
+  "cause": {
+    "summary": "xgboost is not installed in the image, but the repo's training code and the adapters import it."
+  },
+  "fix": {
+    "summary": "add_dependency xgboost",
+    "verified_by": {
+      "attempt_id": "20261009T184533Z-676efa",
+      "ok": true
+    }
+  },
+  "expected_fix": {
+    "action": "add_dependency",
+    "name": "xgboost"
+  },
+  "static_check": {
+    "catchable_before_run": false,
+    "rule": "none: only a run shows it",
+    "evidence": [
+      "sandbox stage train"
+    ]
+  },
+  "reproduce": {
+    "how": "Run the generator for this variant; it injects the fault into the Builder's generated files only, then runs the sandbox.",
+    "command": "python -m builder_agent.faults ../taxi-trip-regression --slots tests/gold/taxi_slots.json --expected tests/gold/taxi_expected.json --variant xgboost_uninstalled"
+  }
+}
