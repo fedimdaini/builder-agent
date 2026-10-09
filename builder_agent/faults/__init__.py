@@ -46,6 +46,7 @@ class Variant(BaseModel):
     cause: str
     static_rule: str | None = None    # set if a static check could catch it before any run
     static_evidence: list[str] = []
+    mlflow_client: str | None = None  # MLflow client install spec instead of the pinned one (e.g. "mlflow")
 
 
 CATALOG: dict[str, Variant] = {v.name: v for v in [
@@ -97,6 +98,86 @@ CATALOG: dict[str, Variant] = {v.name: v for v in [
             expected_fix={"action": "add_system_package", "name": "libffi8"},
             cause="The image lacks libffi.so.8, so Python's ctypes module (_ctypes) can't load. "
                   "Simulates a slimmer base image."),
+    # --- second batch (two more per family, from docs/ROADMAP.md) ---
+    Variant(name="mlflow_client_3_0_1", family="version_mismatch",
+            title="MLflow client pinned to 3.0.1 against a 2.17.2 tracking server",
+            injection=Overrides(pins={"mlflow": "3.0.1"}),
+            expected_fix={"action": "pin_package", "name": "mlflow", "version": "2.17.2"},
+            cause="The image installs mlflow==3.0.1; the tracking server is ghcr.io/mlflow/mlflow:v2.17.2. "
+                  "The 3.x client calls endpoints the 2.x server doesn't have.",
+            static_rule="the MLflow client version differs from the server image's tag",
+            static_evidence=["Dockerfile: pip install ... mlflow==3.0.1",
+                             "compose.base.yml: image: ghcr.io/mlflow/mlflow:v2.17.2"]),
+    Variant(name="mlflow_client_unpinned", family="version_mismatch",
+            title="MLflow client installed unpinned against a 2.17.2 tracking server",
+            injection=Overrides(), mlflow_client="mlflow",
+            expected_fix={"action": "pin_package", "name": "mlflow", "version": "2.17.2"},
+            cause="`pip install mlflow` resolves to the newest 3.x client; the tracking server is "
+                  "ghcr.io/mlflow/mlflow:v2.17.2 (the same fault as the hand-recorded fault-001).",
+            static_rule="a client package is installed unpinned while its server is a pinned image",
+            static_evidence=["Dockerfile: pip install mlflow", "compose.base.yml: image: ghcr.io/mlflow/mlflow:v2.17.2"]),
+    Variant(name="flask_uninstalled", family="missing_dependency",
+            title="flask missing from the image",
+            injection=Overrides(post_install_commands=["pip uninstall -y flask"]),
+            expected_fix={"action": "add_dependency", "name": "flask"},
+            cause="flask is not installed in the image, but the serve adapter imports it."),
+    Variant(name="gunicorn_uninstalled", family="missing_dependency",
+            title="gunicorn missing from the image",
+            injection=Overrides(post_install_commands=["pip uninstall -y gunicorn"]),
+            expected_fix={"action": "add_dependency", "name": "gunicorn"},
+            cause="gunicorn is not installed in the image, but the model service's command runs it."),
+    Variant(name="xgboost_3_0_0", family="incompatible_pin",
+            title="xgboost 3.0.0 pinned on Python 3.9",
+            injection=Overrides(pins={"xgboost": "3.0.0"}),
+            expected_fix={"action": "pin_package", "name": "xgboost", "version": "2.0.0"},
+            cause="xgboost 3.x requires Python 3.10 or newer; the image is Python 3.9. Pipfile.lock pins 2.0.0.",
+            static_rule="a pinned version doesn't support the image's Python version",
+            static_evidence=["Dockerfile: FROM python:3.9-slim", "Dockerfile: pip install ... xgboost==3.0.0"]),
+    Variant(name="flask_2_0_3", family="incompatible_pin",
+            title="flask 2.0.3 pinned next to werkzeug 3.0.1",
+            injection=Overrides(pins={"flask": "2.0.3"}),
+            expected_fix={"action": "pin_package", "name": "flask", "version": "3.0.1"},
+            cause="flask 2.0.3 imports werkzeug.urls.url_quote, which werkzeug 3 removed; Pipfile.lock pins "
+                  "werkzeug 3.0.1 and flask 3.0.1.",
+            static_rule="an installed version differs from the one Pipfile.lock pins",
+            static_evidence=["Pipfile.lock: flask ==3.0.1, werkzeug ==3.0.1", "Dockerfile: pip install ... flask==2.0.3"]),
+    Variant(name="python_3_13", family="python_version",
+            title="Image on Python 3.13, the repo asks for 3.9",
+            injection=Overrides(python_version="3.13"),
+            expected_fix={"action": "set_python_version", "version": "3.9"},
+            cause="The Pipfile requires python_version 3.9 and Pipfile.lock pins packages for it; "
+                  "the image is python:3.13-slim.",
+            static_rule="the base image's Python version differs from the repo's",
+            static_evidence=["Pipfile: python_version = \"3.9\"", "Dockerfile: FROM python:3.13-slim"]),
+    Variant(name="python_3_8", family="python_version",
+            title="Image on Python 3.8, the repo asks for 3.9",
+            injection=Overrides(python_version="3.8"),
+            expected_fix={"action": "set_python_version", "version": "3.9"},
+            cause="The Pipfile requires python_version 3.9 and Pipfile.lock pins packages for it; "
+                  "the image is python:3.8-slim.",
+            static_rule="the base image's Python version differs from the repo's",
+            static_evidence=["Pipfile: python_version = \"3.9\"", "Dockerfile: FROM python:3.8-slim"]),
+    Variant(name="mlflow_uri_wrong_port", family="env_var",
+            title="MLFLOW_TRACKING_URI on the wrong port",
+            injection=Overrides(env={"MLFLOW_TRACKING_URI": "http://mlflow:5001"}),
+            expected_fix={"action": "set_env_var", "name": "MLFLOW_TRACKING_URI", "value": "http://mlflow:5000"},
+            cause="The tracking URI uses port 5001; the mlflow service listens on 5000.",
+            static_rule="the tracking URI's port is not the port the compose service listens on",
+            static_evidence=["compose.base.yml: MLFLOW_TRACKING_URI: \"http://mlflow:5001\"",
+                             "compose.base.yml: mlflow server --port 5000"]),
+    Variant(name="mlflow_uri_empty", family="env_var",
+            title="MLFLOW_TRACKING_URI set to an empty string",
+            injection=Overrides(env={"MLFLOW_TRACKING_URI": ""}),
+            expected_fix={"action": "set_env_var", "name": "MLFLOW_TRACKING_URI", "value": "http://mlflow:5000"},
+            cause="An empty tracking URI makes MLflow fall back to a local ./mlruns folder instead of the server.",
+            static_rule="the tracking URI is empty",
+            static_evidence=["compose.base.yml: MLFLOW_TRACKING_URI: \"\""]),
+    Variant(name="libsqlite3_removed", family="system_library",
+            title="libsqlite3-0 (needed by Python's sqlite3) missing from the base image",
+            injection=Overrides(pre_apt_commands=["dpkg --remove --force-depends libsqlite3-0"]),
+            expected_fix={"action": "add_system_package", "name": "libsqlite3-0"},
+            cause="The image lacks libsqlite3.so.0, so Python's sqlite3 module can't load. "
+                  "Simulates a slimmer base image."),
 ]}
 
 
@@ -139,7 +220,8 @@ def check_expected_fix(v: Variant, repo, slots: dict, contracts_path) -> list[st
     """Would the fix loop accept the expected fix in the faulty state? Reasons if not."""
     ctx = scan_repo(repo)
     c = load_contracts(contracts_path)
-    tctx = config_context(ctx, c, plan_build(ctx, c), validate_slots(ctx, slots).slots, None, v.injection)
+    tctx = config_context(ctx, c, plan_build(ctx, c), validate_slots(ctx, slots).slots, v.mlflow_client,
+                          v.injection)
     check = validate_fix({"fix": v.expected_fix, "reason": "expected fix"}, v.injection,
                          _installed(ctx, tctx), python_packages=_python_packages(ctx))
     return check.reasons
@@ -157,7 +239,7 @@ def generate_case(v: Variant, repo: str | Path, slots: dict, expected: dict | No
 
     def sandbox(o: Overrides) -> SandboxResult:
         return run_sandbox(repo, slots, expected=expected, contracts_path=contracts_path, log_path=sandbox_log,
-                           runner=runner, overrides=o)
+                           runner=runner, mlflow_client=v.mlflow_client, overrides=o)
 
     r = sandbox(v.injection)
     if r.ok:
@@ -173,7 +255,8 @@ def generate_case(v: Variant, repo: str | Path, slots: dict, expected: dict | No
         "id": next_id(out), "name": v.name, "title": v.title,
         "family": v.family, "variant": v.name, "generated": True,
         "split": None,                # later: "memory" or "test", by variant
-        "injection": v.injection.model_dump(exclude_defaults=True),
+        "injection": v.injection.model_dump(exclude_defaults=True)
+        | ({"mlflow_client": v.mlflow_client} if v.mlflow_client else {}),
         "found_by": {"attempt_id": r.attempt_id, "repo": r.repo, "date": r.started_at[:10],
                      "log": "logs/sandbox_attempts.jsonl"},
         "stage": failed.name, "command": failed.command, "exit_code": failed.exit_code,

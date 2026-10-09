@@ -51,7 +51,7 @@ def test_catalog_has_one_variant_per_family_with_a_menu_fix():
     assert {v.family for v in CATALOG.values()} == set(FAMILIES)
     for v in CATALOG.values():
         Diagnosis.model_validate({"fix": v.expected_fix, "reason": "x"})   # a menu action, strict
-        assert v.injection != Overrides(), v.name
+        assert v.injection != Overrides() or v.mlflow_client, v.name
 
 
 # --- injection hooks in the rendered files ---------------------------------------------------------
@@ -154,3 +154,13 @@ def test_expected_fix_the_loop_would_reject_is_refused(mini, tmp_path):  # noqa:
                                                                               "name": "numpy"}}))
     with pytest.raises(ValueError, match="already installed"):
         gen(mini, bad, out=tmp_path)
+
+
+def test_mlflow_client_variant_renders_unpinned_and_is_recorded(mini, tmp_path):  # noqa: F811
+    v = Variant(name="unpinned", family="version_mismatch", title="t", injection=Overrides(), mlflow_client="mlflow",
+                expected_fix={"action": "pin_package", "name": "mlflow", "version": "2.17.2"}, cause="c")
+    runner = InjectionRunner("FROM", "mlflow==2.17.2")
+    r = gen(mini, v, runner=runner, out=tmp_path)
+    assert r.saved, r.reason
+    assert "mlflow==" not in runner.dockerfiles[0] and "mlflow==2.17.2" in runner.dockerfiles[1]
+    assert r.case["injection"] == {"mlflow_client": "mlflow"}
