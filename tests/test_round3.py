@@ -11,7 +11,7 @@ import pytest
 from builder_agent.decide import plan_build
 from builder_agent.llm import fill_slots, load_prompt
 from builder_agent.llm.eval import EvalReport, SLOTS, compare, summarize
-from builder_agent.llm.ollama import OllamaClient, OllamaError
+from builder_agent.llm.ollama import ChatResponse, OllamaClient, OllamaError
 from builder_agent.render.slots import validate_slots
 from builder_agent.scan import rows, scan_repo
 
@@ -223,3 +223,15 @@ def test_summary_mean_spread_and_counts():
     assert set(s.per_slot_correct) == set(SLOTS)
     text = s.text()
     assert "valid at the end         2/3" in text and "distinct final answers   2" in text
+
+
+def test_ollama_unloads_the_model_after_each_call_by_default(monkeypatch):
+    sent = []
+
+    def fake_post(self, data, errors):
+        sent.append(json.loads(data))
+        return ChatResponse(content="{}", latency_s=0.0)
+    monkeypatch.setattr(OllamaClient, "_post", fake_post)
+    OllamaClient("m").chat([])
+    OllamaClient("m", keep_alive="5m").chat([])
+    assert [b["keep_alive"] for b in sent] == [0, "5m"]

@@ -12,6 +12,9 @@ from pydantic import BaseModel
 
 DEFAULT_HOST = "http://127.0.0.1:11434"
 DEFAULT_OPTIONS = {"temperature": 0, "seed": 42, "num_ctx": 8192}
+# unload the model after each call: frees its memory (about 5 GB for a 7B model) while the sandbox
+# runs Docker builds between calls; reloading costs a few seconds per call
+DEFAULT_KEEP_ALIVE = 0
 
 
 RETRY_WAIT_S = 10   # Ollama restarts its model server after a crash (e.g. a CUDA error)
@@ -50,8 +53,9 @@ def inline_refs(schema: dict) -> dict:
 
 class OllamaClient:
     def __init__(self, model: str, host: str = DEFAULT_HOST, options: dict | None = None, timeout: float = 900,
-                 retry_wait_s: float = RETRY_WAIT_S):
+                 retry_wait_s: float = RETRY_WAIT_S, keep_alive: int | str = DEFAULT_KEEP_ALIVE):
         self.model, self.host, self.timeout, self.retry_wait_s = model, host.rstrip("/"), timeout, retry_wait_s
+        self.keep_alive = keep_alive       # Ollama's keep_alive: 0 unloads at once, "5m" keeps it loaded
         self.options = dict(DEFAULT_OPTIONS if options is None else options)
         self._digest: str | None = None
 
@@ -68,7 +72,8 @@ class OllamaClient:
         return self._digest
 
     def chat(self, messages: list[dict], schema: dict | None = None) -> ChatResponse:
-        body = {"model": self.model, "stream": False, "options": self.options, "messages": messages}
+        body = {"model": self.model, "stream": False, "options": self.options, "messages": messages,
+                "keep_alive": self.keep_alive}
         if schema is not None:
             body["format"] = schema
         data = json.dumps(body).encode()

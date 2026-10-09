@@ -247,27 +247,34 @@ def _log(path, repo: str, prompt: PromptFile, client, digest: str, a: FixAttempt
         return
     entry = {"time": datetime.now(timezone.utc).isoformat(), "task": "build_fix", "repo": repo,
              "prompt_version": prompt.version, "prompt_sha256": prompt.sha256, "model": client.model,
-             "model_digest": digest, "options": client.options} | a.model_dump()
+             "model_digest": digest, "options": client.options,
+             "keep_alive": getattr(client, "keep_alive", None)} | a.model_dump()
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
-def score_fix(result: FixLoopResult, expected_fix: dict) -> dict:
-    """Did the first accepted action match the expected fix? exact: same action and arguments;
-    loose: same action on the same package (any version)."""
-    first = next((a.action for a in result.attempts if a.action), None)
-    if first is None:
-        return {"exact": False, "loose": False, "first_action": None}
-    same = first.get("action") == expected_fix.get("action") and \
+def score_attempts(attempts: list[dict], expected_fix: dict) -> dict:
+    """Score one run from its fix attempts (FixAttempt dumps or fix_attempts.jsonl entries).
+    Main: did the first fix pass the sandbox, and how many fixes until it passed (None: not fixed).
+    Secondary: was the first accepted action the expected one (exact: same action and arguments;
+    loose: same action on the same package, any version)."""
+    passed = next((a["n"] for a in attempts if a["outcome"] == "passed"), None)
+    first = next((a["action"] for a in attempts if a.get("action")), None)
+    same = first is not None and first.get("action") == expected_fix.get("action") and \
         normalize(str(first.get("name", ""))) == normalize(str(expected_fix.get("name", "")))
-    return {"exact": same and all(first.get(k) == v for k, v in expected_fix.items()), "loose": same,
+    return {"first_fix_passed": passed == 1, "fixes_to_pass": passed,
+            "exact": same and all(first.get(k) == v for k, v in expected_fix.items()), "loose": same,
             "first_action": first}
 
 
+def score_fix(result: FixLoopResult, expected_fix: dict) -> dict:
+    return score_attempts([a.model_dump() for a in result.attempts], expected_fix)
+
+
 def export_run(result: FixLoopResult, out: str | Path, summary: str, fix_log: str | Path = DEFAULT_FIX_LOG,
-               sandbox_log: str | Path = DEFAULT_LOG) -> Path:
+               sandbox_log: str | Path = DEFAULT_LOG, score: dict | None = None) -> Path:
     """Copy one run's log lines (its fix attempts and sandbox attempts) and its summary to out/.
     Call it right after the run."""
     out = Path(out)
@@ -280,4 +287,10 @@ def export_run(result: FixLoopResult, out: str | Path, summary: str, fix_log: st
     (out / "fix_attempts.jsonl").write_text("\n".join(fixes) + "\n", encoding="utf-8", newline="\n")
     (out / "sandbox_attempts.jsonl").write_text("\n".join(sandboxes) + "\n", encoding="utf-8", newline="\n")
     (out / "summary.txt").write_text(summary + "\n", encoding="utf-8", newline="\n")
+    if score is not None:
+        write_score(out, score)
     return out
+
+
+def write_score(out: str | Path, score: dict) -> None:
+    (Path(out) / "score.json").write_text(json.dumps(score, indent=2) + "\n", encoding="utf-8", newline="\n")

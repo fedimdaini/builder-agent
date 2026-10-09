@@ -1,0 +1,13 @@
+{
+  "first_fix_passed": false,
+  "fixes_to_pass": 3,
+  "exact": false,
+  "loose": false,
+  "first_action": {
+    "action": "set_env_var",
+    "name": "GIT_PYTHON_REFRESH",
+    "value": "quiet"
+  },
+  "case": "gen-001",
+  "recomputed_from": "fix_attempts.jsonl"
+}

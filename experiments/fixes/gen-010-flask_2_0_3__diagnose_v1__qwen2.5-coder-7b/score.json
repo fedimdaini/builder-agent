@@ -1,0 +1,13 @@
+{
+  "first_fix_passed": true,
+  "fixes_to_pass": 1,
+  "exact": false,
+  "loose": false,
+  "first_action": {
+    "action": "pin_package",
+    "name": "werkzeug",
+    "version": "2.3.1"
+  },
+  "case": "gen-010",
+  "recomputed_from": "fix_attempts.jsonl"
+}

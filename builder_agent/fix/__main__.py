@@ -41,12 +41,12 @@ def main() -> None:
                           mlflow_client=mlflow_client, injection=injection)
     sys.stdout.reconfigure(encoding="utf-8")
     text = result.text()
+    score = score_fix(result, case["expected_fix"]) | {"case": case["id"]} if case else None
     if case:
-        text += f"\nscore vs {case['id']} ({case.get('variant', case['name'])}): " \
-                + json.dumps(score_fix(result, case["expected_fix"]))
+        text += f"\nscore vs {case['id']} ({case.get('variant', case['name'])}): " + json.dumps(score)
     print(text)
     if args.out:
-        print("logs ->", export_run(result, args.out, text, DEFAULT_FIX_LOG, DEFAULT_LOG))
+        print("logs ->", export_run(result, args.out, text, DEFAULT_FIX_LOG, DEFAULT_LOG, score))
     sys.exit(0 if result.final_ok else 1)
 
 

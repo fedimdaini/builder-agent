@@ -1,0 +1,12 @@
+{
+  "first_fix_passed": false,
+  "fixes_to_pass": null,
+  "exact": false,
+  "loose": false,
+  "first_action": {
+    "action": "add_system_package",
+    "name": "build-essential"
+  },
+  "case": "gen-011",
+  "recomputed_from": "fix_attempts.jsonl"
+}

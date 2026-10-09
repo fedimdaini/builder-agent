@@ -96,7 +96,8 @@ def test_fault_001_fixed_by_the_expected_pin(mini, tmp_path):  # noqa: F811
     assert (a.stage, a.action_text, a.outcome) == ("train", "pin_package mlflow==2.17.2", "passed")
     assert "logged-models failed with error code 404" in "\n".join(a.error_tail)
     assert "mlflow==2.17.2" not in runner.dockerfiles[0] and "mlflow==2.17.2" in runner.dockerfiles[1]
-    assert score_fix(r, FAULT_001["expected_fix"]) == {"exact": True, "loose": True, "first_action": PIN["fix"]}
+    assert score_fix(r, FAULT_001["expected_fix"]) == {"first_fix_passed": True, "fixes_to_pass": 1, "exact": True,
+                                                        "loose": True, "first_action": PIN["fix"]}
     assert snapshot(Path(mini.root)) == before                          # the repo itself is never touched
 
     [entry] = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()]
@@ -124,8 +125,8 @@ def test_loose_score_for_a_wrong_version(mini):  # noqa: F811
                                               "still failed"]
     assert r.attempts[1].calls[1].valid
     assert "- pin_package mlflow==2.9.2: then failed at train" in r.attempts[1].calls[0].messages[1]["content"]
-    assert score_fix(r, FAULT_001["expected_fix"])["exact"] is False
-    assert score_fix(r, FAULT_001["expected_fix"])["loose"] is True
+    score = score_fix(r, FAULT_001["expected_fix"])
+    assert (score["first_fix_passed"], score["fixes_to_pass"], score["exact"], score["loose"]) == (False, 2, False, True)
 
 
 def test_give_up_stops(mini):  # noqa: F811
@@ -239,3 +240,15 @@ def test_loop_starts_from_an_injected_fault_and_exports_its_logs(mini, tmp_path)
     out = export_run(r, tmp_path / "run", r.text(), fix_log, sbx_log)
     assert len((out / "fix_attempts.jsonl").read_text(encoding="utf-8").splitlines()) == 1
     assert len((out / "sandbox_attempts.jsonl").read_text(encoding="utf-8").splitlines()) == 2
+
+
+def test_score_counts_a_passing_alternative_fix_and_not_fixed_runs():
+    from builder_agent.fix import score_attempts
+
+    expected = {"action": "pin_package", "name": "flask", "version": "3.0.1"}
+    werkzeug = {"action": "pin_package", "name": "werkzeug", "version": "2.3.1"}
+    passed = score_attempts([{"n": 1, "action": werkzeug, "outcome": "passed"}], expected)
+    assert (passed["first_fix_passed"], passed["fixes_to_pass"], passed["exact"], passed["loose"]) == (True, 1, False, False)
+    failed = score_attempts([{"n": 1, "action": None, "outcome": "not applied: no valid fix after 3 call(s)"},
+                             {"n": 2, "action": expected, "outcome": "failed at build"}], expected)
+    assert (failed["first_fix_passed"], failed["fixes_to_pass"], failed["exact"]) == (False, None, True)
