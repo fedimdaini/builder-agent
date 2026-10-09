@@ -16,7 +16,7 @@ from pathlib import Path, PurePosixPath
 from urllib.parse import urlparse
 
 import yaml
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ..decide.contracts import Contracts
 from ..decide.models import BuildPlan
@@ -44,6 +44,20 @@ def mlflow_client_spec(image: str) -> str:
     if not m:
         raise RenderError(f"can't derive the MLflow client version from image {image!r}: use a vX.Y.Z tag")
     return f"mlflow=={m.group(1)}"
+
+
+class Overrides(BaseModel):
+    """Fixes from the diagnosis loop. They change only what the Builder generates (its Dockerfile),
+    never the repo's own files: the repo's Pipfile or requirements are left as they are."""
+    pins: dict[str, str] = Field(default_factory=dict)   # pip name -> version, installed after the repo's deps
+    dependencies: list[str] = Field(default_factory=list)  # extra pip packages, unpinned
+    apt: list[str] = Field(default_factory=list)          # extra system packages
+    python_version: str | None = None
+    env: dict[str, str] = Field(default_factory=dict)
+
+
+def _pip_name(spec: str) -> str:
+    return normalize(re.split(r"[=<>!~;\[ ]", spec, maxsplit=1)[0])
 
 
 class MakeRule(BaseModel):
@@ -112,7 +126,7 @@ def _make_rules(plan: BuildPlan, c: Contracts, adapters: str | None, serve_cmd: 
 
 
 def config_context(ctx: RepoContext, c: Contracts, plan: BuildPlan, slots: SlotAnswers | None,
-                   mlflow_client: str | None = None) -> dict:
+                   mlflow_client: str | None = None, overrides: Overrides | None = None) -> dict:
     """mlflow_client overrides the derived client pin (e.g. "mlflow" to reproduce fault-001)."""
     if plan.python.status != "decided":
         raise RenderError(f"Python version not decided: {plan.python.reason}")
@@ -141,6 +155,12 @@ def config_context(ctx: RepoContext, c: Contracts, plan: BuildPlan, slots: SlotA
     if slots or any(normalize(e) == "mlflow" for e in extras):
         spec = mlflow_client_spec(MLFLOW_IMAGE) if mlflow_client is None else mlflow_client
         extras = [spec] + [e for e in extras if normalize(e) != "mlflow"]
+    o = overrides or Overrides()
+    for dep in o.dependencies:
+        if _pip_name(dep) not in {_pip_name(e) for e in extras}:
+            extras.append(dep)
+    for name, version in o.pins.items():                 # a pin replaces any other spec for that package
+        extras = [e for e in extras if _pip_name(e) != normalize(name)] + [f"{name}=={version}"]
     install = plan.install.commands + ([f"pip install {' '.join(extras)}"] if extras else [])
 
     mlflow = urlparse(c.paths["mlflow_uri"])
@@ -158,7 +178,9 @@ def config_context(ctx: RepoContext, c: Contracts, plan: BuildPlan, slots: SlotA
         "marker": MARKER,
         "tab": "\t",
         "repo": ctx.name,
-        "python_version": plan.python.version,
+        "python_version": o.python_version or plan.python.version,
+        "apt_packages": ["make"] + [p for p in o.apt if p != "make"],
+        "env": o.env,
         "deps_files": _deps_files(plan),
         "install_source": plan.install.source,
         "install_commands": install,
@@ -189,7 +211,8 @@ def config_context(ctx: RepoContext, c: Contracts, plan: BuildPlan, slots: SlotA
 
 def render_configs(ctx: RepoContext, contracts: Contracts, plan: BuildPlan,
                    slots: dict | SlotAnswers | None, out_root: str | Path,
-                   mlflow_client: str | None = None, writer: RepoWriter | None = None) -> RenderResult:
+                   mlflow_client: str | None = None, writer: RepoWriter | None = None,
+                   overrides: Overrides | None = None) -> RenderResult:
     """Render Dockerfile, .dockerignore, Makefile and the compose base file into out_root."""
     answers = None
     if slots is not None:
@@ -197,7 +220,7 @@ def render_configs(ctx: RepoContext, contracts: Contracts, plan: BuildPlan,
         if not v.ok:
             raise RenderError("invalid slot answers: " + "; ".join(v.reasons))
         answers = v.slots
-    tctx = config_context(ctx, contracts, plan, answers, mlflow_client)
+    tctx = config_context(ctx, contracts, plan, answers, mlflow_client, overrides)
     env = _env()
     rendered = {
         "Dockerfile": env.get_template("Dockerfile.j2").render(**tctx),

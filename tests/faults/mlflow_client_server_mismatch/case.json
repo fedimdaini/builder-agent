@@ -96,6 +96,11 @@
     "level": 2,
     "implemented_in": "builder_agent/render/configs.py: mlflow_client_spec()"
   },
+  "expected_fix": {
+    "action": "pin_package",
+    "name": "mlflow",
+    "version": "2.17.2"
+  },
   "static_check": {
     "catchable_before_run": true,
     "rule": "a client package is installed unpinned (pip install mlflow) while the server it talks to is a pinned image (ghcr.io/mlflow/mlflow:v2.17.2)",

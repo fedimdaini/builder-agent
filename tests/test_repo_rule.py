@@ -169,6 +169,7 @@ ALLOWED_WRITERS = {
     "repo_writer.py": "the only writer into target repos (new files, builder branch)",
     "render/actionlint.py": "downloads the pinned actionlint binary into builder-agent's .tools/",
     "llm/__init__.py": "LLM call log in builder-agent's logs/",
+    "fix/__init__.py": "fix-attempt log in builder-agent's logs/",
     "llm/eval.py": "eval reports in builder-agent's experiments/",
     "sandbox/__init__.py": "copies the target to a temp folder (read-only on the original); attempts log",
     "scan/rows.py": "row-sample cache in builder-agent's .cache/",

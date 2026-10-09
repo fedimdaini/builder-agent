@@ -9,10 +9,13 @@ ENV PYTHONUNBUFFERED=1 \
 
 # make runs the pipeline targets (`make all {{ sample_var }}=1` in the sandbox)
 RUN apt-get update \
- && apt-get install -y --no-install-recommends make \
+ && apt-get install -y --no-install-recommends {{ apt_packages | join(" ") }} \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR {{ workdir }}
+{% for k, v in env.items() %}
+ENV {{ k }}={{ v | json }}
+{% endfor %}
 
 {% if deps_files %}
 # 1. Dependencies only: this layer stays cached until {{ deps_files | join(" or ") }} change.
