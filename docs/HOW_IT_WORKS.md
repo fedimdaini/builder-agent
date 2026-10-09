@@ -82,10 +82,10 @@ compose, Makefile, CI, agents.yaml, schema draft, contract adapter), "create" or
 **`render/`**: the file generator. *In:* the plan, the **slot answers** (the few choices the LLM
 makes, section 5), `contracts.yaml`. *Out:* the adapter scripts in `pipeline/` (train, evaluate,
 serve, data, smoke test, sample request) and the config files (Dockerfile, .dockerignore, Makefile,
-compose.base.yml). `slots.py` holds the answer model, the candidate lists and the validator. Output
-is checked with **pyflakes** (finds undefined names and unused imports in Python). *Key functions:*
-`render_adapters()`, `render_configs()`, `validate_slots()`. A CI-workflow template (`ci.py`,
-checked with **actionlint**, a GitHub-workflow checker) is built but not committed yet (section 7).
+compose.base.yml) and the CI workflow (`ci.py`). `slots.py` holds the answer model, the candidate
+lists and the validator. Output is checked with **pyflakes** (finds undefined names and unused imports
+in Python) and, for the workflow, **actionlint** (a GitHub-workflow checker). *Key functions:*
+`render_adapters()`, `render_configs()`, `render_ci()`, `validate_slots()`.
 
 **`sandbox/`**: the test run. *In:* a repo path and slot answers. *Out:* a result per stage
 (ok/failed/skipped, duration, last 50 lines of output) and a line in `logs/sandbox_attempts.jsonl`.
@@ -204,15 +204,15 @@ how to reproduce it; all six could be caught before running anything):
 `e157717`): **8 errors and 5 warnings**, covering all five fault cases 002–006, plus Grafana's image
 without a version and without a healthcheck. The proposed patch applies cleanly to that commit.
 
-**Tests:** 198 automated tests pass on the committed code (`tests/`).
+**Tests:** 213 automated tests pass (`tests/`).
 
 ## 7. What's not done yet
 
 From `docs/ROADMAP.md` and `CLAUDE.md`:
 
-- **CI workflow** (roadmap item 6): the template, the rules and actionlint validation are written and
-  tested locally (taxi and the main project both pass actionlint), but not committed yet, and no
-  generated workflow has run on GitHub.
+- **CI workflow** (roadmap item 6) is done and passes actionlint for both repos, but no generated
+  workflow has run on GitHub yet, and its `needs_llm` items (smoke-test data, service tests, compose
+  variables) are still open.
 - **Complete mode**: today an artifact is either created or verified; generating only the missing
   pieces of a partly done setup isn't built.
 - **agents.yaml, the schema draft** (for the Inspector agent) and **the contract adapter** for the
@@ -220,7 +220,7 @@ From `docs/ROADMAP.md` and `CLAUDE.md`:
   needs a bridge to the contract.
 - **The message board service** in compose.base.yml, once its owner provides it.
 - **Scanner extensions** (roadmap item 5): Airflow DAGs as entry points, parquet headers, a target
-  computed from two columns (dropoff minus pickup). The scanner should also skip gitignored files.
+  computed from two columns (dropoff minus pickup).
 - **The LLM fix loop**: reading a failed sandbox stage, choosing a fix, retrying (at most 3).
 - **Fix memory and model training** (roadmap item 9): RAG over past fixes, fine-tuning, DPO.
 - **Proposing patches as pull requests** instead of files; verify only writes them today.

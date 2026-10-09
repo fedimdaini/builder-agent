@@ -232,3 +232,43 @@ def test_taxi_repo():
     [req] = ctx.undeclared_imports
     assert req.distribution == "requests" and req.notebooks_only
     assert "requests (notebooks only, 2 files)" in ctx.summary()
+
+
+# --- .gitignore is respected: runtime output never becomes a fact ------------------------------
+
+def _git(root, *args):
+    import subprocess
+    subprocess.run(["git", "-C", str(root), "-c", "user.name=t", "-c", "user.email=t@t", *args],
+                   check=True, capture_output=True)
+
+
+def _runtime_junk():
+    return {"requirements.txt": "numpy\n", "src/train.py": "import numpy\n",
+            ".gitignore": "logs/\nartifacts/\n.env\n*.pyc\n",
+            "artifacts/run1/conda.yaml": "dependencies:\n  - python=3.12.4\n",
+            "artifacts/run1/requirements.txt": "mlflow==2.15.1\n",
+            "logs/dag.py": "import requests\n", ".env": "SECRET=1\n"}
+
+
+def test_gitignored_files_are_not_scanned_in_a_git_repo(tmp_path):
+    write(tmp_path, _runtime_junk())
+    _git(tmp_path, "init", "-q")
+    _git(tmp_path, "add", "-A")
+    ctx = scan_repo(tmp_path)
+    assert [d.path for d in ctx.dependency_files] == ["requirements.txt"]
+    assert not ctx.python_version_hints                        # no 3.12 from the ignored conda.yaml
+    assert {t.module for t in ctx.third_party_imports} == {"numpy"}   # logs/dag.py ignored
+
+
+def test_gitignored_files_are_not_scanned_without_git(tmp_path):
+    write(tmp_path, _runtime_junk())                           # e.g. a git archive export
+    ctx = scan_repo(tmp_path)
+    assert [d.path for d in ctx.dependency_files] == ["requirements.txt"]
+    assert not (tmp_path / ".git").exists()                    # nothing was written in the folder
+
+
+def test_tracked_files_count_even_if_a_pattern_matches(tmp_path):
+    write(tmp_path, {".gitignore": "*.pyc\n", "src/__pycache__/m.cpython-39.pyc": "x", "src/m.py": "x = 1\n"})
+    _git(tmp_path, "init", "-q")
+    _git(tmp_path, "add", "-f", "-A")                          # the .pyc is tracked anyway (like the taxi repo)
+    assert [h.value for h in scan_repo(tmp_path).python_version_hints] == ["3.9"]

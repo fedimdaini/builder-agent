@@ -1,0 +1,131 @@
+{{ marker }}
+# CI for {{ repo }}, rendered from scanner facts. Nothing is pushed anywhere.
+{% if ci.needs_llm %}
+#
+# Not decided by rules (needs_llm), so not in this workflow yet:
+{% for n in ci.needs_llm %}
+#   - {{ n.item }}: {{ n.reason }}
+{% for line in n.context %}
+#       {{ line }}
+{% endfor %}
+{% endfor %}
+{% endif %}
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-{{ gh.ref }}
+  cancel-in-progress: true
+
+jobs:
+{% if ci.python_version %}
+  test:
+    runs-on: {{ runner }}
+    steps:
+      - uses: {{ actions.checkout }}
+{% if ci.precommit %}
+        with:
+          fetch-depth: 0      # full history: pre-commit compares the PR with its base branch
+{% endif %}
+      - uses: {{ actions.setup_python }}
+        with:
+          python-version: "{{ ci.python_version }}"
+{% if ci.install %}
+      - name: Install dependencies
+        run: |
+{% for cmd in ci.install %}
+          {{ cmd }}
+{% endfor %}
+{% endif %}
+{% if ci.unit_tests %}
+      - name: Unit tests (pytest)
+        run: |
+{% for cmd in ci.test_install %}
+          {{ cmd }}
+{% endfor %}
+          python -m pytest {{ ci.unit_tests | join(" ") }}
+{% endif %}
+{% if ci.smoke %}
+      - name: Smoke test ({{ sample_var }}=1, local MLflow file store)
+        env:
+          MLFLOW_TRACKING_URI: file:{{ gh.workspace }}/mlruns
+        run: |
+{% for cmd in ci.smoke %}
+          {{ cmd }}
+{% endfor %}
+{% endif %}
+{% if ci.precommit %}
+      - name: Install pre-commit
+        run: pip install pre-commit
+      - name: Pre-commit on the files this pull request changes
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: {{ gh.base_ref }}
+        run: pre-commit run --from-ref "origin/$BASE_REF" --to-ref HEAD --show-diff-on-failure
+      - name: Pre-commit on all files (push to main)
+        if: github.event_name == 'push'
+        run: pre-commit run --all-files --show-diff-on-failure
+{% endif %}
+{% endif %}
+{% if ci.compose_files or ci.builds %}
+
+  docker:
+    runs-on: {{ runner }}
+    steps:
+      - uses: {{ actions.checkout }}
+{% if ci.builds %}
+        with:
+          fetch-depth: 0      # full history: to see which build contexts changed
+{% endif %}
+{% if ci.compose_files %}
+      - name: Validate compose files (always)
+        run: |
+{% for f in ci.compose_files %}
+          docker compose -f {{ f }} config -q
+{% endfor %}
+{% endif %}
+{% if ci.builds %}
+      - name: Which images need rebuilding
+        id: changes
+        env:
+          EVENT: {{ gh.event_name }}
+          BASE_REF: {{ gh.base_ref }}
+          BEFORE: {{ gh.before }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = "pull_request" ]; then
+            changed=$(git diff --name-only "origin/$BASE_REF...HEAD")
+          elif [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            changed="*"   # first push of a branch: no previous commit to compare with, build everything
+          else
+            changed=$(git diff --name-only "$BEFORE" HEAD)
+          fi
+          # rebuild <output> if any changed file starts with one of the given paths
+          check() {
+            out=$1; shift
+            for prefix in "$@"; do
+              while IFS= read -r f; do
+                [ -n "$f" ] || continue   # no changes: one empty line, which matches nothing
+                case "$f" in "$prefix"*|"*") echo "$out=true" >> "$GITHUB_OUTPUT"; return;; esac
+              done <<< "$changed"
+            done
+            echo "$out=false" >> "$GITHUB_OUTPUT"
+          }
+{% for b in ci.builds %}
+          check {{ b.output }}{% for p in b.paths %} "{{ p }}"{% endfor %}
+
+{% endfor %}
+{% for b in ci.builds %}
+      - name: Build {{ b.dockerfile }}
+        if: steps.changes.outputs.{{ b.output }} == 'true'
+        run: docker build -f {{ b.dockerfile }} -t {{ b.tag }}:ci {{ b.context }}
+{% endfor %}
+{% endif %}
+{% endif %}

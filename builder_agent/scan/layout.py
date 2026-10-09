@@ -5,7 +5,11 @@ from __future__ import annotations
 import csv
 import fnmatch
 import os
+import posixpath
 import re
+import shutil
+import subprocess
+import tempfile
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
@@ -44,7 +48,53 @@ def _is_venv(path: Path) -> bool:
         return False   # e.g. a Linux symlink written by a container, unreadable on Windows
 
 
+def _git_listing(root: Path) -> list[str] | None:
+    """Files git would consider part of the repo: tracked, plus untracked but not ignored (.gitignore,
+    .git/info/exclude, global excludes). Works on a folder without .git too, through a throwaway
+    git dir in a temp folder; nothing is written in the scanned folder. None if git isn't available."""
+    if not shutil.which("git"):
+        return None
+    if (root / ".git").exists():
+        r = subprocess.run(["git", "-C", str(root), "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+                           capture_output=True)
+    else:
+        with tempfile.TemporaryDirectory(prefix="builder-scan-git-") as tmp:
+            subprocess.run(["git", "init", "-q", "--bare", tmp], capture_output=True)
+            r = subprocess.run(["git", f"--git-dir={tmp}", f"--work-tree={root}", "ls-files", "-z", "--others",
+                                "--exclude-standard"], capture_output=True)
+    if r.returncode != 0:
+        return None
+    return [p for p in r.stdout.decode("utf-8", errors="replace").split("\0") if p]
+
+
 def walk_repo(root: Path) -> WalkResult:
+    """The repo's files, as git sees them: gitignored runtime output (logs, MLflow artifacts, .env)
+    never becomes a fact."""
+    listed = _git_listing(root)
+    if listed is None:
+        return _walk_all(root)
+    venvs = {posixpath.dirname(p) for p in listed if posixpath.basename(p) == "pyvenv.cfg"}
+    files: dict[str, int] = {}
+    pyc: list[str] = []
+    for rel in sorted(set(listed)):
+        parts = rel.split("/")
+        if any(v and (rel + "/").startswith(v + "/") for v in venvs):
+            continue
+        if "__pycache__" in parts[:-1]:
+            if rel.endswith(".pyc"):
+                pyc.append(rel)
+            continue
+        if any(p in PRUNE_DIRS or p.endswith(".egg-info") for p in parts[:-1]):
+            continue
+        try:
+            files[rel] = (root / rel).stat().st_size
+        except OSError:
+            continue        # listed by git but gone, or an unreadable symlink
+    return WalkResult(files=files, pyc_names=sorted(pyc))
+
+
+def _walk_all(root: Path) -> WalkResult:
+    """Fallback without git: every file except the usual caches and virtualenvs."""
     files: dict[str, int] = {}
     pyc: list[str] = []
     for dirpath, dirnames, filenames in os.walk(root):
@@ -208,7 +258,7 @@ def scan_lfs(root: Path, files: dict[str, int]) -> LfsInfo:
 # --- existing pipeline files and tests -------------------------------------
 
 PIPELINE_FILE_PATTERNS = [
-    "Dockerfile", "Dockerfile.*", "*.Dockerfile", ".dockerignore",
+    "Dockerfile", "Dockerfile.*", "*.Dockerfile", "*.dockerfile", ".dockerignore",
     "docker-compose*.yml", "docker-compose*.yaml", "compose.yml", "compose.yaml",
     "Makefile", "Procfile", "MLproject", "dvc.yaml", "Jenkinsfile",
     ".gitlab-ci.yml", "tox.ini", "noxfile.py", "agents.yaml",
