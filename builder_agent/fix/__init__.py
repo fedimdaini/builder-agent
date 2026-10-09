@@ -78,7 +78,8 @@ class FixLoopResult(BaseModel):
     attempts: list[FixAttempt]
     final_ok: bool
     stopped_because: str
-    applied: Overrides
+    applied: Overrides                # the injected fault (if any) plus the fixes on top
+    injection: Overrides | None = None
 
     def text(self) -> str:
         out = [f"FIX LOOP {self.repo} ({self.prompt_version} x {self.model}): "
@@ -187,13 +188,14 @@ def run_fix_loop(repo: str | Path, slots: dict, prompt_version: str, client: Cha
                  expected: dict | None = None, mlflow_client: str | None = None, max_fixes: int = MAX_FIXES,
                  contracts_path: str | Path = DEFAULT_CONTRACTS, prompts_dir: str | Path | None = None,
                  runner=subprocess_runner, sandbox_log: str | Path | None = DEFAULT_LOG,
-                 fix_log: str | Path | None = DEFAULT_FIX_LOG) -> FixLoopResult:
+                 fix_log: str | Path | None = DEFAULT_FIX_LOG, injection: Overrides | None = None) -> FixLoopResult:
+    """injection: a generated fault (builder_agent/faults) the loop starts from; fixes are applied on top."""
     prompt = load_prompt(prompt_version, prompts_dir) if prompts_dir else load_prompt(prompt_version)
     ctx = scan_repo(repo)
     c = load_contracts(contracts_path)
     plan = plan_build(ctx, c)
     answers = validate_slots(ctx, slots).slots
-    applied = Overrides()
+    applied = injection.model_copy(deep=True) if injection else Overrides()
 
     def sandbox(o: Overrides) -> SandboxResult:
         return run_sandbox(repo, slots, expected=expected, contracts_path=contracts_path, log_path=sandbox_log,
@@ -236,7 +238,8 @@ def run_fix_loop(repo: str | Path, slots: dict, prompt_version: str, client: Cha
         stopped = "passed" if r.ok else "max fixes reached"
     return FixLoopResult(repo=ctx.name, prompt_version=prompt.version, prompt_sha256=prompt.sha256,
                          model=client.model, model_digest=digest, initial=initial, initial_attempt_id=initial_id,
-                         attempts=attempts, final_ok=r.ok, stopped_because=stopped, applied=applied)
+                         attempts=attempts, final_ok=r.ok, stopped_because=stopped, applied=applied,
+                         injection=injection)
 
 
 def _log(path, repo: str, prompt: PromptFile, client, digest: str, a: FixAttempt) -> None:
@@ -261,3 +264,20 @@ def score_fix(result: FixLoopResult, expected_fix: dict) -> dict:
         normalize(str(first.get("name", ""))) == normalize(str(expected_fix.get("name", "")))
     return {"exact": same and all(first.get(k) == v for k, v in expected_fix.items()), "loose": same,
             "first_action": first}
+
+
+def export_run(result: FixLoopResult, out: str | Path, summary: str, fix_log: str | Path = DEFAULT_FIX_LOG,
+               sandbox_log: str | Path = DEFAULT_LOG) -> Path:
+    """Copy one run's log lines (its fix attempts and sandbox attempts) and its summary to out/.
+    Call it right after the run."""
+    out = Path(out)
+    out.mkdir(parents=True, exist_ok=True)
+    sandbox_ids = {result.initial_attempt_id} | {a.sandbox_attempt_id for a in result.attempts if a.sandbox_attempt_id}
+    # runs go one at a time, so this run's fix attempts are the last lines of the fix log
+    fixes = Path(fix_log).read_text(encoding="utf-8").splitlines()[-len(result.attempts):] if result.attempts else []
+    sandboxes = [line for line in Path(sandbox_log).read_text(encoding="utf-8").splitlines()
+                 if json.loads(line).get("attempt_id") in sandbox_ids]
+    (out / "fix_attempts.jsonl").write_text("\n".join(fixes) + "\n", encoding="utf-8", newline="\n")
+    (out / "sandbox_attempts.jsonl").write_text("\n".join(sandboxes) + "\n", encoding="utf-8", newline="\n")
+    (out / "summary.txt").write_text(summary + "\n", encoding="utf-8", newline="\n")
+    return out

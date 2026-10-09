@@ -226,3 +226,16 @@ def test_the_loop_rejects_the_v2_mistake(mini):  # noqa: F811
     r = loop(mini, FakeModel(apt_mlflow, PIN))
     calls = r.attempts[0].calls
     assert "not a Debian package" in calls[0].reasons[0] and calls[1].valid and r.final_ok
+
+
+def test_loop_starts_from_an_injected_fault_and_exports_its_logs(mini, tmp_path):  # noqa: F811
+    from builder_agent.fix import export_run
+
+    runner, fix_log, sbx_log = Fault001Runner(), tmp_path / "fix.jsonl", tmp_path / "sbx.jsonl"
+    r = run_fix_loop(mini.root, MINI_GOLD, "diagnose_v1", FakeModel(PIN), runner=runner, sandbox_log=sbx_log,
+                     fix_log=fix_log, injection=Overrides(pins={"mlflow": "3.1.4"}))
+    assert "mlflow==3.1.4" in runner.dockerfiles[0] and "mlflow==2.17.2" in runner.dockerfiles[1]
+    assert r.final_ok and r.injection.pins == {"mlflow": "3.1.4"} and r.applied.pins == {"mlflow": "2.17.2"}
+    out = export_run(r, tmp_path / "run", r.text(), fix_log, sbx_log)
+    assert len((out / "fix_attempts.jsonl").read_text(encoding="utf-8").splitlines()) == 1
+    assert len((out / "sandbox_attempts.jsonl").read_text(encoding="utf-8").splitlines()) == 2
