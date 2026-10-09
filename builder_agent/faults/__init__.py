@@ -67,12 +67,14 @@ CATALOG: dict[str, Variant] = {v.name: v for v in [
             cause="xgboost is not installed in the image, but the repo's training code and the adapters import it."),
     Variant(name="numpy_2_0_2", family="incompatible_pin",
             title="numpy 2.0.2 installed over pandas 2.0.3, which is built for numpy 1.x",
-            injection=Overrides(post_install_commands=["pip install numpy==2.0.2"]),
+            # as a Builder pin: a separate `pip install numpy==2.0.2` before the extras was undone by
+            # `pip install mlflow==2.17.2`, which resolved numpy back to 1.26.4 (tried 2026-10-09)
+            injection=Overrides(pins={"numpy": "2.0.2"}),
             expected_fix={"action": "pin_package", "name": "numpy", "version": "1.23.5"},
             cause="pandas 2.0.3's compiled extensions use the numpy 1.x C API; numpy 2 changed it. "
                   "Pipfile.lock pins numpy 1.23.5.",
             static_rule="an installed version differs from the one Pipfile.lock pins",
-            static_evidence=["Pipfile.lock: numpy ==1.23.5", "Dockerfile: pip install numpy==2.0.2"]),
+            static_evidence=["Pipfile.lock: numpy ==1.23.5", "Dockerfile: pip install mlflow==2.17.2 numpy==2.0.2"]),
     Variant(name="python_3_12", family="python_version",
             title="Image on Python 3.12, the repo asks for 3.9",
             injection=Overrides(python_version="3.12"),

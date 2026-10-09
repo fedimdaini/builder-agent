@@ -1,0 +1,93 @@
+{
+  "id": "gen-003",
+  "name": "numpy_2_0_2",
+  "title": "numpy 2.0.2 installed over pandas 2.0.3, which is built for numpy 1.x",
+  "family": "incompatible_pin",
+  "variant": "numpy_2_0_2",
+  "generated": true,
+  "split": null,
+  "injection": {
+    "pins": {
+      "numpy": "2.0.2"
+    }
+  },
+  "found_by": {
+    "attempt_id": "20261009T185632Z-87d9f2",
+    "repo": "taxi-trip-regression",
+    "date": "2026-10-09",
+    "log": "logs/sandbox_attempts.jsonl"
+  },
+  "stage": "train",
+  "command": "docker compose -p builder-sbx-taxi-trip-regression -f compose.base.yml -f compose.sandbox.yml run --rm -T --no-deps serving-current make train SAMPLE=1",
+  "exit_code": 2,
+  "stages": {
+    "render": "ok",
+    "build": "ok",
+    "mlflow": "ok",
+    "data": "ok",
+    "train": "failed",
+    "evaluate": "skipped",
+    "serve": "skipped",
+    "health": "skipped",
+    "predict": "skipped"
+  },
+  "error_signature": "ValueError: numpy.dtype size changed, may indicate binary incompatibility. Expected 96 from C header, got 88 from PyObject",
+  "error_tail": [
+    " Container builder-sbx-taxi-trip-regression-serving-current-run-c55fd3ba1c4c Creating ",
+    " Container builder-sbx-taxi-trip-regression-serving-current-run-c55fd3ba1c4c Created ",
+    "python pipeline/train.py",
+    "Traceback (most recent call last):",
+    "  File \"/app/pipeline/train.py\", line 13, in <module>",
+    "    import mlflow",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/__init__.py\", line 35, in <module>",
+    "    from mlflow import (",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/data/__init__.py\", line 5, in <module>",
+    "    from mlflow.data import dataset_registry",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/data/dataset_registry.py\", line 137, in <module>",
+    "    from mlflow.data.pandas_dataset import from_pandas",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/data/pandas_dataset.py\", line 6, in <module>",
+    "    import pandas as pd",
+    "  File \"/usr/local/lib/python3.9/site-packages/pandas/__init__.py\", line 22, in <module>",
+    "    from pandas.compat import is_numpy_dev as _is_numpy_dev  # pyright: ignore # noqa:F401",
+    "  File \"/usr/local/lib/python3.9/site-packages/pandas/compat/__init__.py\", line 25, in <module>",
+    "    from pandas.compat.numpy import (",
+    "  File \"/usr/local/lib/python3.9/site-packages/pandas/compat/numpy/__init__.py\", line 4, in <module>",
+    "    from pandas.util.version import Version",
+    "  File \"/usr/local/lib/python3.9/site-packages/pandas/util/__init__.py\", line 2, in <module>",
+    "    from pandas.util._decorators import (  # noqa:F401",
+    "  File \"/usr/local/lib/python3.9/site-packages/pandas/util/_decorators.py\", line 14, in <module>",
+    "    from pandas._libs.properties import cache_readonly",
+    "  File \"/usr/local/lib/python3.9/site-packages/pandas/_libs/__init__.py\", line 13, in <module>",
+    "    from pandas._libs.interval import Interval",
+    "  File \"pandas/_libs/interval.pyx\", line 1, in init pandas._libs.interval",
+    "ValueError: numpy.dtype size changed, may indicate binary incompatibility. Expected 96 from C header, got 88 from PyObject",
+    "make: *** [Makefile:27: train] Error 1"
+  ],
+  "cause": {
+    "summary": "pandas 2.0.3's compiled extensions use the numpy 1.x C API; numpy 2 changed it. Pipfile.lock pins numpy 1.23.5."
+  },
+  "fix": {
+    "summary": "pin_package numpy==1.23.5",
+    "verified_by": {
+      "attempt_id": "20261009T185957Z-b3f25e",
+      "ok": true
+    }
+  },
+  "expected_fix": {
+    "action": "pin_package",
+    "name": "numpy",
+    "version": "1.23.5"
+  },
+  "static_check": {
+    "catchable_before_run": true,
+    "rule": "an installed version differs from the one Pipfile.lock pins",
+    "evidence": [
+      "Pipfile.lock: numpy ==1.23.5",
+      "Dockerfile: pip install mlflow==2.17.2 numpy==2.0.2"
+    ]
+  },
+  "reproduce": {
+    "how": "Run the generator for this variant; it injects the fault into the Builder's generated files only, then runs the sandbox.",
+    "command": "python -m builder_agent.faults ../taxi-trip-regression --slots tests/gold/taxi_slots.json --expected tests/gold/taxi_expected.json --variant numpy_2_0_2"
+  }
+}
