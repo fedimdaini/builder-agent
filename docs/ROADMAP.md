@@ -68,6 +68,30 @@ Each technique is measured against a baseline on the same faults, with the same 
 **First: a fault generator.** RAG, fine-tuning and DPO need many faults, not six. Generate them
 (and their known fixes) before comparing those techniques.
 
+*Plan* (`builder_agent/faults/`, taxi dev repo first):
+
+- A fault is injected as a change to what the Builder generates, never to the repo's files: build
+  settings (pins, Python version, environment variables) plus two injection hooks the LLM's menu
+  can't use (commands before the system-package install, and after the repo's install). Fixes are
+  applied on top, so a correct fix undoes the fault.
+- Each case: run the sandbox with the fault (it must fail), keep the failed stage, the last 50 lines
+  and the error line; then run the sandbox again with the expected fix and record whether it passes.
+  Saved in the same shape as `tests/faults/`, under `tests/faults/generated/`, with its family,
+  variant, injection and expected fix from the action menu.
+- Families and variants (several per family; one per family first):
+
+  | Family | Variants | Expected fix |
+  |---|---|---|
+  | 1 client/server version mismatch | mlflow 3.1.4 pinned, 3.0.x, unpinned (fault-001) | `pin_package mlflow <server version>` |
+  | 2 missing Python dependency | pandas, xgboost, flask, gunicorn, numpy uninstalled | `add_dependency <name>` |
+  | 3 incompatible pin | numpy 2.0.2 with pandas built for numpy 1.x; xgboost 3.x on Python 3.9; old flask with new werkzeug | `pin_package <name> <working version>` |
+  | 4 wrong Python version | 3.12, 3.13, 3.8 for a Pipfile that asks for 3.9 | `set_python_version 3.9` |
+  | 5 missing environment variable | tracking URI: wrong host, wrong port, empty | `set_env_var <name> <value>` |
+  | 6 missing system library | libgomp1 (xgboost) removed; others where the image needs them | `add_system_package <name>` |
+
+- Later: split by **variant** into RAG memory and a held-out test set, with no variant in both, so
+  RAG is never tested on a fault it has stored.
+
 1. **Prompting.** Zero-shot (`diagnose_v1`, the baseline) vs Chain-of-Thought. Self-consistency
    (several answers at a temperature above 0, majority vote) only if the CoT answers vary.
    *Result on fault-001* (qwen2.5-coder:7b, `experiments/fixes/`): CoT (`diagnose_v2`) quoted the
