@@ -303,3 +303,17 @@ def test_failing_at_the_same_or_a_later_stage_is_kept(mini):  # noqa: F811
     assert regressed(res("train"), res("build")) and regressed(res("evaluate"), res("render"))
     assert not regressed(res("train"), res("train")) and not regressed(res("train"), res("serve"))
     assert not regressed(res("train"), res(None))
+
+
+def test_set_python_version_to_the_image_version_is_rejected():
+    answer = {"fix": {"action": "set_python_version", "version": "3.9"}, "reason": "x"}
+    v = validate_fix(answer, Overrides(), set(), current_python="3.9")
+    assert not v.ok and v.reasons == ["set_python_version: the image already uses Python 3.9 (python:3.9-slim)"]
+    assert validate_fix(answer, Overrides(python_version="3.13"), set(), current_python="3.13").ok
+
+
+def test_the_loop_passes_the_image_python_version(mini, tmp_path):  # noqa: F811
+    same = {"fix": {"action": "set_python_version", "version": "3.11"}, "reason": "x"}     # mini is on 3.11
+    r = loop(mini, FakeModel(same, PIN), fix_log=None)
+    assert r.final_ok and r.attempts[0].calls[0].reasons == [
+        "set_python_version: the image already uses Python 3.11 (python:3.11-slim)"]

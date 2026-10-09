@@ -161,8 +161,8 @@ def regressed(before: SandboxResult, after: SandboxResult) -> bool:
 # --- one diagnosis ------------------------------------------------------------------------------
 
 def diagnose(prompt: PromptFile, client: ChatClient, variables: dict, applied: Overrides,
-             installed: set[str], python_packages: set[str] = frozenset(), reverted: list[dict] = ()
-             ) -> tuple[Diagnosis | DiagnosisWithAnalysis | None, list[Call]]:
+             installed: set[str], python_packages: set[str] = frozenset(), reverted: list[dict] = (),
+             current_python: str | None = None) -> tuple[Diagnosis | DiagnosisWithAnalysis | None, list[Call]]:
     model = answer_model("\n".join(prompt.sections.values()))
     schema = inline_refs(model.model_json_schema())
     messages = [{"role": "system", "content": prompt.render("system", variables)},
@@ -178,7 +178,7 @@ def diagnose(prompt: PromptFile, client: ChatClient, variables: dict, applied: O
             return None, calls
         try:
             answer = json.loads(resp.content)
-            v = validate_fix(answer, applied, installed, model, python_packages, reverted) \
+            v = validate_fix(answer, applied, installed, model, python_packages, reverted, current_python) \
                 if isinstance(answer, dict) else None
             reasons = v.reasons if v else ["the answer must be one JSON object"]
         except json.JSONDecodeError as e:
@@ -237,7 +237,7 @@ def run_fix_loop(repo: str | Path, slots: dict, prompt_version: str, client: Cha
             variables["retrieved_text"] = render_retrieved(hits)
             retrieved = [{"id": h.doc.id, "variant": h.doc.variant, "score": h.score, "ranks": h.ranks} for h in hits]
         diag, calls = diagnose(prompt, client, variables, applied, _installed(ctx, tctx), _python_packages(ctx),
-                               reverted)
+                               reverted, tctx["python_version"])
         attempt = FixAttempt(n=n, stage=stage.name, error_tail=stage.output_tail, calls=calls, outcome="",
                              retrieved=retrieved)
         if diag is None:

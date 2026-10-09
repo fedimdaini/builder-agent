@@ -85,10 +85,12 @@ class FixValidation(BaseModel):
 
 def validate_fix(answer: dict, applied: Overrides, installed: set[str],
                  model: type[Diagnosis] | type[DiagnosisWithAnalysis] = Diagnosis,
-                 python_packages: set[str] = frozenset(), reverted: list[dict] = ()) -> FixValidation:
+                 python_packages: set[str] = frozenset(), reverted: list[dict] = (),
+                 current_python: str | None = None) -> FixValidation:
     """Check one diagnosis. applied: fixes already in place; installed: pip names already installed;
     python_packages: names known to be Python packages (installed, imported, or known to the scanner);
-    reverted: fixes the regression guard undid (they made an earlier stage fail)."""
+    reverted: fixes the regression guard undid (they made an earlier stage fail);
+    current_python: the Python version of the image as it was built (base image python:<version>-slim)."""
     try:
         d = model.model_validate(answer)
     except ValidationError as e:
@@ -126,6 +128,9 @@ def validate_fix(answer: dict, applied: Overrides, installed: set[str],
             bad(f"set_python_version: {f.version!r} must be 3.N with N >= 8, e.g. 3.11")
         elif applied.python_version == f.version:
             bad(f"set_python_version {f.version} was already applied and the stage still failed")
+        elif current_python == f.version:
+            # gen-010 / diagnose_v4: set_python_version 3.9 on a python:3.9-slim image changed nothing
+            bad(f"set_python_version: the image already uses Python {f.version} (python:{f.version}-slim)")
     elif isinstance(f, SetEnvVar):
         if not ENV_NAME_RE.match(f.name):
             bad(f"set_env_var: {f.name!r} must be UPPER_CASE letters, digits and _")
