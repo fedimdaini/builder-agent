@@ -83,12 +83,15 @@ Each technique is measured against a baseline on the same faults, with the same 
   | Family | Variants | Expected fix |
   |---|---|---|
   | 1 client/server version mismatch | mlflow 3.1.4 pinned, 3.0.x, unpinned (fault-001) | `pin_package mlflow <server version>` |
-  | 2 missing Python dependency | pandas, xgboost, flask, gunicorn, numpy uninstalled | `add_dependency <name>` |
+  | 2 missing Python dependency | xgboost uninstalled; others MLflow doesn't depend on (pandas, flask, gunicorn, numpy come back with `pip install mlflow`) | `add_dependency <name>` |
   | 3 incompatible pin | numpy 2.0.2 with pandas built for numpy 1.x; xgboost 3.x on Python 3.9; old flask with new werkzeug | `pin_package <name> <working version>` |
   | 4 wrong Python version | 3.12, 3.13, 3.8 for a Pipfile that asks for 3.9 | `set_python_version 3.9` |
   | 5 missing environment variable | tracking URI: wrong host, wrong port, empty | `set_env_var <name> <value>` |
-  | 6 missing system library | libgomp1 (xgboost) removed; others where the image needs them | `add_system_package <name>` |
+  | 6 missing system library | libffi8 (ctypes), libsqlite3-0 (sqlite3) removed; not libgomp1 (xgboost wheels bundle it) and not libssl3/libbz2 (apt needs them) | `add_system_package <name>` |
 
+- Generated so far (one per family, `tests/faults/generated/`, gen-001..006): all six break the taxi
+  sandbox and pass with their expected fix. Injections before `pip install mlflow==...` are undone
+  when they touch MLflow's dependencies, so version faults are injected as Builder pins.
 - Later: split by **variant** into RAG memory and a held-out test set, with no variant in both, so
   RAG is never tested on a fault it has stored.
 
