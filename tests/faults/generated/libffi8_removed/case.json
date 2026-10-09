@@ -1,0 +1,90 @@
+{
+  "id": "gen-006",
+  "name": "libffi8_removed",
+  "title": "libffi8 (needed by Python's ctypes) missing from the base image",
+  "family": "system_library",
+  "variant": "libffi8_removed",
+  "generated": true,
+  "split": null,
+  "injection": {
+    "pre_apt_commands": [
+      "dpkg --remove --force-depends libffi8"
+    ]
+  },
+  "found_by": {
+    "attempt_id": "20261009T191646Z-85d2f9",
+    "repo": "taxi-trip-regression",
+    "date": "2026-10-09",
+    "log": "logs/sandbox_attempts.jsonl"
+  },
+  "stage": "train",
+  "command": "docker compose -p builder-sbx-taxi-trip-regression -f compose.base.yml -f compose.sandbox.yml run --rm -T --no-deps serving-current make train SAMPLE=1",
+  "exit_code": 2,
+  "stages": {
+    "render": "ok",
+    "build": "ok",
+    "mlflow": "ok",
+    "data": "ok",
+    "train": "failed",
+    "evaluate": "skipped",
+    "serve": "skipped",
+    "health": "skipped",
+    "predict": "skipped"
+  },
+  "error_signature": "ImportError: libffi.so.8: cannot open shared object file: No such file or directory",
+  "error_tail": [
+    " Container builder-sbx-taxi-trip-regression-serving-current-run-85089aad18da Creating ",
+    " Container builder-sbx-taxi-trip-regression-serving-current-run-85089aad18da Created ",
+    "python pipeline/train.py",
+    "Traceback (most recent call last):",
+    "  File \"/app/pipeline/train.py\", line 14, in <module>",
+    "    import mlflow.xgboost",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/xgboost/__init__.py\", line 36, in <module>",
+    "    from mlflow.data.numpy_dataset import from_numpy",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/data/numpy_dataset.py\", line 12, in <module>",
+    "    from mlflow.data.pyfunc_dataset_mixin import PyFuncConvertibleDatasetMixin, PyFuncInputsOutputs",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/data/pyfunc_dataset_mixin.py\", line 6, in <module>",
+    "    from mlflow.models.utils import PyFuncInput, PyFuncOutput",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/models/utils.py\", line 18, in <module>",
+    "    import pandas as pd",
+    "  File \"/usr/local/lib/python3.9/site-packages/pandas/__init__.py\", line 48, in <module>",
+    "    from pandas.core.api import (",
+    "  File \"/usr/local/lib/python3.9/site-packages/pandas/core/api.py\", line 9, in <module>",
+    "    from pandas.core.dtypes.dtypes import (",
+    "  File \"/usr/local/lib/python3.9/site-packages/pandas/core/dtypes/dtypes.py\", line 42, in <module>",
+    "    from pandas.core.dtypes.base import (",
+    "  File \"/usr/local/lib/python3.9/site-packages/pandas/core/dtypes/base.py\", line 24, in <module>",
+    "    from pandas.errors import AbstractMethodError",
+    "  File \"/usr/local/lib/python3.9/site-packages/pandas/errors/__init__.py\", line 6, in <module>",
+    "    import ctypes",
+    "  File \"/usr/local/lib/python3.9/ctypes/__init__.py\", line 8, in <module>",
+    "    from _ctypes import Union, Structure, Array",
+    "ImportError: libffi.so.8: cannot open shared object file: No such file or directory",
+    "make: *** [Makefile:27: train] Error 1"
+  ],
+  "cause": {
+    "summary": "The image lacks libffi.so.8, so Python's ctypes module (_ctypes) can't load. Simulates a slimmer base image."
+  },
+  "fix": {
+    "summary": "add_system_package libffi8",
+    "verified_by": {
+      "attempt_id": "20261009T192001Z-39131a",
+      "ok": true
+    }
+  },
+  "expected_fix": {
+    "action": "add_system_package",
+    "name": "libffi8"
+  },
+  "static_check": {
+    "catchable_before_run": false,
+    "rule": "none: only a run shows it",
+    "evidence": [
+      "sandbox stage train"
+    ]
+  },
+  "reproduce": {
+    "how": "Run the generator for this variant; it injects the fault into the Builder's generated files only, then runs the sandbox.",
+    "command": "python -m builder_agent.faults ../taxi-trip-regression --slots tests/gold/taxi_slots.json --expected tests/gold/taxi_expected.json --variant libffi8_removed"
+  }
+}
