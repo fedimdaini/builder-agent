@@ -1,0 +1,112 @@
+{
+  "id": "gen-008",
+  "name": "mlflow_client_unpinned",
+  "title": "MLflow client installed unpinned against a 2.17.2 tracking server",
+  "family": "version_mismatch",
+  "variant": "mlflow_client_unpinned",
+  "generated": true,
+  "split": null,
+  "injection": {
+    "mlflow_client": "mlflow"
+  },
+  "found_by": {
+    "attempt_id": "20261009T193813Z-db5928",
+    "repo": "taxi-trip-regression",
+    "date": "2026-10-09",
+    "log": "logs/sandbox_attempts.jsonl"
+  },
+  "stage": "train",
+  "command": "docker compose -p builder-sbx-taxi-trip-regression -f compose.base.yml -f compose.sandbox.yml run --rm -T --no-deps serving-current make train SAMPLE=1",
+  "exit_code": 2,
+  "stages": {
+    "render": "ok",
+    "build": "ok",
+    "mlflow": "ok",
+    "data": "ok",
+    "train": "failed",
+    "evaluate": "skipped",
+    "serve": "skipped",
+    "health": "skipped",
+    "predict": "skipped"
+  },
+  "error_signature": "mlflow.exceptions.MlflowException: API request to endpoint /api/2.0/mlflow/logged-models failed with error code 404 != 200. Response body: '<!doctype html>",
+  "error_tail": [
+    "python pipeline/train.py",
+    "2026/10/09 19:38:26 INFO mlflow.tracking.fluent: Experiment with name 'mlops-zoomcamp-experiment' does not exist. Creating a new experiment.",
+    "2026/10/09 19:38:29 WARNING mlflow.utils.git_utils: Failed to import Git (the Git executable is probably not on your PATH), so Git SHA is not available. Error: Failed to initialize: Bad git executable.",
+    "The git executable must be specified in one of the following ways:",
+    "    - be included in your $PATH",
+    "    - be set via $GIT_PYTHON_GIT_EXECUTABLE",
+    "    - explicitly set via git.refresh(<full-path-to-git-executable>)",
+    "All git commands will error until this is rectified.",
+    "This initial message can be silenced or aggravated in the future by setting the",
+    "$GIT_PYTHON_REFRESH environment variable. Use one of the following values:",
+    "    - quiet|q|silence|s|silent|none|n|0: for no message or exception",
+    "    - warn|w|warning|log|l|1: for a warning message (logging level CRITICAL, displayed by default)",
+    "    - error|e|exception|raise|r|2: for a raised exception",
+    "Example:",
+    "    export GIT_PYTHON_REFRESH=quiet",
+    "2026/10/09 19:38:30 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.",
+    "🏃 View run classy-hawk-84 at: http://mlflow:5000/#/experiments/1/runs/1cc6f1e6ffee49a2ab6a5d9bd92d9eee",
+    "🧪 View experiment at: http://mlflow:5000/#/experiments/1",
+    "Traceback (most recent call last):",
+    "  File \"/app/pipeline/train.py\", line 96, in <module>",
+    "    main()",
+    "  File \"/app/pipeline/train.py\", line 86, in main",
+    "    mlflow.xgboost.log_model(model, \"model\")",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/xgboost/__init__.py\", line 278, in log_model",
+    "    return Model.log(",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/models/model.py\", line 1161, in log",
+    "    model = mlflow.initialize_logged_model(",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/tracking/fluent.py\", line 2130, in initialize_logged_model",
+    "    model = _create_logged_model(",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/tracking/fluent.py\", line 2257, in _create_logged_model",
+    "    return MlflowClient().create_logged_model(",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/tracking/client.py\", line 5369, in create_logged_model",
+    "    return self._tracking_client.create_logged_model(",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/tracking/_tracking_service/client.py\", line 824, in create_logged_model",
+    "    return self.store.create_logged_model(",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/store/tracking/rest_store.py\", line 936, in create_logged_model",
+    "    response_proto = self._call_endpoint(CreateLoggedModel, req_body)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/store/tracking/rest_store.py\", line 135, in _call_endpoint",
+    "    return call_endpoint(",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/utils/rest_utils.py\", line 594, in call_endpoint",
+    "    response = verify_rest_response(response, endpoint)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/utils/rest_utils.py\", line 314, in verify_rest_response",
+    "    raise MlflowException(",
+    "mlflow.exceptions.MlflowException: API request to endpoint /api/2.0/mlflow/logged-models failed with error code 404 != 200. Response body: '<!doctype html>",
+    "<html lang=en>",
+    "<title>404 Not Found</title>",
+    "<h1>Not Found</h1>",
+    "<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.</p>",
+    "'",
+    "make: *** [Makefile:27: train] Error 1"
+  ],
+  "cause": {
+    "summary": "`pip install mlflow` resolves to the newest 3.x client; the tracking server is ghcr.io/mlflow/mlflow:v2.17.2 (the same fault as the hand-recorded fault-001)."
+  },
+  "fix": {
+    "summary": "pin_package mlflow==2.17.2",
+    "verified_by": {
+      "attempt_id": "20261009T193832Z-ff29dd",
+      "ok": true
+    }
+  },
+  "expected_fix": {
+    "action": "pin_package",
+    "name": "mlflow",
+    "version": "2.17.2"
+  },
+  "static_check": {
+    "catchable_before_run": true,
+    "rule": "a client package is installed unpinned while its server is a pinned image",
+    "evidence": [
+      "Dockerfile: pip install mlflow",
+      "compose.base.yml: image: ghcr.io/mlflow/mlflow:v2.17.2"
+    ]
+  },
+  "reproduce": {
+    "how": "Run the generator for this variant; it injects the fault into the Builder's generated files only, then runs the sandbox.",
+    "command": "python -m builder_agent.faults ../taxi-trip-regression --slots tests/gold/taxi_slots.json --expected tests/gold/taxi_expected.json --variant mlflow_client_unpinned"
+  }
+}
