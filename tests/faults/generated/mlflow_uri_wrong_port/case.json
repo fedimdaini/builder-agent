@@ -1,0 +1,114 @@
+{
+  "id": "gen-013",
+  "name": "mlflow_uri_wrong_port",
+  "title": "MLFLOW_TRACKING_URI on the wrong port",
+  "family": "env_var",
+  "variant": "mlflow_uri_wrong_port",
+  "generated": true,
+  "split": null,
+  "injection": {
+    "env": {
+      "MLFLOW_TRACKING_URI": "http://mlflow:5001"
+    }
+  },
+  "found_by": {
+    "attempt_id": "20261009T200316Z-f3a344",
+    "repo": "taxi-trip-regression",
+    "date": "2026-10-09",
+    "log": "logs/sandbox_attempts.jsonl"
+  },
+  "stage": "train",
+  "command": "docker compose -p builder-sbx-taxi-trip-regression -f compose.base.yml -f compose.sandbox.yml run --rm -T --no-deps serving-current make train SAMPLE=1",
+  "exit_code": 2,
+  "stages": {
+    "render": "ok",
+    "build": "ok",
+    "mlflow": "ok",
+    "data": "ok",
+    "train": "failed",
+    "evaluate": "skipped",
+    "serve": "skipped",
+    "health": "skipped",
+    "predict": "skipped"
+  },
+  "error_signature": "mlflow.exceptions.MlflowException: API request to http://mlflow:5001/api/2.0/mlflow/experiments/get-by-name failed with exception HTTPConnectionPool(host='mlflow', port=5001): Max retries exceeded wit",
+  "error_tail": [
+    "Traceback (most recent call last):",
+    "  File \"/usr/local/lib/python3.9/site-packages/requests/adapters.py\", line 644, in send",
+    "    resp = conn.urlopen(",
+    "  File \"/usr/local/lib/python3.9/site-packages/urllib3/connectionpool.py\", line 871, in urlopen",
+    "    return self.urlopen(",
+    "  File \"/usr/local/lib/python3.9/site-packages/urllib3/connectionpool.py\", line 871, in urlopen",
+    "    return self.urlopen(",
+    "  File \"/usr/local/lib/python3.9/site-packages/urllib3/connectionpool.py\", line 871, in urlopen",
+    "    return self.urlopen(",
+    "  [Previous line repeated 2 more times]",
+    "  File \"/usr/local/lib/python3.9/site-packages/urllib3/connectionpool.py\", line 841, in urlopen",
+    "    retries = retries.increment(",
+    "  File \"/usr/local/lib/python3.9/site-packages/urllib3/util/retry.py\", line 535, in increment",
+    "    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]",
+    "urllib3.exceptions.MaxRetryError: HTTPConnectionPool(host='mlflow', port=5001): Max retries exceeded with url: /api/2.0/mlflow/experiments/get-by-name?experiment_name=mlops-zoomcamp-experiment (Caused by NewConnectionError(\"HTTPConnection(host='mlflow', port=5001): Failed to establish a new connection: [Errno 111] Connection refused\"))",
+    "During handling of the above exception, another exception occurred:",
+    "Traceback (most recent call last):",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/utils/rest_utils.py\", line 189, in http_request",
+    "    return _get_http_response_with_retries(",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/utils/request_utils.py\", line 237, in _get_http_response_with_retries",
+    "    return session.request(method, url, allow_redirects=allow_redirects, **kwargs)",
+    "  File \"/usr/local/lib/python3.9/site-packages/requests/sessions.py\", line 589, in request",
+    "    resp = self.send(prep, **send_kwargs)",
+    "  File \"/usr/local/lib/python3.9/site-packages/requests/sessions.py\", line 703, in send",
+    "    r = adapter.send(request, **kwargs)",
+    "  File \"/usr/local/lib/python3.9/site-packages/requests/adapters.py\", line 677, in send",
+    "    raise ConnectionError(e, request=request)",
+    "requests.exceptions.ConnectionError: HTTPConnectionPool(host='mlflow', port=5001): Max retries exceeded with url: /api/2.0/mlflow/experiments/get-by-name?experiment_name=mlops-zoomcamp-experiment (Caused by NewConnectionError(\"HTTPConnection(host='mlflow', port=5001): Failed to establish a new connection: [Errno 111] Connection refused\"))",
+    "During handling of the above exception, another exception occurred:",
+    "Traceback (most recent call last):",
+    "  File \"/app/pipeline/train.py\", line 96, in <module>",
+    "    main()",
+    "  File \"/app/pipeline/train.py\", line 67, in main",
+    "    mlflow.set_experiment(EXPERIMENT)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/tracking/fluent.py\", line 145, in set_experiment",
+    "    experiment = client.get_experiment_by_name(experiment_name)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/tracking/client.py\", line 1256, in get_experiment_by_name",
+    "    return self._tracking_client.get_experiment_by_name(name)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/tracking/_tracking_service/client.py\", line 501, in get_experiment_by_name",
+    "    return self.store.get_experiment_by_name(name)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/store/tracking/rest_store.py\", line 519, in get_experiment_by_name",
+    "    response_proto = self._call_endpoint(GetExperimentByName, req_body)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/store/tracking/rest_store.py\", line 82, in _call_endpoint",
+    "    return call_endpoint(self.get_host_creds(), endpoint, method, json_body, response_proto)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/utils/rest_utils.py\", line 365, in call_endpoint",
+    "    response = http_request(**call_kwargs)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/utils/rest_utils.py\", line 212, in http_request",
+    "    raise MlflowException(f\"API request to {url} failed with exception {e}\")",
+    "mlflow.exceptions.MlflowException: API request to http://mlflow:5001/api/2.0/mlflow/experiments/get-by-name failed with exception HTTPConnectionPool(host='mlflow', port=5001): Max retries exceeded with url: /api/2.0/mlflow/experiments/get-by-name?experiment_name=mlops-zoomcamp-experiment (Caused by NewConnectionError(\"HTTPConnection(host='mlflow', port=5001): Failed to establish a new connection: [Errno 111] Connection refused\"))",
+    "make: *** [Makefile:27: train] Error 1"
+  ],
+  "cause": {
+    "summary": "The tracking URI uses port 5001; the mlflow service listens on 5000."
+  },
+  "fix": {
+    "summary": "set_env_var MLFLOW_TRACKING_URI=http://mlflow:5000",
+    "verified_by": {
+      "attempt_id": "20261009T200716Z-4de252",
+      "ok": true
+    }
+  },
+  "expected_fix": {
+    "action": "set_env_var",
+    "name": "MLFLOW_TRACKING_URI",
+    "value": "http://mlflow:5000"
+  },
+  "static_check": {
+    "catchable_before_run": true,
+    "rule": "the tracking URI's port is not the port the compose service listens on",
+    "evidence": [
+      "compose.base.yml: MLFLOW_TRACKING_URI: \"http://mlflow:5001\"",
+      "compose.base.yml: mlflow server --port 5000"
+    ]
+  },
+  "reproduce": {
+    "how": "Run the generator for this variant; it injects the fault into the Builder's generated files only, then runs the sandbox.",
+    "command": "python -m builder_agent.faults ../taxi-trip-regression --slots tests/gold/taxi_slots.json --expected tests/gold/taxi_expected.json --variant mlflow_uri_wrong_port"
+  }
+}
