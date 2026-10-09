@@ -134,3 +134,17 @@ def test_diagnose_v3_without_a_retriever_names_the_missing_placeholder(mini, tmp
     with pytest.raises(PromptError, match="retrieved_text"):
         run_fix_loop(mini.root, MINI_GOLD, "diagnose_v3", FakeModel(PIN), mlflow_client="mlflow",
                      runner=Fault001Runner(), sandbox_log=None, fix_log=None)
+
+
+def test_diagnose_v4_shows_the_current_build_settings_with_applied_fixes(mini, memory, tmp_path):  # noqa: F811
+    wrong = {"fix": {"action": "pin_package", "name": "mlflow", "version": "2.9.2"}, "reason": "x"}
+    model = FakeModel(wrong, PIN)
+    r = run_fix_loop(mini.root, MINI_GOLD, "diagnose_v4", model, mlflow_client="mlflow", runner=Fault001Runner(),
+                     sandbox_log=None, fix_log=None, retriever=retriever(memory, "advanced"))
+    assert r.final_ok and len(r.attempts) == 2
+    first, second = (model.sent[i][1]["content"] for i in (0, 1))
+    settings = lambda u: u[u.index("CURRENT BUILD SETTINGS"):u.index("FIXES ALREADY TRIED")]  # noqa: E731
+    assert "base image: python:3.11-slim" in settings(first)
+    assert "install: pip install mlflow " in settings(first) and "mlflow==2.9.2" not in settings(first)
+    assert "mlflow==2.9.2" in settings(second)                         # the applied fix shows on the next attempt
+    assert 'model service environment: MLFLOW_TRACKING_URI="http://mlflow:5000"' in settings(second)

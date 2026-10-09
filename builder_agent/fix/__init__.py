@@ -122,10 +122,12 @@ def prompt_variables(ctx, r: SandboxResult, tctx: dict, attempt: int, history: l
         "previous_fixes": [h.model_dump() for h in history],
         "previous_fixes_text": "\n".join(prev) or "none",
         "menu_text": "\n".join(f"- {k} {v}" for k, v in MENU.items()),
-        # what the Builder generated (not used by diagnose_v1: "from the error alone")
+        # what the Builder generated for this attempt, fixes already applied included (diagnose_v4)
         "pipeline_text": "\n".join([
             f"base image: python:{tctx['python_version']}-slim",
+            f"system packages (apt-get install): {' '.join(tctx['apt_packages'])}",
             *[f"install: {c}" for c in tctx["install_commands"]],
+            *[f"model service environment: {k}={json.dumps(v)}" for k, v in tctx["compose_env"].items()],
             f"MLflow server image: {MLFLOW_IMAGE}",
             f"serve: {' '.join(tctx['serve_cmd'])}",
         ]),
