@@ -60,12 +60,29 @@ Goal: catch the guide's setup fixes (fault cases 2–4) automatically.
 
 Bridge the project's batch `/predict` and `/reload` to the contract.
 
-## 9. LLM work, each step measured
+## 9. LLM work: one comparison per technique family
 
-- **Prompt versions:** v3 (a reasoning field, if needed); v1 with better feedback; a rerun at
-  temperature 0.7 with 5 seeds for variance (at temperature 0 the seed has no effect).
-- **RAG fix memory:** compare dense, BM25, and hybrid + reranking retrieval, with a metadata
-  filter by stage.
-- **Fine-tuning:** LoRA vs QLoRA on the logged slot decisions; distillation from a bigger free model.
-- **DPO** on preference pairs from sandbox pass/fail.
-- No multimodal in the Builder.
+Each technique is measured against a baseline on the same faults, with the same scoring
+(exact / loose fix, sandbox pass, tokens, time). The main project stays a held-out test.
+
+**First: a fault generator.** RAG, fine-tuning and DPO need many faults, not six. Generate them
+(and their known fixes) before comparing those techniques.
+
+1. **Prompting.** Zero-shot (`diagnose_v1`, the baseline) vs Chain-of-Thought. Self-consistency
+   (several answers at a temperature above 0, majority vote) only if the CoT answers vary.
+2. **RAG over the fault memory** (`tests/faults/` and the generated faults). Naive: vectors only.
+   Advanced: hybrid (BM25 + vectors), reranking, and a filter on the failed stage. Agentic RAG
+   (a PyPI version lookup as a tool) only if the version problem remains after that.
+3. **Fine-tuning.** Base model vs QLoRA. Single-task vs multi-task (slots + diagnosis) only if
+   there is enough data.
+4. **DPO from preference pairs.** Automatic pairs from sandbox pass/fail, plus about 50 pairs
+   labeled by hand between two passing fixes. Optionally an LLM judge, checked against those
+   hand labels.
+5. **Already done:** slots v1 vs v2, zero-shot vs few-shot (`experiments/evals/`).
+
+**Not used, with reasons:**
+
+- Tree of Thoughts: each branch would need its own sandbox run.
+- Generated knowledge and prompt chaining: RAG and the small action menu cover them.
+- Full fine-tuning and prompt tuning: QLoRA is enough for a small local model.
+- PPO: DPO gets the preference signal without a reward model.
