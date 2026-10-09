@@ -5,7 +5,7 @@
   "family": "incompatible_pin",
   "variant": "xgboost_3_0_0",
   "generated": true,
-  "split": null,
+  "split": "memory",
   "injection": {
     "pins": {
       "xgboost": "3.0.0"

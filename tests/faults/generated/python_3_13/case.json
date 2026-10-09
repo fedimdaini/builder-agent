@@ -5,7 +5,7 @@
   "family": "python_version",
   "variant": "python_3_13",
   "generated": true,
-  "split": null,
+  "split": "test",
   "injection": {
     "python_version": "3.13"
   },

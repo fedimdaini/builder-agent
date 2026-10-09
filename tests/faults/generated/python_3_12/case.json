@@ -5,7 +5,7 @@
   "family": "python_version",
   "variant": "python_3_12",
   "generated": true,
-  "split": null,
+  "split": "memory",
   "injection": {
     "python_version": "3.12"
   },

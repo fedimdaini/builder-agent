@@ -5,7 +5,7 @@
   "family": "env_var",
   "variant": "mlflow_uri_wrong_host",
   "generated": true,
-  "split": null,
+  "split": "memory",
   "injection": {
     "env": {
       "MLFLOW_TRACKING_URI": "http://mlflow-server:5000"

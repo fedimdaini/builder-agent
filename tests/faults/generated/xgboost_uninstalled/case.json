@@ -5,7 +5,7 @@
   "family": "missing_dependency",
   "variant": "xgboost_uninstalled",
   "generated": true,
-  "split": null,
+  "split": "memory",
   "injection": {
     "post_install_commands": [
       "pip uninstall -y xgboost"

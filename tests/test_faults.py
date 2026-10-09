@@ -58,3 +58,13 @@ def test_generated_case_shape(path):
 def test_generated_ids_are_unique_and_sequential():
     ids = sorted(json.loads(p.read_text(encoding="utf-8"))["id"] for p in GENERATED)
     assert ids == [f"gen-{i:03d}" for i in range(1, len(ids) + 1)]
+
+
+def test_generated_split_by_variant():
+    """Each variant is in exactly one split (memory or test), and every family has memory cases."""
+    cases = [json.loads(p.read_text(encoding="utf-8")) for p in GENERATED]
+    variants = [c["variant"] for c in cases]
+    assert len(variants) == len(set(variants))
+    assert all(c["split"] in ("memory", "test") for c in cases)
+    families = {c["family"] for c in cases}
+    assert families == {c["family"] for c in cases if c["split"] == "memory"}

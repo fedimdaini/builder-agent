@@ -5,7 +5,7 @@
   "family": "incompatible_pin",
   "variant": "flask_2_0_3",
   "generated": true,
-  "split": null,
+  "split": "test",
   "injection": {
     "pins": {
       "flask": "2.0.3"

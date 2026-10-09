@@ -5,7 +5,7 @@
   "family": "system_library",
   "variant": "libffi8_removed",
   "generated": true,
-  "split": null,
+  "split": "memory",
   "injection": {
     "pre_apt_commands": [
       "dpkg --remove --force-depends libffi8"

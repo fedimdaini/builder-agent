@@ -5,7 +5,7 @@
   "family": "env_var",
   "variant": "mlflow_uri_empty",
   "generated": true,
-  "split": null,
+  "split": "test",
   "injection": {
     "env": {
       "MLFLOW_TRACKING_URI": ""
