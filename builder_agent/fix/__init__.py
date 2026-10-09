@@ -26,6 +26,7 @@ from ..render.configs import MLFLOW_IMAGE, Overrides, config_context
 from ..sandbox import DEFAULT_CONTRACTS, DEFAULT_LOG, SandboxResult, run_sandbox, subprocess_runner
 from ..scan import scan_repo
 from ..scan.deps import declared_names, normalize
+from ..scan.known import FRAMEWORKS, IMPORT_TO_DIST
 from .models import Diagnosis, DiagnosisWithAnalysis, GiveUp, answer_model, apply_fix, describe, validate_fix
 
 MAX_FIXES = 3
@@ -134,10 +135,17 @@ def _installed(ctx, tctx: dict) -> set[str]:
     return names
 
 
+def _python_packages(ctx) -> set[str]:
+    """Names known to be Python packages: what the repo imports, plus the scanner's known ML packages."""
+    return ({normalize(t.distribution) for t in ctx.third_party_imports} | {normalize(n) for n in FRAMEWORKS}
+            | {normalize(d) for d in IMPORT_TO_DIST.values()})
+
+
 # --- one diagnosis ------------------------------------------------------------------------------
 
 def diagnose(prompt: PromptFile, client: ChatClient, variables: dict, applied: Overrides,
-             installed: set[str]) -> tuple[Diagnosis | DiagnosisWithAnalysis | None, list[Call]]:
+             installed: set[str], python_packages: set[str] = frozenset()
+             ) -> tuple[Diagnosis | DiagnosisWithAnalysis | None, list[Call]]:
     model = answer_model("\n".join(prompt.sections.values()))
     schema = inline_refs(model.model_json_schema())
     messages = [{"role": "system", "content": prompt.render("system", variables)},
@@ -153,7 +161,7 @@ def diagnose(prompt: PromptFile, client: ChatClient, variables: dict, applied: O
             return None, calls
         try:
             answer = json.loads(resp.content)
-            v = validate_fix(answer, applied, installed, model) if isinstance(answer, dict) else None
+            v = validate_fix(answer, applied, installed, model, python_packages) if isinstance(answer, dict) else None
             reasons = v.reasons if v else ["the answer must be one JSON object"]
         except json.JSONDecodeError as e:
             v, reasons = None, [f"the answer is not valid JSON: {e}"]
@@ -200,7 +208,7 @@ def run_fix_loop(repo: str | Path, slots: dict, prompt_version: str, client: Cha
         tctx = config_context(ctx, c, plan, answers, mlflow_client, applied)
         variables = prompt_variables(ctx, r, tctx, n, attempts)
         stage = _failed(r)
-        diag, calls = diagnose(prompt, client, variables, applied, _installed(ctx, tctx))
+        diag, calls = diagnose(prompt, client, variables, applied, _installed(ctx, tctx), _python_packages(ctx))
         attempt = FixAttempt(n=n, stage=stage.name, error_tail=stage.output_tail, calls=calls, outcome="")
         if diag is None:
             attempt.outcome = "not applied: " + ("LLM call failed" if calls and calls[-1].error else

@@ -70,6 +70,13 @@ Each technique is measured against a baseline on the same faults, with the same 
 
 1. **Prompting.** Zero-shot (`diagnose_v1`, the baseline) vs Chain-of-Thought. Self-consistency
    (several answers at a temperature above 0, majority vote) only if the CoT answers vary.
+   *Result on fault-001* (qwen2.5-coder:7b, `experiments/fixes/`): CoT (`diagnose_v2`) quoted the
+   right error line (the 404 on `/logged-models`) in every analysis but didn't fix the fault: not
+   fixed after 3 fixes, while zero-shot passed on its third fix with a guessed `mlflow==2.10.0`.
+   The model finds the symptom but lacks the knowledge to connect it to the MLflow client/server
+   version mismatch: a knowledge gap, not a reasoning-format problem. This is consistent with
+   Wei et al. 2022 ("Chain-of-Thought Prompting Elicits Reasoning in Large Language Models"), where
+   CoT helps mainly large models. **So RAG is next** (item 2), to bring that knowledge in.
 2. **RAG over the fault memory** (`tests/faults/` and the generated faults). Naive: vectors only.
    Advanced: hybrid (BM25 + vectors), reranking, and a filter on the failed stage. Agentic RAG
    (a PyPI version lookup as a tool) only if the version problem remains after that.

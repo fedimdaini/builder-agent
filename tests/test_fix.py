@@ -204,3 +204,25 @@ def test_v1_schema_is_unchanged(mini):  # noqa: F811
     r = loop(mini, model)
     assert list(model.schema["properties"]) == ["fix", "reason"] and r.attempts[0].analysis is None
     assert not validate_fix(COT, Overrides(), set()).ok             # v1 doesn't accept extra fields
+
+
+# --- check 2: a Python package is not a system package ----------------------------------------------
+
+@pytest.mark.parametrize("name,known", [("mlflow", {"mlflow"}), ("scikit-learn", {"scikit-learn"}),
+                                        ("Scikit_Learn", {"scikit-learn"})])
+def test_add_system_package_rejects_python_packages(name, known):
+    answer = {"fix": {"action": "add_system_package", "name": name.lower()}, "reason": "x"}
+    v = validate_fix(answer, Overrides(), installed=set(), python_packages=known)
+    assert not v.ok and any("is a Python package (installed with pip), not a Debian package" in r for r in v.reasons)
+
+
+def test_add_system_package_still_allows_debian_packages():
+    answer = {"fix": {"action": "add_system_package", "name": "libgomp1"}, "reason": "x"}
+    assert validate_fix(answer, Overrides(), installed={"mlflow"}, python_packages={"xgboost"}).ok
+
+
+def test_the_loop_rejects_the_v2_mistake(mini):  # noqa: F811
+    apt_mlflow = {"fix": {"action": "add_system_package", "name": "mlflow"}, "reason": "x"}
+    r = loop(mini, FakeModel(apt_mlflow, PIN))
+    calls = r.attempts[0].calls
+    assert "not a Debian package" in calls[0].reasons[0] and calls[1].valid and r.final_ok

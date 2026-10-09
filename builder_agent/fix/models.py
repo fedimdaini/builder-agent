@@ -83,8 +83,10 @@ class FixValidation(BaseModel):
 
 
 def validate_fix(answer: dict, applied: Overrides, installed: set[str],
-                 model: type[Diagnosis] | type[DiagnosisWithAnalysis] = Diagnosis) -> FixValidation:
-    """Check one diagnosis. applied: fixes already in place; installed: pip names already installed."""
+                 model: type[Diagnosis] | type[DiagnosisWithAnalysis] = Diagnosis,
+                 python_packages: set[str] = frozenset()) -> FixValidation:
+    """Check one diagnosis. applied: fixes already in place; installed: pip names already installed;
+    python_packages: names known to be Python packages (installed, imported, or known to the scanner)."""
     try:
         d = model.model_validate(answer)
     except ValidationError as e:
@@ -106,6 +108,10 @@ def validate_fix(answer: dict, applied: Overrides, installed: set[str],
             bad(f"add_system_package: {f.name!r} is not a valid Debian package name")
         if f.name in applied.apt or f.name == "make":
             bad(f"add_system_package {f.name} is already installed")
+        elif normalize(f.name) in installed | python_packages:
+            # fault-001 / diagnose_v2: "add_system_package mlflow" broke the build (no such Debian package)
+            bad(f"add_system_package: {f.name} is a Python package (installed with pip), not a Debian "
+                "package; to change its version use pin_package, to add it use add_dependency")
     elif isinstance(f, SetPythonVersion):
         m = re.fullmatch(r"3\.(\d{1,2})", f.version)
         if not m or int(m.group(1)) < 8:
