@@ -64,9 +64,28 @@ libffi8, and `set_python_version 3.10` for both python_3_12 and xgboost_3_0_0).
 - **Limits of the filter.** It is a term check. It catches copied names and numbers, but it passes
   vague or muddled reasons that name a right term. Two kept gen-012 reasons say "the service is named
   'mlflow'" without saying what is wrong.
-- **Loose matches are not sandbox-verified.** The 8 gen-003 examples pin numpy 1.21.x or 1.23.1
-  instead of the locked 1.23.5. They count as correct under the agreed rule (same package), but they
-  teach guessed versions.
+- **Loose matches, now sandbox-verified.** The 8 gen-003 examples pin numpy 1.21.x or 1.23.1 instead
+  of the locked 1.23.5. All 4 distinct versions (1.21.2, 1.21.4, 1.21.5, 1.23.1) passed every
+  sandbox stage on top of the fault (`checks.json`, kind "loose"), so they stay correct. A loose pin
+  that failed would be labelled wrong.
+
+## Filter changes after the first build
+
+These made no difference to the sampled answers (same counts as above). They were needed for
+written reasons, which quote the fault's own record:
+
+- The fault's own recorded cause doesn't count as copied. Example: the server image `v2.17.2`
+  in gen-007 and gen-008.
+- The Python check flags only claims about the image ("the image is Python 3.12"), not
+  requirements ("xgboost 3.x requires Python 3.10").
+
+## Rationalization (STaR), not run yet
+
+`python -m builder_agent.finetune rationalize` asks for 4 reasons per fault, with a hint giving the
+verified fix. A reason is kept if the fix is unchanged and the reason passes the filter; otherwise a
+reason is written from the recorded error signature and cause. `build` then adds these answers
+(source `rationalized` or `written`) with the prompt **without** the hint. SFT records and DPO
+"chosen" carry their source.
 
 ## Files
 
@@ -74,7 +93,9 @@ libffi8, and `set_python_version 3.10` for both python_3_12 and xgboost_3_0_0).
 - `samples.jsonl`: every model call (seed, options, model digest, latency, response).
 - `labels.jsonl` (before the sandbox checks), `labels_final.jsonl` (after the checks, with the
   faithfulness verdict and its reason).
-- `checks.json`: the sandbox checks (attempt ids in `logs/sandbox_attempts.jsonl`).
+- `checks.json`: the sandbox checks of possible alternatives and loose pins (attempt ids in
+  `logs/sandbox_attempts.jsonl`).
+- `rationalized.jsonl` (after `rationalize`): the hinted samples, their verdicts and reasons.
 - `sft.jsonl`: `messages` = system, user, assistant (the answer as JSON), with case id, variant,
   family, seed and match type.
 - `dpo.jsonl`: `prompt` (system + user messages), `chosen`, `rejected`.

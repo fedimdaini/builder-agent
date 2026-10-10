@@ -94,5 +94,53 @@
     "ok": true,
     "failed_stage": null,
     "attempt_id": "20261010T094852Z-2b0ff5"
+  },
+  "gen-003 {\"action\": \"pin_package\", \"name\": \"numpy\", \"version\": \"1.21.2\"}": {
+    "case_id": "gen-003",
+    "fix": {
+      "action": "pin_package",
+      "name": "numpy",
+      "version": "1.21.2"
+    },
+    "ok": true,
+    "failed_stage": null,
+    "attempt_id": "20261010T101108Z-f7158a",
+    "kind": "loose"
+  },
+  "gen-003 {\"action\": \"pin_package\", \"name\": \"numpy\", \"version\": \"1.21.5\"}": {
+    "case_id": "gen-003",
+    "fix": {
+      "action": "pin_package",
+      "name": "numpy",
+      "version": "1.21.5"
+    },
+    "ok": true,
+    "failed_stage": null,
+    "attempt_id": "20261010T101509Z-1b4d62",
+    "kind": "loose"
+  },
+  "gen-003 {\"action\": \"pin_package\", \"name\": \"numpy\", \"version\": \"1.23.1\"}": {
+    "case_id": "gen-003",
+    "fix": {
+      "action": "pin_package",
+      "name": "numpy",
+      "version": "1.23.1"
+    },
+    "ok": true,
+    "failed_stage": null,
+    "attempt_id": "20261010T101935Z-274a6f",
+    "kind": "loose"
+  },
+  "gen-003 {\"action\": \"pin_package\", \"name\": \"numpy\", \"version\": \"1.21.4\"}": {
+    "case_id": "gen-003",
+    "fix": {
+      "action": "pin_package",
+      "name": "numpy",
+      "version": "1.21.4"
+    },
+    "ok": true,
+    "failed_stage": null,
+    "attempt_id": "20261010T102309Z-1c3f4a",
+    "kind": "loose"
   }
 }
