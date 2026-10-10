@@ -186,3 +186,16 @@ def test_only_known_modules_write_files():
         f"new file writers: {sorted(writers - set(ALLOWED_WRITERS))}; "
         f"no longer writing: {sorted(set(ALLOWED_WRITERS) - writers)}. "
         "Target-repo writes must go through repo_writer.RepoWriter.")
+
+
+def test_the_tests_never_write_to_the_real_logs():
+    """tests/conftest.py sends every attempt and call log to a temp folder (test runs once appended
+    545 fake-model lines to logs/; they are in logs/_test_pollution/)."""
+    import os
+
+    from builder_agent.fix import DEFAULT_FIX_LOG
+    from builder_agent.llm import DEFAULT_CALL_LOG
+    from builder_agent.sandbox import DEFAULT_LOG
+    real = Path(__file__).resolve().parents[1] / "logs"
+    for log in (DEFAULT_FIX_LOG, DEFAULT_CALL_LOG, DEFAULT_LOG):
+        assert log.parent == Path(os.environ["BUILDER_LOG_DIR"]) and real not in log.parents, log
