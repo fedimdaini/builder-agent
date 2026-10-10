@@ -1,4 +1,4 @@
-# prompt: slots_v3 (DRAFT, not approved yet: slots_v2 + the task, regression or classification; nothing else changed)
+# prompt: slots_v3 (slots_v2 + the task, regression or classification; nothing else changed)
 
 ## system
 
@@ -27,9 +27,11 @@ WHY THESE QUESTIONS (from the build plan):
 {{ needs_llm_text }}
 
 QUESTIONS AND ALLOWED VALUES:
-- task: what the model predicts. "regression" for a quantity (a price, a duration, a count),
-  "classification" for a category or a yes/no label. If the TASK line above says it was decided
-  by the scan signals, give that value. Allowed: {{ task_candidates | join(", ") }}
+- task: what the trained model outputs. "regression" if it predicts a number on a scale (a price,
+  a duration, a count); "classification" if it predicts one of a fixed set of labels, including
+  labels stored as numbers such as 0/1. If the TASK line above says it was decided by the scan
+  signals, give that value. Otherwise, decide from the model class the training code creates: the
+  pipeline evaluates that model, so the task must match what it outputs. Allowed: {{ task_candidates | join(", ") }}
 - target_column: the column the model predicts. Allowed: {{ candidates.target_column | join(", ") }}
 - target_transform: transform applied to the target before training. Allowed: {{ candidates.target_transform | join(", ") }}
 - transform_inside_train_fn: true if the code of train_function itself applies target_transform

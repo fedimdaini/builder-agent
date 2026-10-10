@@ -30,6 +30,7 @@ between, the scanner and validator were fixed after the first v1 run ("fixed sys
 | v1, fixed system | 8 / 9 | no | 3 (**never valid**) | 9,049 | not run |
 | v2, fixed system | 9 / 10 | no | 2 | 5,889 | all stages ok |
 | v2, better feedback, 5 seeds | 9 / 10 in every run | 0 of 5 | 2 in every run | 6,047 | all stages ok, 5 of 5 |
+| v3 (v2 + task slot), seed 42 | 9 / 10, task `regression` | no | 2 | 6,699 | all stages ok |
 
 "Lenient" also accepts an alternative the gold file allows (`train.csv` for the training file). The
 one remaining miss is `evaluate.eval_file`: `validation.csv` instead of `test.csv`.
@@ -38,6 +39,15 @@ one remaining miss is `evaluate.eval_file`: `validation.csv` instead of `test.cs
 third fewer tokens, and an answer that runs end to end. At temperature 0 the seed changes nothing (5
 seeds, one distinct answer). Clear rejection reasons from the validator matter: the model fixes
 what the reason names.
+
+**v3** (2026-10-10) adds one question, the task (regression or classification), and a TASK line
+with the scan rule's decision (for taxi: regression, from 4 agreeing signals). On taxi it scores the
+same as v2 (9 strict / 10 lenient of 11, the same eval_file miss) and answers `regression`. It is
+valid on the second try, like v2: the first answer had arg_map key and transform flag mistakes, the
+same kind v2 made. Tokens rise by about 650, mostly the TASK lines. One seed only. The task question
+matters only for repos where the scan signals don't settle the task, and taxi isn't one, so this run
+shows that v3 doesn't regress, not that the question helps. The sandbox run used `train.csv` (an
+allowed alternative) and predicted 410 s for the reference row (expected 531 ± 50%).
 
 Logs: `experiments/evals/` (one JSON report per run, plus the 5-seed summary).
 
