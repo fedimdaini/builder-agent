@@ -68,6 +68,13 @@ libffi8, and `set_python_version 3.10` for both python_3_12 and xgboost_3_0_0).
   of the locked 1.23.5. All 4 distinct versions (1.21.2, 1.21.4, 1.21.5, 1.23.1) passed every
   sandbox stage on top of the fault (`checks.json`, kind "loose"), so they stay correct. A loose pin
   that failed would be labelled wrong.
+- **The filter is not a fully independent judge.** It was refined three times after looking at the
+  data: (1) the fault's own recorded cause no longer counts as copied; (2) the Python check flags only
+  claims about the image, not requirements; (3) the version the fix sets ("set the image back to
+  Python 3.9") is not a false claim. Each change was logged and tested, but each was made while
+  looking at the answers the filter judges, so its verdicts on this data are partly fitted to it. To
+  make it independent: freeze the filter (its code and term lists) before labelling new data, and
+  check a random sample of its verdicts by hand, kept and dropped, to measure how often it is wrong.
 
 ## Filter changes after the first build
 

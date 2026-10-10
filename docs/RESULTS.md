@@ -208,8 +208,16 @@ version 1, env var 8, system library 12. DPO pairs: 12, 0, 7, 8, 7, 0.
 - **The Python-version blind spot again.** gen-004 (Python 3.12) is the only fault with no reason from
   the model, even when told the fix. Its one example is written, the same failure as the held-out
   gen-011.
-- **Small and unbalanced.** 53 examples and 34 pairs from 9 faults. Two families have no DPO pairs
-  because the model was always right. Enough to try QLoRA as a direction, not to measure it.
+- **Small and unbalanced.** 56 examples (33 after the cap) and 34 pairs from 9 faults. Two families
+  have no DPO pairs because the model was always right. Enough to try QLoRA as a direction, not to
+  measure it.
+- **The filter is not a fully independent judge.** It was refined three times after looking at the
+  data: (1) the fault's own recorded cause no longer counts as copied; (2) the Python check flags only
+  claims about the image, not requirements; (3) the version the fix sets ("set the image back to
+  Python 3.9") is not a false claim. Each change was logged and tested, but each was made while
+  looking at the answers the filter judges, so its verdicts on this data are partly fitted to it. To
+  make it independent: freeze the filter (its code and term lists) before labelling new data, and
+  check a random sample of its verdicts by hand, kept and dropped, to measure how often it is wrong.
 
 **Two later additions.**
 
