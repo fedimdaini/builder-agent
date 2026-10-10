@@ -212,3 +212,29 @@ def test_mlflow_client_override_reproduces_fault_001(mini, contracts, tmp_path):
     render_configs(mini, contracts, plan, MINI_GOLD, tmp_path, mlflow_client="mlflow", writer=writer)
     install = next(line for line in read(tmp_path, "Dockerfile").splitlines() if line.startswith(" && pip install"))
     assert "mlflow" in install.split() and "mlflow==2.17.2" not in install
+
+
+def _apt_line(root):
+    return next(line for line in (root / "Dockerfile").read_text(encoding="utf-8").splitlines()
+                if "apt-get install" in line)
+
+
+def test_known_library_adds_its_system_packages(mini, contracts, tmp_path):  # noqa: F811
+    from builder_agent.render import validate_slots
+    from builder_agent.render.configs import Overrides
+    from builder_agent.scan.models import Requirement
+    deps = [d.model_copy(update={"packages": d.packages + [Requirement(name="lightgbm")]})
+            if d.kind == "requirements" else d for d in mini.dependency_files]
+    ctx = mini.model_copy(update={"dependency_files": deps})
+    plan = plan_build(ctx, contracts)
+    render_configs(ctx, contracts, plan, MINI_GOLD, tmp_path)
+    assert _apt_line(tmp_path).endswith("--no-install-recommends make libgomp1 \\")
+    # a fix that adds the same package doesn't duplicate it
+    tctx = config_context(ctx, contracts, plan, validate_slots(ctx, MINI_GOLD).slots,
+                          overrides=Overrides(apt=["libgomp1", "libffi8"]))
+    assert tctx["apt_packages"] == ["make", "libgomp1", "libffi8"]
+
+
+def test_no_known_library_means_only_make(mini, contracts, tmp_path):  # noqa: F811
+    render_configs(mini, contracts, plan_build(mini, contracts), MINI_GOLD, tmp_path)
+    assert _apt_line(tmp_path).endswith("--no-install-recommends make \\")

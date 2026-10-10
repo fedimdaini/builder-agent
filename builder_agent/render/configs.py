@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field
 from ..decide.contracts import Contracts
 from ..decide.models import BuildPlan
 from ..scan.deps import declared_names, normalize
+from ..scan.known import SYSTEM_PACKAGES
 from ..scan.models import RepoContext
 from ..repo_writer import RepoWriter
 from . import MARKER, RenderError, RenderResult, _env, manifest_path, write_new_files
@@ -167,6 +168,13 @@ def config_context(ctx: RepoContext, c: Contracts, plan: BuildPlan, slots: SlotA
     # order: the repo's install, injected commands, then the Builder's extras (where fixes land)
     install = plan.install.commands + o.post_install_commands + ([f"pip install {' '.join(extras)}"] if extras else [])
 
+    # system packages that known libraries need (scan/known.py), for what the repo declares or imports
+    # and what the Builder installs; then the fixes' packages
+    used = declared_names(ctx.dependency_files) | {normalize(t.distribution) for t in ctx.third_party_imports}         | {_pip_name(e) for e in extras}
+    apt = ["make"] + [p for lib in sorted(used) for p in SYSTEM_PACKAGES.get(lib, [])]
+    apt += [p for p in o.apt if p not in apt]
+    apt = list(dict.fromkeys(apt))
+
     mlflow = urlparse(c.paths["mlflow_uri"])
     if not mlflow.hostname or mlflow.hostname in {"localhost", "127.0.0.1"}:
         raise RenderError(f"paths.mlflow_uri {c.paths['mlflow_uri']!r} must name the compose service, "
@@ -183,7 +191,7 @@ def config_context(ctx: RepoContext, c: Contracts, plan: BuildPlan, slots: SlotA
         "tab": "\t",
         "repo": ctx.name,
         "python_version": o.python_version or plan.python.version,
-        "apt_packages": ["make"] + [p for p in o.apt if p != "make"],
+        "apt_packages": apt,
         "pre_apt_commands": o.pre_apt_commands,
         "env": o.env,
         # the model service's environment; compose wins over Dockerfile ENV, so overrides go here too

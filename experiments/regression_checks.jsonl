@@ -1,0 +1,2 @@
+{"step": "2b default Python", "commit": "2efd0c2", "taxi_attempt": "20261010T195239Z-27d587", "taxi_ok": true, "prediction": 472.18335492834865, "verify_findings": 13, "verify_identical": true, "patch_identical": true}
+{"step": "2d system packages", "commit_before": "2efd0c2", "taxi_attempt": "20261010T195618Z-84652d", "taxi_ok": true, "prediction": 472.18335492834865, "within_reference": true, "same_as_previous": true, "verify_findings": 13, "verify_identical": true, "patch_identical": true}

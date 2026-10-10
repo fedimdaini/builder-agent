@@ -46,3 +46,11 @@ FRAMEWORKS = {
     "pandas": "data", "numpy": "data", "polars": "data", "pyspark": "data",
     "dask": "data", "pyarrow": "data", "geopandas": "data", "pandera": "data",
 }
+
+# pip name -> Debian packages its Linux wheels need at import time on python:<version>-slim images.
+# Only entries verified in a container (date, how), so the Builder adds them before the first build.
+SYSTEM_PACKAGES = {
+    # 2026-10-10, python:3.11-slim: `import lightgbm` 4.7.0 fails with "libgomp.so.1: cannot open shared
+    # object file" until libgomp1 is installed (OpenMP runtime; xgboost wheels bundle their own)
+    "lightgbm": ["libgomp1"],
+}
