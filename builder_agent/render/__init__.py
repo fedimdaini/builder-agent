@@ -15,6 +15,7 @@ import csv
 import hashlib
 import io
 import json
+import re
 from pathlib import Path, PurePosixPath
 
 from jinja2 import Environment, PackageLoader, StrictUndefined
@@ -98,6 +99,15 @@ def _first_record(root: Path, path: str, features: list[str]) -> dict:
     return {c: _coerce(row[c]) for c in features}
 
 
+def experiment_name(ctx: RepoContext, c: Contracts) -> str:
+    """The MLflow experiment: contracts.yaml paths.mlflow_experiment when it is set (the main project keeps
+    mlops-zoomcamp-experiment); otherwise, or with "auto", one per repo, named after it."""
+    value = (c.paths.get("mlflow_experiment") or "").strip()
+    if value and value != "auto":
+        return value
+    return re.sub(r"[^a-z0-9._-]+", "-", ctx.name.lower()).strip("-") or "builder"
+
+
 def template_context(ctx: RepoContext, c: Contracts, s: SlotAnswers) -> dict:
     adapters_dir = c.paths["adapters_dir"].strip("/")
     headers = {d.path: d.columns for d in ctx.data_columns}
@@ -165,7 +175,7 @@ def template_context(ctx: RepoContext, c: Contracts, s: SlotAnswers) -> dict:
         "sample_var": c.sample_mode.variable,
         "fraction": c.sample_mode.fraction,
         "mlflow_uri": c.paths["mlflow_uri"],
-        "experiment": c.paths["mlflow_experiment"],
+        "experiment": experiment_name(ctx, c),
         "model_uri_env": c.serving.model_uri_env,
         "model_uri_file": c.paths["latest_model_uri"],
         "eval_report": c.paths["eval_report"],

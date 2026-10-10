@@ -315,3 +315,25 @@ def test_gold_file_alternatives(tmp_path):
 @taxi_only
 def test_taxi_model_input_candidates_follow_the_api(taxi):
     assert slot_candidates(taxi)["model_input"] == ["dmatrix"]   # train_xgboost uses xgb.train
+
+
+@pytest.mark.parametrize("value,expected", [
+    ("mlops-zoomcamp-experiment", "mlops-zoomcamp-experiment"),     # set in contracts.yaml: always wins
+    ("auto", "my-repo_2"), (None, "my-repo_2"), ("", "my-repo_2"),   # not set: one experiment per repo
+])
+def test_experiment_name(mini, tmp_path, value, expected):
+    from test_decide import edit_contracts
+    from builder_agent.render import experiment_name
+
+    def change(d):
+        if value is None:
+            d["paths"].pop("mlflow_experiment")
+        else:
+            d["paths"]["mlflow_experiment"] = value
+    c = edit_contracts(tmp_path, change)
+    assert experiment_name(mini.model_copy(update={"name": "My Repo_2"}), c) == expected
+
+
+def test_train_adapter_uses_the_contract_experiment(mini, contracts, tmp_path):
+    render_adapters(mini, contracts, MINI_GOLD, tmp_path)
+    assert 'EXPERIMENT = "mlops-zoomcamp-experiment"' in (tmp_path / "pipeline" / "train.py").read_text(encoding="utf-8")
