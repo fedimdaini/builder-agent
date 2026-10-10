@@ -12,6 +12,56 @@ Verdicts used below:
 - **taxi-shaped**: an assumption that holds for taxi and would break, or silently mislead, on
   many other repos.
 
+## 0. Supported scope (decided 2026-10-10)
+
+**In scope:** Python tabular machine learning, **regression or classification**, with **CSV data** in
+the repo (or made by a data step in the repo), trained by **either** an importable function that
+returns the model **or** a training script run with arguments. For a script, the LLM reads it and
+fills in how to run it: the command, its arguments, and where the model and metrics end up. A
+separate slot set and prompt version do this, and the sandbox validates the answers.
+
+**Out of scope, explicitly:** deep learning (PyTorch, TensorFlow/Keras, transformers), text or image
+data, notebooks-only repos, pipeline frameworks that own the training run (Airflow, DVC, Kedro,
+Prefect), non-CSV data (Parquet, Excel, databases), and data downloaded at run time from outside
+the repo. An out-of-scope repo still gets scan facts and verify-mode findings; create mode reports
+why it stops instead of generating files that can't work.
+
+## 0.1 The main project against this scope
+
+`mlops-zoomcamp-project` (checked at commit `e157717`, read only) is **outside the create-mode scope**:
+
+| Aspect | Main project | In scope? |
+|---|---|---|
+| Training | `train_sklearn_model(download_date, sklearn_model, model_name)` in `airflow/dags/dag_02_training.py`, run by an Airflow `PythonOperator`; it logs to MLflow and saves the model and a `DictVectorizer` as pickles to S3; it does not return the model | no: orchestrated by Airflow, and the function takes a date, not data |
+| Data | `dag_01` downloads NYC taxi Parquet from the internet into LocalStack S3; `dag_02` reads Parquet from S3 | no: downloaded at run time, Parquet, S3 |
+| Target | `duration`, computed from two timestamp columns | not supported by the scanner yet (roadmap item 5) |
+| Task / framework | regression with scikit-learn (LinearRegression, Lasso, RandomForest, GradientBoosting) | yes |
+| Dependencies | root `Pipfile` (Python 3.9, `apache-airflow = "*"` unpinned), plus per-service `requirements.txt` | yes, but the root Pipfile isn't what the services use |
+| Serving | Flask app with a batch `POST /predict`, no `/health`, `POST /reload` from S3 | needs the contract bridge (roadmap item 8) |
+| Existing pipeline files | `docker-compose.yaml`, Dockerfiles, `Makefile` | verify mode, not create |
+
+**What create mode can do there today:** nothing end to end. Every file the project already has goes
+to verify mode (5 findings, `experiments/verify/mlops-zoomcamp-project/`). The missing ones (CI
+workflow, `pipeline/` adapters) can't be filled, because no slot can point at a function that
+returns a model from CSV data.
+
+**What would be needed** (a separate mode, not a widening of the tabular scope):
+
+1. An **orchestrated-repo mode**: the make targets call the repo's own orchestrator inside its own
+   stack. For example, `make data` = `airflow dags test dag_01_download_nyc_data <date>` and
+   `make train` = `airflow dags test dag_02_training <date>`, each run in the Airflow container
+   of the repo's compose, with DAG ids and the date argument as slots. This is the script-training
+   mode one level up: a command with arguments, validated by the sandbox.
+2. A sandbox that brings up the **repo's** compose (Airflow, LocalStack, Postgres; about 589 s
+   and the memory peak measured in `docs/reference-run-main.md`), not the Builder's.
+3. **Network access** in the sandbox for the NYC data download, and a sample mode (one month).
+4. The **contract bridge** for the API (roadmap item 8).
+5. Scanner support for **Parquet** columns and for a **target computed from two columns**
+   (roadmap item 5).
+
+Until then, the main project is the held-out test for **verify mode**, and create mode is
+evaluated on in-scope repos.
+
 ## 1. Specific values and assumptions
 
 ### Hard-coded literals
