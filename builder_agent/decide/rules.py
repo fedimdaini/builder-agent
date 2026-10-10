@@ -15,7 +15,7 @@ from packaging.version import Version
 from ..scan.deps import declared_names, normalize
 from ..scan.models import EntryPoint, RepoContext, WebApp
 from .contracts import Contracts, Endpoint
-from .models import InstallPlan, MakeTarget, NeedsLLM, PythonChoice, ServingPlan
+from .models import InstallPlan, MakeTarget, NeedsLLM, PythonChoice, ServingPlan, TaskChoice
 
 # Exact-version hint sources, most trusted first. Builder-internal, not a team decision.
 EXACT_PRIORITY = ["pipfile", "python-version-file", "runtime.txt", "pipfile-lock",
@@ -120,6 +120,37 @@ def choose_python(ctx: RepoContext, c: Contracts) -> tuple[PythonChoice, NeedsLL
         if not _allows(spec, version):
             return fail(f"{version} ({reason}) violates {h.value} from {h.source}")
     return PythonChoice(status="decided", version=version, reason=reason, evidence=evidence), None
+
+
+# --- task ------------------------------------------------------------------
+
+def task_evidence(ctx: RepoContext) -> list[tuple[str, str]]:
+    """(task, evidence line) for every scan signal: model classes, metrics, objectives, target values."""
+    out = [(s.task, f"{s.kind} {s.value} -> {s.task} ({', '.join(s.files[:2])}"
+                    f"{', ...' if len(s.files) > 2 else ''})") for s in ctx.task_signals]
+    v = ctx.target_values
+    if v:
+        kind = ("non-numeric" if not v.numeric else "integer" if v.integer else "decimal")
+        line = (f"target values: {v.column} in {v.file}: {v.distinct} distinct {kind} values in {v.n} rows "
+                f"(e.g. {', '.join(v.examples)})")
+        out.append((v.task, line + (f" -> {v.task}" if v.task else " -> unclear")))
+    return out
+
+
+def choose_task(ctx: RepoContext) -> tuple[TaskChoice, NeedsLLM | None]:
+    """Decided when every signal that points somewhere points the same way; needs_llm when there are
+    none or they disagree."""
+    evidence = task_evidence(ctx)
+    tasks = {t for t, _ in evidence if t}
+    lines = [line for _, line in evidence]
+    if len(tasks) == 1:
+        task = tasks.pop()
+        return TaskChoice(status="decided", task=task, evidence=lines,
+                          reason=f"all {sum(1 for t, _ in evidence if t)} task signal(s) agree"), None
+    reason = ("no task signal (no model class, metric, objective or readable target values)" if not tasks
+              else "task signals disagree")
+    return (TaskChoice(status="needs_llm", reason=reason, evidence=lines),
+            NeedsLLM(item="task", reason=reason, context=lines))
 
 
 # --- serving ---------------------------------------------------------------

@@ -19,10 +19,10 @@ from pydantic import BaseModel, Field
 
 from .. import LOG_DIR
 from ..decide.models import BuildPlan
-from ..render.slots import SlotAnswers, validate_slots
+from ..render.slots import validate_slots
 from ..scan.models import RepoContext
 from .ollama import ChatResponse, OllamaClient, inline_refs
-from .prompts import PromptError, PromptFile, load_prompt, retry_variables, slot_variables
+from .prompts import PromptError, PromptFile, load_prompt, retry_variables, slot_variables, slots_model
 
 __all__ = ["fill_slots", "load_prompt", "OllamaClient", "PromptError", "SlotFillResult", "DEFAULT_CALL_LOG"]
 
@@ -89,7 +89,7 @@ def fill_slots(ctx: RepoContext, plan: BuildPlan, prompt: PromptFile, client: Ch
     variables = slot_variables(ctx, plan)
     messages = [{"role": "system", "content": prompt.render("system", variables)},
                 {"role": "user", "content": prompt.render("user", variables)}]
-    schema = inline_refs(SlotAnswers.model_json_schema())
+    schema = inline_refs(slots_model(prompt).model_json_schema())   # v1/v2: SlotAnswers, unchanged
     digest = client.digest
     attempts: list[Attempt] = []
     answer: dict | None = None

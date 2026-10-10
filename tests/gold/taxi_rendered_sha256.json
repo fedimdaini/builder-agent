@@ -1,0 +1,12 @@
+{
+  ".dockerignore": "9f7e45fedbcbe6b65bca78e0975ad0379680bf791733bc84767c04b92dac66fd",
+  "compose.base.yml": "0dfacb6ad17e22d0a1b9301dd09d836907d0b46b9a25f08b4f28fc46bd70ecae",
+  "Dockerfile": "4f2da903ab6a6b3f690fdb6e7af8b6c63dfb4a79e67b14ab3da344b0b851afb8",
+  "Makefile": "1817ded4dd7080c6dc768a72e670d1080357efd389990356ab244512d91a369c",
+  "pipeline/data.py": "854a5dca7739c4b5dd2fb04d600c2929b42457dd98b79dfa21a24a2db0e9ec63",
+  "pipeline/evaluate.py": "ccaf0602ff1e3b4b580911b16200372932d1750e94c6b6f08be25e463e85c3b3",
+  "pipeline/sample_request.json": "2b7ec2c3809c7da7f6b15ca5b2b9109f5a27c4e864e707513e431c55a304bce7",
+  "pipeline/serve.py": "e854c3f92354b58546a492f6d608caab7ec302b778037a72dc1f1553875adc7a",
+  "pipeline/smoke_test.py": "401f06222609a3fe4ad871d49f35819a62031915ffd60c649a2ca6735b3959fd",
+  "pipeline/train.py": "5a1fd1a7fddf9fb87a069a3ade3285762511cfb980ffbb171fd7bd6ec35f0859"
+}

@@ -27,6 +27,14 @@ class PythonChoice(BaseModel):
     assumed: bool = False          # no version in the repo: the Builder's default, reported as an assumption
 
 
+class TaskChoice(BaseModel):
+    """Regression or classification, decided by a rule from scan signals (decide/rules.py choose_task)."""
+    status: Status
+    task: Literal["regression", "classification"] | None = None
+    reason: str
+    evidence: list[str] = Field(default_factory=list)
+
+
 class InstallPlan(BaseModel):
     status: Status
     tool: Literal["pipenv", "pip", "poetry"] | None = None
@@ -72,6 +80,7 @@ class BuildPlan(BaseModel):
     serving: ServingPlan
     make_targets: list[MakeTarget]
     sample: SamplePlan
+    task: TaskChoice | None = None      # None only in plans built before the task rule existed
     needs_llm: list[NeedsLLM] = Field(default_factory=list)
 
     @property
@@ -86,6 +95,8 @@ class BuildPlan(BaseModel):
         out = [f"PLAN {self.repo} | contract v{self.contract_version} | "
                f"{'complete' if self.is_complete else f'{len(self.needs_llm)} item(s) need the LLM'}"]
         mark = {"decided": "ok ", "needs_llm": "LLM"}
+        if self.task:
+            out.append(f"[{mark[self.task.status]}] task: {self.task.task or '-'} — {self.task.reason}")
         assumed = " (ASSUMED)" if self.python.assumed else ""
         out.append(f"[{mark[self.python.status]}] python: {self.python.version or '-'}{assumed} — {self.python.reason}")
         extras = f" + pip install {' '.join(self.install.extra_packages)}" if self.install.extra_packages else ""

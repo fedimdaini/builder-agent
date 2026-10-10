@@ -8,7 +8,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import PurePosixPath
 
-from . import targets
+from . import targets, task
 from .layout import DATA_EXTS, MODEL_EXTS
 from .models import EntryRole, FunctionSig, PortHint, Route, WebApp
 
@@ -43,6 +43,7 @@ class ModuleFacts:
     web_apps: list[WebApp] = field(default_factory=list)
     ports: list[PortHint] = field(default_factory=list)
     path_literals: set[str] = field(default_factory=set)
+    task_signals: list = field(default_factory=list)     # scan/task.py TaskSignal, regression vs classification
 
 
 def role_for(path: str) -> EntryRole | None:
@@ -146,6 +147,7 @@ def analyze_tree(tree: ast.Module, path: str, *, is_notebook: bool = False) -> M
 
     top = {i.split(".")[0] for i in facts.imports}
     facts.target = targets.collect(tree)
+    facts.task_signals = task.code_signals(tree, path)
     if is_notebook:
         return facts
 

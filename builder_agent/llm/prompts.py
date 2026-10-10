@@ -25,7 +25,8 @@ from jinja2 import Environment, StrictUndefined, TemplateSyntaxError, UndefinedE
 from pydantic import BaseModel
 
 from ..decide.models import BuildPlan
-from ..render.slots import SlotAnswers, slot_candidates
+from ..decide.rules import choose_task
+from ..render.slots import TASKS, SlotAnswers, SlotAnswersV3, slot_candidates
 from ..scan.models import RepoContext
 
 PROMPTS_DIR = Path(__file__).resolve().parents[2] / "prompts"
@@ -76,6 +77,19 @@ def load_prompt(version: str, prompts_dir: str | Path = PROMPTS_DIR) -> PromptFi
                       sections=sections)
 
 
+def slots_model(prompt: PromptFile) -> type[SlotAnswers]:
+    """The answer schema a slot prompt asks for: with the task (slots_v3 on) if it shows {{ task_facts }}."""
+    return SlotAnswersV3 if "{{ task_facts }}" in prompt.sections.get("user", "") else SlotAnswers
+
+
+def task_facts(ctx: RepoContext) -> str:
+    """The task rule's decision and its evidence, for slots_v3."""
+    choice, _ = choose_task(ctx)
+    head = (f"TASK: decided by the scan signals: {choice.task} ({choice.reason})" if choice.status == "decided"
+            else f"TASK: not decided ({choice.reason})")
+    return "\n".join([head] + [f"  - {line}" for line in choice.evidence])
+
+
 def slot_variables(ctx: RepoContext, plan: BuildPlan) -> dict:
     """Variables for the system and user sections."""
     needs = [n.model_dump() for n in plan.needs_llm]
@@ -92,6 +106,9 @@ def slot_variables(ctx: RepoContext, plan: BuildPlan) -> dict:
         "candidates_json": json.dumps(candidates, indent=2),
         "schema": schema,                              # SlotAnswers JSON schema
         "schema_json": json.dumps(schema, indent=2),
+        # slots_v3: the task (regression or classification); v1/v2 don't use these
+        "task_facts": task_facts(ctx),
+        "task_candidates": TASKS,
     }
 
 

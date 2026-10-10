@@ -13,6 +13,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
+from ..decide.rules import choose_task
 from ..scan.code import module_target
 from ..scan.layout import DATA_EXTS
 from ..scan.models import FunctionSig, RepoContext
@@ -74,6 +75,23 @@ class SlotAnswers(_Strict):
     train: TrainSlots
     evaluate: EvaluateSlots
     data: DataSlots
+
+
+class SlotAnswersV3(SlotAnswers):
+    """slots_v3 and later: the task too. Asked only when the scan signals don't settle it (choose_task);
+    v1/v2 answers have no task field and take the rule's decision."""
+    task: Literal["regression", "classification"]
+
+
+TASKS = ["regression", "classification"]
+
+
+def answer_task(ctx: RepoContext, s: SlotAnswers) -> str | None:
+    """The task the adapters are rendered for: the rule's, when it decides; else the answer's (v3)."""
+    choice, _ = choose_task(ctx)
+    if choice.status == "decided":
+        return choice.task
+    return getattr(s, "task", None)
 
 
 class SlotValidation(BaseModel):
@@ -187,7 +205,8 @@ def validate_slots(ctx: RepoContext, answer: dict | SlotAnswers) -> SlotValidati
         s = answer
     else:
         try:
-            s = SlotAnswers.model_validate(answer)
+            model = SlotAnswersV3 if isinstance(answer, dict) and "task" in answer else SlotAnswers
+            s = model.model_validate(answer)
         except ValidationError as e:
             return SlotValidation(ok=False, reasons=_pydantic_reasons(e))
 
@@ -321,5 +340,27 @@ def validate_slots(ctx: RepoContext, answer: dict | SlotAnswers) -> SlotValidati
             bad(f"evaluate.group_column {s.evaluate.group_column!r} is not in the header of {s.evaluate.eval_file}")
         elif s.evaluate.group_column == s.target_column:
             bad("evaluate.group_column can't be the target column")
+
+    # task: the rule decides when the scan signals agree; the answer (v3) only fills a gap
+    choice, _ = choose_task(ctx)
+    answered = getattr(s, "task", None)
+    if answered and choice.status == "decided" and answered != choice.task:
+        bad(f"task {answered!r}: the scan signals decide {choice.task!r} ({'; '.join(choice.evidence[:3])})")
+    task = answer_task(ctx, s)
+    values = ctx.target_values
+    if task and values and values.column == s.target_column:
+        if task == "classification" and values.numeric and not values.integer and values.distinct > 20:
+            bad(f"task 'classification' doesn't fit {s.target_column}: {values.distinct} distinct decimal values "
+                f"in {values.n} rows of {values.file} (e.g. {', '.join(values.examples[:3])}) is a quantity")
+        if task == "regression" and not values.numeric:
+            bad(f"task 'regression' doesn't fit {s.target_column}: its values are not numbers "
+                f"(e.g. {', '.join(values.examples[:3])})")
+    if task == "classification":
+        if s.target_transform != "none":
+            bad(f"target_transform {s.target_transform!r} is for regression targets; with task "
+                "'classification' it must be 'none'")
+        if s.model_input == "dmatrix":
+            bad("model_input 'dmatrix' (xgboost Booster API) isn't supported for classification: Booster.predict "
+                "returns probabilities, not classes; use a repo function that returns an XGBClassifier")
 
     return SlotValidation(ok=not reasons, reasons=reasons, slots=s if not reasons else None)

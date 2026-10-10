@@ -34,6 +34,52 @@ EVAL_REPORT = {{ eval_report | py }}
 {% include "_model.py.j2" %}
 
 
+{% if task == "classification" %}
+def positive_proba(model, df):
+    """Probability of the second class for a binary classifier with predict_proba, else None."""
+    classes = list(getattr(model, "classes_", []))
+    if not hasattr(model, "predict_proba") or len(classes) != 2:
+        return None, None
+    X = df[FEATURES]
+{% if model_input == "numpy" %}
+    X = X.values
+{% endif %}
+    return np.asarray(model.predict_proba(X))[:, 1], classes[1]
+
+
+def average_ranks(x):
+    """Ranks 1..n, ties sharing their average rank."""
+    order = np.argsort(x, kind="mergesort")
+    ranks = np.empty(len(x))
+    ranks[order] = np.arange(1, len(x) + 1)
+    _, groups = np.unique(x, return_inverse=True)
+    return (np.bincount(groups, weights=ranks) / np.bincount(groups))[groups]
+
+
+def roc_auc(positive, score):
+    """Area under the ROC curve from ranks (Mann-Whitney U); None when only one class is present."""
+    n_pos, n_neg = int(positive.sum()), int((~positive).sum())
+    if n_pos == 0 or n_neg == 0:
+        return None
+    ranks = average_ranks(np.asarray(score, dtype=float))
+    return float((ranks[positive].sum() - n_pos * (n_pos + 1) / 2) / (n_pos * n_neg))
+
+
+def metrics(y_true, y_pred, score=None, positive_class=None):
+    labels = sorted(set(y_true.tolist()) | set(y_pred.tolist()), key=str)
+    f1 = []
+    for c in labels:
+        tp = int(np.sum((y_pred == c) & (y_true == c)))
+        fp = int(np.sum((y_pred == c) & (y_true != c)))
+        fn = int(np.sum((y_pred != c) & (y_true == c)))
+        f1.append(2 * tp / (2 * tp + fp + fn) if tp + fp + fn else 0.0)
+    out = {"accuracy": float(np.mean(y_pred == y_true)), "f1_macro": float(np.mean(f1)) if f1 else 0.0}
+    if score is not None:
+        auc = roc_auc(y_true == positive_class, score)
+        if auc is not None:
+            out["roc_auc"] = auc
+    return out
+{% else %}
 def metrics(y_true, y_pred):
     err = y_pred - y_true
     total = float(np.sum((y_true - y_true.mean()) ** 2))
@@ -42,6 +88,7 @@ def metrics(y_true, y_pred):
         "mae": float(np.mean(np.abs(err))),
         "r2": float(1 - np.sum(err ** 2) / total) if total > 0 else 0.0,
     }
+{% endif %}
 
 
 def main():
@@ -53,6 +100,17 @@ def main():
     df = pd.read_csv(ROOT / EVAL_FILE)
     if SAMPLE:
         df = df.sample(frac=SAMPLE_FRACTION, random_state=42)
+{% if task == "classification" %}
+    y_true = df[TARGET].to_numpy()
+    y_pred = predict(model, df)
+    score, positive_class = positive_proba(model, df)
+
+    per_group = {}
+    for group, idx in df.groupby(GROUP_COLUMN).indices.items():
+        per_group[str(group)] = {"accuracy": float(np.mean(y_pred[idx] == y_true[idx])), "n": int(len(idx))}
+    report = {"model_version": version, "task": "classification",
+              "metrics": metrics(y_true, y_pred, score, positive_class), "per_group": per_group}
+{% else %}
     y_true = df[TARGET].to_numpy(dtype=float)
     y_pred = predict(model, df)
 
@@ -61,6 +119,7 @@ def main():
         m = metrics(y_true[idx], y_pred[idx])
         per_group[str(group)] = {"rmse": m["rmse"], "mae": m["mae"], "n": int(len(idx))}
     report = {"model_version": version, "metrics": metrics(y_true, y_pred), "per_group": per_group}
+{% endif %}
 
     out = ROOT / EVAL_REPORT
     out.parent.mkdir(parents=True, exist_ok=True)

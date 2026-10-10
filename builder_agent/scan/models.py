@@ -101,6 +101,26 @@ class TargetCandidate(BaseModel):
     evidence: list[str]            # "label: notebooks/x.ipynb", "drop: src/train.py", ...
 
 
+class TaskSignal(BaseModel):
+    """Evidence of the ML task in the code (scan/task.py)."""
+    kind: Literal["model", "metric", "objective"]
+    value: str                     # "XGBClassifier", "mean_squared_error", "reg:squarederror"
+    task: Literal["regression", "classification"]
+    files: list[str]
+
+
+class TargetValues(BaseModel):
+    """A sample of the top target column's values, from one data file (scan/task.py)."""
+    file: str
+    column: str
+    n: int                         # values read (at most scan.task.MAX_ROWS)
+    distinct: int
+    numeric: bool
+    integer: bool                  # numeric and every value a whole number
+    examples: list[str]            # first distinct values, at most 5
+    task: Literal["regression", "classification"] | None   # None: the values don't settle it
+
+
 class TargetTransform(BaseModel):
     forward: str                   # "log1p"
     inverse: str                   # "expm1"
@@ -205,6 +225,8 @@ class RepoContext(BaseModel):
     target_candidates: list[TargetCandidate] = Field(default_factory=list)  # best first
     target_transforms: list[TargetTransform] = Field(default_factory=list)
     data_overlaps: list[DataOverlap] = Field(default_factory=list)  # data files sharing rows
+    task_signals: list[TaskSignal] = Field(default_factory=list)    # model classes, metrics, objectives
+    target_values: TargetValues | None = None                       # values of the top target column
 
     existing_pipeline_files: list[str] = Field(default_factory=list)  # Dockerfile, Makefile, CI, ...
     test_files: list[str] = Field(default_factory=list)

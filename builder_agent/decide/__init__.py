@@ -11,7 +11,7 @@ from __future__ import annotations
 from ..scan.models import RepoContext
 from .contracts import Contracts, load_contracts
 from .models import BuildPlan, SamplePlan
-from .rules import choose_python, plan_install, plan_serving, plan_targets
+from .rules import choose_python, choose_task, plan_install, plan_serving, plan_targets
 
 __all__ = ["plan_build", "load_contracts", "BuildPlan", "Contracts"]
 
@@ -21,8 +21,9 @@ def plan_build(ctx: RepoContext, contracts: Contracts) -> BuildPlan:
     serving, serving_need = plan_serving(ctx, contracts)
     install, install_need = plan_install(ctx, contracts, serving)
     targets, target_needs = plan_targets(ctx, contracts, install, serving)
+    task, task_need = choose_task(ctx)
 
-    needs = [n for n in (py_need, install_need, serving_need) if n] + target_needs
+    needs = [n for n in (py_need, install_need, serving_need) if n] + target_needs + ([task_need] if task_need else [])
     return BuildPlan(
         repo=ctx.name,
         contract_version=contracts.contract_version,
@@ -31,5 +32,6 @@ def plan_build(ctx: RepoContext, contracts: Contracts) -> BuildPlan:
         serving=serving,
         make_targets=targets,
         sample=SamplePlan(variable=contracts.sample_mode.variable, fraction=contracts.sample_mode.fraction),
+        task=task,
         needs_llm=needs,
     )

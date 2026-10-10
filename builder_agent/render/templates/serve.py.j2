@@ -88,6 +88,14 @@ def predict_endpoint():
         X = parse_record(payload)
     except BadRequest as e:
         return jsonify({"error": str(e)}), 400
+{% if task == "classification" %}
+    try:
+        value = predict(MODEL, X)[0]
+        value = value.item() if hasattr(value, "item") else value   # numpy scalar -> int/float/str/bool
+    except Exception as e:  # noqa: BLE001 - any model failure is a 500, never a 200
+        log.exception("prediction failed")
+        return jsonify({"error": f"prediction failed: {e}"}), 500
+{% else %}
     try:
         value = float(predict(MODEL, X)[0])
     except Exception as e:  # noqa: BLE001 - any model failure is a 500, never a 200
@@ -95,6 +103,7 @@ def predict_endpoint():
         return jsonify({"error": f"prediction failed: {e}"}), 500
     if not np.isfinite(value):
         return jsonify({"error": "prediction is not a finite number"}), 500
+{% endif %}
 
     request_id = str(uuid.uuid4())
     log_prediction({f: payload[f] for f in FEATURES}, value, request_id)

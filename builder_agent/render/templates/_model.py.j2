@@ -24,7 +24,9 @@ def predict(model, X):
 {% else %}
     raw = model.predict(X)
 {% endif %}
-{% if inverse_fn %}
+{% if task == "classification" %}
+    return np.asarray(raw)  # class labels, as the model returns them
+{% elif inverse_fn %}
     return {{ inverse_fn }}(np.asarray(raw, dtype=float))  # undo {{ transform }} from training
 {% else %}
     return np.asarray(raw, dtype=float)

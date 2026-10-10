@@ -12,7 +12,7 @@ import sys
 from collections import defaultdict
 from pathlib import Path, PurePosixPath
 
-from . import code, deps, hints, layout, rows, targets
+from . import code, deps, hints, layout, rows, targets, task
 from .known import FRAMEWORKS, IMPORT_TO_DIST
 from .models import (
     EntryPoint, Framework, Notebook, ParseError, PathReference, RepoContext, ThirdPartyImport,
@@ -189,6 +189,17 @@ def scan_repo(path: str | Path) -> RepoContext:
         {c for d in data_columns for c in d.columns},
     )
 
+    # --- task signals: regression or classification ---
+    task_signals = task.merge([s for f in module_facts + notebook_facts if f.path not in test_files
+                               for s in f.task_signals])
+    top = next((t for t in target_candidates if t.in_data), None)
+    target_values = None
+    if top:
+        holder = next((d.path for d in data_columns if top.column in d.columns), None)
+        if holder:
+            target_values = task.target_values(root, holder, top.column,
+                                               "	" if holder.endswith(".tsv") else ",")
+
     return RepoContext(
         root=root.as_posix(),
         name=root.name,
@@ -218,4 +229,6 @@ def scan_repo(path: str | Path) -> RepoContext:
         data_overlaps=data_overlaps,
         target_candidates=target_candidates,
         target_transforms=target_transforms,
+        task_signals=task_signals,
+        target_values=target_values,
     )

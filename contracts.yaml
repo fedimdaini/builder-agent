@@ -76,6 +76,10 @@ formats:
     model_version: string
     metrics: {rmse: float, mae: float, r2: float}
     per_group: {group_name: {rmse: float, mae: float, n: int}}
+    # Classification models (added 2026-10-10): the report also has task: "classification", and
+    # "metrics" holds these instead; roc_auc only for binary models with predict_proba.
+    # per_group is then {group_name: {accuracy: float, n: int}}. A report without "task" is regression.
+    classification_metrics: {accuracy: float, f1_macro: float, roc_auc: float}
   predictions_log:           # one JSON line per prediction, read by Monitor
     time: ISO-8601 string
     model_version: string
