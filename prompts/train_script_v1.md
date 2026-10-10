@@ -23,6 +23,9 @@ FACTS (found by static analysis, nothing was executed):
 {{ scan_summary }}
 {{ task_facts }}
 
+WHY THESE QUESTIONS (from the build plan):
+{{ needs_llm_text }}
+
 This repository has no function that trains a model, but a script does. The agent will run the
 script inside an MLflow run, with MLFLOW_RUN_ID set to that run, then take the trained model from
 where the script leaves it.
@@ -54,7 +57,7 @@ QUESTIONS AND ALLOWED VALUES:
 - train_script.train_file: the data file the script trains on. Allowed: {{ script_candidates.data_files | join(", ") }}
 - train_script.model_output: "mlflow" if the script logs the model to MLflow itself (a
   mlflow.<flavor>.log_model call), "file" if it writes the model to a file (joblib.dump,
-  pickle.dump, save_model).
+  pickle.dump, save_model). Allowed: mlflow, file
 - train_script.mlflow_artifact_path: with "mlflow", the artifact path it logs the model under
   (the second argument of log_model, e.g. "model"); otherwise null.
 - train_script.model_file: with "file", the path the script writes the model to, using
@@ -64,13 +67,18 @@ QUESTIONS AND ALLOWED VALUES:
 - data.data_step: "existing" if the processed data is already in the repository, otherwise
   the function that builds it. Allowed: {{ script_candidates.data_step | join(", ") }}
 
-EXAMPLE for train_script, from a different repository:
-the script is   fit.py, with options --csv (required), --out (required), --trees (default 100)
-                and the line  joblib.dump(model, args.out)
-the answer is   {"script": "fit.py", "args": ["--csv", "$train_path", "--out", "$model_dir/model.joblib"],
-                 "train_file": "data/train.csv", "model_output": "file", "mlflow_artifact_path": null,
-                 "model_file": "$model_dir/model.joblib"}
-(--trees is left out, so it keeps its default of 100)
+EXAMPLES for train_script, from other repositories:
+1. the script is   fit.py, with options --csv (required), --out (required), --trees (default 100)
+                   and the line  joblib.dump(model, args.out)
+   the answer is   {"script": "fit.py", "args": ["--csv", "$train_path", "--out", "$model_dir/model.joblib"],
+                    "train_file": "data/train.csv", "model_output": "file", "mlflow_artifact_path": null,
+                    "model_file": "$model_dir/model.joblib"}
+   (--trees is left out, so it keeps its default of 100)
+2. the script is   run.py, reading sys.argv[1] as the data path and sys.argv[2] as the learning
+                   rate, with the line  mlflow.xgboost.log_model(booster, "booster")
+   the answer is   {"script": "run.py", "args": ["$train_path", "0.1"], "train_file": "data/train.csv",
+                    "model_output": "mlflow", "mlflow_artifact_path": "booster", "model_file": null}
+   (the learning rate is a literal: sys.argv[2] has no default, so it must be given)
 
 ## retry
 

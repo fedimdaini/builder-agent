@@ -422,6 +422,22 @@ Prompt: `prompts/diagnose_v5.md`; the line is `python_text()` in `builder_agent/
 
 ---
 
+## 8. Script-training mode: first check (no LLM yet)
+
+**What changed.** Repos whose model is trained by a script, not a function, get their own slot set
+(`render/script_slots.py`) and prompt (`prompts/train_script_v1.md`, not approved or run yet). The
+train adapter runs the script inside an MLflow run and takes the model from the run or from the file
+the script writes (`docs/GENERALITY.md`).
+
+**First check.** Two scratch repos, one whose script writes its model with `joblib.dump` and one whose
+script logs it with `mlflow.sklearn.log_model`, each ran every sandbox stage with a gold slot answer.
+**The scratch repos and their gold answers were written by me (Claude), together with the code
+they test**, so this run is a first check that the adapter works, not an independent evaluation:
+the repos fit the design by construction. The independent test is the pinned public repos
+(`docs/GENERALITY.md` section 4) and the LLM filling the slots with `train_script_v1`.
+
+---
+
 ## Not run yet
 
 - DPO training (roadmap item 9 step 4); the pairs are in section 5.

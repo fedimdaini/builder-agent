@@ -138,3 +138,12 @@ def test_prompt_uses_the_script_schema_and_shows_the_code(tmp_path):
     v = slot_variables(ctx, plan_build(ctx, load_contracts(CONTRACTS)))
     user = prompt.render("user", v)
     assert "option --data: required" in script_facts(ctx) and "joblib.dump" in user and "$model_dir" in user
+
+
+def test_plan_says_script_mode_in_its_needs_llm_text(tmp_path):
+    for script in (ARGPARSE_SCRIPT, MLFLOW_SCRIPT):
+        ctx = scan_repo(script_repo(tmp_path / str(len(script)), script))
+        plan = plan_build(ctx, load_contracts(CONTRACTS))
+        item = next(n for n in plan.needs_llm if n.item == "target:train")
+        assert item.reason.startswith("script mode: scripts/train.py trains the model")
+        assert plan.target("train").status == "needs_llm" and plan.target("train").command is None

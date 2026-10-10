@@ -174,6 +174,37 @@ def choose_train_mode(ctx: RepoContext) -> tuple[TrainModeChoice, NeedsLLM | Non
             NeedsLLM(item="train_mode", reason=reason, context=[]))
 
 
+def script_mode_train(ctx: RepoContext, targets: list[MakeTarget],
+                      needs: list[NeedsLLM]) -> tuple[list[MakeTarget], list[NeedsLLM]]:
+    """In script mode the train target always runs the adapter (pipeline/train.py runs the script inside an
+    MLflow run), so it needs the script's arguments and where its model ends up: say that, instead of the
+    function-mode or run-it-directly reasons. Function-mode plans are not touched."""
+    names = ", ".join(t.path for t in ctx.train_scripts)
+    reason = (f"script mode: {names} train{'s' if len(ctx.train_scripts) == 1 else ''} the model; the agent "
+              "runs it inside an MLflow run and needs its arguments and where the model ends up")
+    context = []
+    for t in ctx.train_scripts:
+        parts = [f"cli {t.cli or 'none'}"]
+        if t.cli_args:
+            parts.append("options " + ", ".join(f"{a.flags[0]}{' (required)' if a.required else ''}"
+                                                for a in t.cli_args))
+        if t.argv:
+            parts.append("reads sys.argv[" + "], sys.argv[".join(str(i) for i in t.argv) + "]")
+        if t.outputs:
+            parts.append("model written by " + ", ".join(f"{o.kind} (line {o.line})" for o in t.outputs))
+        context.append(f"{t.path}: " + "; ".join(parts))
+    item = NeedsLLM(item="target:train", reason=reason, context=context + target_facts(ctx))
+    targets = [MakeTarget(name=t.name, description=t.description, status="needs_llm", reason=reason,
+                          depends_on=t.depends_on) if t.name == "train" else t for t in targets]
+    names_before = [n.item for n in needs]
+    if "target:train" in names_before:
+        needs = [item if n.item == "target:train" else n for n in needs]
+    else:
+        at = names_before.index("target:data") + 1 if "target:data" in names_before else 0
+        needs = needs[:at] + [item] + needs[at:]
+    return targets, needs
+
+
 # --- serving ---------------------------------------------------------------
 
 def _has_route(app: WebApp, ep: Endpoint) -> bool:
