@@ -6,11 +6,14 @@
     "correct_dropped_unfaithful": 0,
     "wrong": 0,
     "invalid": 0,
-    "sft_examples": 8,
-    "dpo_pairs": 0,
+    "sft_examples": 12,
     "sft_sampled": 8,
-    "sft_rationalized": 0,
-    "sft_written": 0
+    "sft_rationalized": 4,
+    "sft_written": 0,
+    "dpo_pairs": 0,
+    "dpo_rejected_wrong": 0,
+    "dpo_rejected_invalid": 0,
+    "dpo_rejected_unfaithful": 0
   },
   "version_mismatch": {
     "cases": 2,
@@ -19,11 +22,14 @@
     "correct_dropped_unfaithful": 7,
     "wrong": 8,
     "invalid": 0,
-    "sft_examples": 1,
-    "dpo_pairs": 0,
+    "sft_examples": 5,
     "sft_sampled": 1,
-    "sft_rationalized": 0,
-    "sft_written": 0
+    "sft_rationalized": 4,
+    "sft_written": 0,
+    "dpo_pairs": 12,
+    "dpo_rejected_wrong": 8,
+    "dpo_rejected_invalid": 0,
+    "dpo_rejected_unfaithful": 4
   },
   "env_var": {
     "cases": 2,
@@ -32,11 +38,14 @@
     "correct_dropped_unfaithful": 6,
     "wrong": 0,
     "invalid": 8,
-    "sft_examples": 2,
-    "dpo_pairs": 0,
+    "sft_examples": 8,
     "sft_sampled": 2,
-    "sft_rationalized": 0,
-    "sft_written": 0
+    "sft_rationalized": 6,
+    "sft_written": 0,
+    "dpo_pairs": 7,
+    "dpo_rejected_wrong": 0,
+    "dpo_rejected_invalid": 6,
+    "dpo_rejected_unfaithful": 1
   },
   "incompatible_pin": {
     "cases": 2,
@@ -45,11 +54,14 @@
     "correct_dropped_unfaithful": 3,
     "wrong": 0,
     "invalid": 4,
-    "sft_examples": 9,
-    "dpo_pairs": 4,
+    "sft_examples": 16,
     "sft_sampled": 9,
-    "sft_rationalized": 0,
-    "sft_written": 0
+    "sft_rationalized": 7,
+    "sft_written": 0,
+    "dpo_pairs": 7,
+    "dpo_rejected_wrong": 0,
+    "dpo_rejected_invalid": 4,
+    "dpo_rejected_unfaithful": 3
   },
   "python_version": {
     "cases": 1,
@@ -58,11 +70,14 @@
     "correct_dropped_unfaithful": 1,
     "wrong": 7,
     "invalid": 0,
-    "sft_examples": 0,
-    "dpo_pairs": 0,
+    "sft_examples": 1,
     "sft_sampled": 0,
     "sft_rationalized": 0,
-    "sft_written": 0
+    "sft_written": 1,
+    "dpo_pairs": 8,
+    "dpo_rejected_wrong": 7,
+    "dpo_rejected_invalid": 0,
+    "dpo_rejected_unfaithful": 1
   },
   "missing_dependency": {
     "cases": 1,
@@ -71,10 +86,13 @@
     "correct_dropped_unfaithful": 0,
     "wrong": 0,
     "invalid": 0,
-    "sft_examples": 8,
-    "dpo_pairs": 0,
+    "sft_examples": 11,
     "sft_sampled": 8,
-    "sft_rationalized": 0,
-    "sft_written": 0
+    "sft_rationalized": 3,
+    "sft_written": 0,
+    "dpo_pairs": 0,
+    "dpo_rejected_wrong": 0,
+    "dpo_rejected_invalid": 0,
+    "dpo_rejected_unfaithful": 0
   }
 }

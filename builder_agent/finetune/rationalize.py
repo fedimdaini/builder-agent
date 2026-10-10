@@ -19,6 +19,8 @@ from ..fix.models import Diagnosis, describe
 from . import CasePrompt, faithful, sample_case
 
 RATIONALIZE_SAMPLES = 4
+# a reason that mentions the hint ("the verified fix is ...") makes no sense without it in the training prompt
+HINT_LEAK_RE = re.compile(r"\bverified\b|\bhint(ed)?\b", re.I)
 HINT_MARK = "HINT (for this answer only):"
 HINT = (HINT_MARK + " the verified fix for this error is `{fix}`. Answer with exactly this fix. In \"reason\", "
         "explain in one or two sentences what in the ERROR OUTPUT above causes the failure and why this fix "
@@ -48,6 +50,10 @@ def judge(row: dict, case: dict, cp: CasePrompt) -> dict:
         return out | {"why": f"not a valid answer: {type(e).__name__}"}
     if d.fix.model_dump() != exp.model_dump():
         return out | {"why": f"changed the fix to {describe(d.fix)}", "reason": d.reason}
+    leak = HINT_LEAK_RE.search(d.reason)
+    if leak:
+        return out | {"reason": d.reason, "why": f"refers to the hint ({leak.group(0)!r}), which the training "
+                                                   "prompt doesn't have"}
     ok, why = faithful(d.reason, case, cp.retrieved, describe(exp), cp.current_python)
     return out | {"reason": d.reason, "kept": ok, "why": why}
 

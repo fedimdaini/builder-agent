@@ -79,13 +79,63 @@ written reasons, which quote the fault's own record:
 - The Python check flags only claims about the image ("the image is Python 3.12"), not
   requirements ("xgboost 3.x requires Python 3.10").
 
-## Rationalization (STaR), not run yet
+## Rationalization (STaR) and the final datasets
 
-`python -m builder_agent.finetune rationalize` asks for 4 reasons per fault, with a hint giving the
-verified fix. A reason is kept if the fix is unchanged and the reason passes the filter; otherwise a
-reason is written from the recorded error signature and cause. `build` then adds these answers
-(source `rationalized` or `written`) with the prompt **without** the hint. SFT records and DPO
-"chosen" carry their source.
+**Rationalization.** For each fault, the same prompt plus a hint: the verified fix, and a request for
+a one- or two-sentence reason from the current error output. 4 answers per fault at temperature 0.7
+(36 calls, no errors). A reason is kept if:
+
+- the fix is unchanged;
+- the reason doesn't mention the hint ("verified", "hint"): the training prompt has no hint;
+- the reason passes the faithfulness filter.
+
+If none is kept, a reason is written from the recorded error line and cause. Training records always
+use the prompt **without** the hint.
+
+| Fault | Hinted reasons kept (of 4) | Why the others were not kept |
+|---|---|---|
+| gen-002 xgboost uninstalled | 4 | |
+| gen-003 numpy 2.0.2 | 4 | |
+| gen-004 Python 3.12 | **0, so written** | 2 mention the hint ("as verified by the past failure"), 2 name no term of the error line |
+| gen-005 wrong host | 4 | |
+| gen-006 libffi8 removed | 4 | |
+| gen-007 MLflow client 3.0.1 | 3 | 1 mentions the hint ("verified to work") |
+| gen-008 MLflow client unpinned | 1 | 3 name "3.0.1", copied from the retrieved gen-007 |
+| gen-009 xgboost 3.0.0 | 3 | 1 mentions the hint ("the verified fix is") |
+| gen-012 wrong port | 2 | 2 name "server", copied from the retrieved gen-005 |
+
+The hint check was added after this run: 4 kept reasons quoted the hint. `build` judges the stored
+hinted answers again, so the current filter applies (`rationalized_final.jsonl`).
+
+**SFT** keeps every distinct correct and faithful answer, from all sources.
+
+**DPO.** *rejected* = every distinct sampled answer that is wrong, invalid, or correct with an
+unfaithful reason (`rejected_kind`). *chosen* = a faithful correct answer of the best source available
+(sampled, then rationalized, then written). Identical rejected answers count once: for example, gen-012's
+6 copied reasons are 1 distinct answer.
+
+| Family | SFT examples | sampled | rationalized | written | DPO pairs | rejected wrong | invalid | unfaithful |
+|---|---|---|---|---|---|---|---|---|
+| version mismatch | 5 | 1 | 4 | 0 | 12 | 8 | 0 | 4 |
+| missing dependency | 11 | 8 | 3 | 0 | 0 | 0 | 0 | 0 |
+| incompatible pin | 16 | 9 | 7 | 0 | 7 | 0 | 4 | 3 |
+| Python version | 1 | 0 | 0 | 1 | 8 | 7 | 0 | 1 |
+| env var | 8 | 2 | 6 | 0 | 7 | 0 | 6 | 1 |
+| system library | 12 | 8 | 4 | 0 | 0 | 0 | 0 | 0 |
+| **Total** | **53** | **28** | **24** | **1** | **34** | **15** | **10** | **9** |
+
+Every memory fault now has at least one SFT example; a test checks it. Before rationalization,
+gen-004, gen-005 and gen-007 had none. DPO went from 4 to 34 pairs. Their "chosen" answer comes from
+the model for 12 pairs (gen-008, gen-009, gen-012), from rationalization for 14 (gen-005, gen-007)
+and from the written reason for 8 (gen-004).
+
+**Only written:** gen-004 (python_3_12). Even when told the fix was `set_python_version 3.9`, the
+model couldn't say why from its error output (the `pkgutil.ImpImporter` error of old setuptools on
+Python 3.12). This is the same blind spot as the held-out gen-011 (Python 3.13).
+
+**Not balanced.** Missing dependency and system library have 11–12 SFT examples but no DPO pairs:
+the model was always right there. Python version has 1 SFT example (written) and 8 pairs. Version
+mismatch and env var lean on rationalized answers.
 
 ## Files
 
@@ -95,7 +145,8 @@ reason is written from the recorded error signature and cause. `build` then adds
   faithfulness verdict and its reason).
 - `checks.json`: the sandbox checks of possible alternatives and loose pins (attempt ids in
   `logs/sandbox_attempts.jsonl`).
-- `rationalized.jsonl` (after `rationalize`): the hinted samples, their verdicts and reasons.
+- `rationalized.jsonl`: the hinted samples as run (calls logged as in sampling);
+  `rationalized_final.jsonl`: the same, judged with the current filter (including the hint check).
 - `sft.jsonl`: `messages` = system, user, assistant (the answer as JSON), with case id, variant,
   family, seed and match type.
 - `dpo.jsonl`: `prompt` (system + user messages), `chosen`, `rejected`.

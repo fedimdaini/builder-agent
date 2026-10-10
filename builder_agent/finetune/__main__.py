@@ -17,7 +17,7 @@ from ..render.slots import load_answer
 from ..sandbox import DEFAULT_LOG, run_sandbox
 from . import (OUT_DIR, SAMPLES_PER_CASE, TEMPERATURE, alternative_overrides, build_datasets, faithful, label_sample,
                read_jsonl, render_case_prompt, sample_case, split_cases, write_json, write_jsonl, CasePrompt)
-from .rationalize import RATIONALIZE_SAMPLES, rationalize_case, training_rows
+from .rationalize import RATIONALIZE_SAMPLES, judge, rationalize_case, training_rows
 
 
 def cmd_sample(args) -> None:
@@ -98,8 +98,11 @@ def cmd_build(args) -> None:
         rows.append(row)
     rationalized = OUT_DIR / "rationalized.jsonl"
     if rationalized.exists():
-        rows += training_rows(read_jsonl(rationalized), cases,
-                              {cid: CasePrompt(**p) for cid, p in prompts.items()})
+        cps = {cid: CasePrompt(**p) for cid, p in prompts.items()}
+        # judged again, so the current filter applies to the stored hinted answers
+        hinted = [r | judge(r, cases[r["case_id"]], cps[r["case_id"]]) for r in read_jsonl(rationalized)]
+        write_jsonl(OUT_DIR / "rationalized_final.jsonl", hinted)
+        rows += training_rows(hinted, cases, cps)
     sft, dpo, stats = build_datasets(prompts, rows)
     write_jsonl(OUT_DIR / "sft.jsonl", sft)
     write_jsonl(OUT_DIR / "dpo.jsonl", dpo)

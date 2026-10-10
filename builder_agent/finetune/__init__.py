@@ -259,36 +259,50 @@ def _assistant(row: dict) -> str:
     return json.dumps({"fix": row["fix"], "reason": row["reason"]}, ensure_ascii=False)
 
 
+SOURCE_PRIORITY = ("sampled", "rationalized", "written")      # for DPO "chosen": the model's own answer first
+
+
 def build_datasets(prompts: dict[str, dict], rows: list[dict]) -> tuple[list[dict], list[dict], dict]:
     """prompts: case_id -> CasePrompt dump (the prompt WITHOUT any hint); rows: labelled answers (label in
     correct/wrong/invalid after the sandbox checks), each with a source: "sampled" (default), "rationalized"
-    or "written". Returns sft examples, dpo pairs and per-family counts."""
+    or "written".
+
+    SFT: every distinct correct and faithful answer, from all sources.
+    DPO: rejected = every distinct sampled answer that is wrong, invalid, or correct with an unfaithful
+    reason (its kind recorded); chosen = a faithful correct answer of the best source available
+    (sampled, then rationalized, then written), cycling through that source's answers.
+    Returns sft examples, dpo pairs and per-family counts."""
     sft, dpo, stats = [], [], {}
     for case_id, cp in prompts.items():
         case_rows = [r for r in rows if r["case_id"] == case_id]
-        fam = stats.setdefault(cp["family"], {"cases": 0, "samples": 0, "correct": 0, "correct_dropped_unfaithful": 0,
-                                              "wrong": 0, "invalid": 0, "sft_examples": 0, "dpo_pairs": 0,
-                                              "sft_sampled": 0, "sft_rationalized": 0, "sft_written": 0})
+        fam = stats.setdefault(cp["family"], {
+            "cases": 0, "samples": 0, "correct": 0, "correct_dropped_unfaithful": 0, "wrong": 0, "invalid": 0,
+            "sft_examples": 0, "sft_sampled": 0, "sft_rationalized": 0, "sft_written": 0,
+            "dpo_pairs": 0, "dpo_rejected_wrong": 0, "dpo_rejected_invalid": 0, "dpo_rejected_unfaithful": 0})
         fam["cases"] += 1
-        fam["samples"] += sum(1 for r in case_rows if r.get("source", "sampled") == "sampled")
         chosen, rejected, seen_c, seen_r = [], [], set(), set()
         for r in case_rows:
             sampled = r.get("source", "sampled") == "sampled"
-            if r["label"] == "correct":
+            fam["samples"] += sampled
+            if r["label"] == "correct" and r["faithful"]:
                 fam["correct"] += sampled
-                if not r["faithful"]:
-                    fam["correct_dropped_unfaithful"] += sampled
-                    continue
-                key = _assistant(r)
-                if key not in seen_c:
-                    seen_c.add(key)
+                if _assistant(r) not in seen_c:
+                    seen_c.add(_assistant(r))
                     chosen.append(r)
+                continue
+            if not sampled:
+                continue                               # a hinted answer that failed is not a model answer to reject
+            if r["label"] == "correct":
+                fam["correct"] += 1
+                fam["correct_dropped_unfaithful"] += 1
+                kind = "unfaithful"
             else:
-                fam["wrong" if r["label"] == "wrong" else "invalid"] += 1
-                key = json.dumps([r.get("fix"), r.get("reason")], sort_keys=True)
-                if key not in seen_r and r.get("fix") is not None:
-                    seen_r.add(key)
-                    rejected.append(r)
+                fam[r["label"]] += 1
+                kind = r["label"]
+            key = json.dumps([r.get("fix"), r.get("reason")], sort_keys=True)
+            if r.get("fix") is not None and key not in seen_r:
+                seen_r.add(key)
+                rejected.append((kind, r))
         meta = {"case_id": case_id, "variant": cp["variant"], "family": cp["family"],
                 "prompt_version": cp["prompt_version"], "prompt_sha256": cp["prompt_sha256"]}
         for r in chosen:
@@ -296,13 +310,16 @@ def build_datasets(prompts: dict[str, dict], rows: list[dict]) -> tuple[list[dic
             fam[f"sft_{source}"] += 1
             sft.append(meta | {"seed": r["seed"], "match": r["match"], "source": source,
                                "messages": cp["messages"] + [{"role": "assistant", "content": _assistant(r)}]})
-        pairs = [(chosen[n % len(chosen)], r) for n, r in enumerate(rejected)] if chosen else []
-        for c, r in pairs:
+        best = next(([c for c in chosen if c.get("source", "sampled") == src] for src in SOURCE_PRIORITY
+                     if any(c.get("source", "sampled") == src for c in chosen)), [])
+        for n, (kind, r) in enumerate(rejected if best else []):
+            c = best[n % len(best)]
+            fam[f"dpo_rejected_{kind}"] += 1
             dpo.append(meta | {"prompt": cp["messages"], "chosen": _assistant(c), "rejected": _assistant(r),
                                "chosen_source": c.get("source", "sampled"), "chosen_seed": c["seed"],
-                               "rejected_seed": r["seed"], "rejected_label": r["label"]})
+                               "rejected_seed": r["seed"], "rejected_kind": kind})
         fam["sft_examples"] += len(chosen)
-        fam["dpo_pairs"] += len(pairs)
+        fam["dpo_pairs"] += len(rejected) if best else 0
     return sft, dpo, stats
 
 

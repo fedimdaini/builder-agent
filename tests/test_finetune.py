@@ -120,14 +120,31 @@ def test_build_datasets_dedupes_and_pairs():
             {"case_id": "c", "seed": 2, "label": "correct", "match": "exact", "fix": fix_ok, "reason": "a", "faithful": True},
             {"case_id": "c", "seed": 3, "label": "correct", "match": "exact", "fix": fix_ok, "reason": "b", "faithful": False},
             {"case_id": "c", "seed": 4, "label": "wrong", "fix": fix_bad, "reason": "r"},
-            {"case_id": "c", "seed": 5, "label": "invalid", "fix": None, "reason": None}]
+            {"case_id": "c", "seed": 5, "label": "invalid", "fix": fix_bad, "reason": "already applied"},
+            {"case_id": "c", "seed": 6, "label": "invalid", "fix": None, "reason": None},
+            {"case_id": "c", "seed": 1, "source": "rationalized", "label": "correct", "match": "exact", "fix": fix_ok,
+             "reason": "c", "faithful": True}]
     sft, dpo, stats = build_datasets({"c": cp}, rows)
-    assert len(sft) == 1 and sft[0]["messages"][-1] == {"role": "assistant", "content": json.dumps(
-        {"fix": fix_ok, "reason": "a"})}
-    assert len(dpo) == 1 and json.loads(dpo[0]["rejected"])["fix"] == fix_bad
-    assert stats["f"] | {} == {"cases": 1, "samples": 5, "correct": 3, "correct_dropped_unfaithful": 1, "wrong": 1,
-                               "invalid": 1, "sft_examples": 1, "dpo_pairs": 1, "sft_sampled": 1,
-                               "sft_rationalized": 0, "sft_written": 0}
+    assert [(r["source"], json.loads(r["messages"][-1]["content"])["reason"]) for r in sft] == [
+        ("sampled", "a"), ("rationalized", "c")]
+    # every sampled answer that isn't a faithful correct one is rejected once; chosen is the sampled answer
+    assert [(d["rejected_kind"], d["chosen_source"]) for d in dpo] == [
+        ("unfaithful", "sampled"), ("wrong", "sampled"), ("invalid", "sampled")]
+    assert stats["f"] == {"cases": 1, "samples": 6, "correct": 3, "correct_dropped_unfaithful": 1, "wrong": 1,
+                          "invalid": 2, "sft_examples": 2, "sft_sampled": 1, "sft_rationalized": 1, "sft_written": 0,
+                          "dpo_pairs": 3, "dpo_rejected_wrong": 1, "dpo_rejected_invalid": 1,
+                          "dpo_rejected_unfaithful": 1}
+
+
+def test_dpo_chosen_falls_back_to_rationalized_then_written():
+    cp = {"variant": "v", "family": "f", "prompt_version": "diagnose_v3", "prompt_sha256": "s", "messages": []}
+    wrong = {"case_id": "c", "seed": 1, "label": "wrong", "fix": {"action": "add_dependency", "name": "y"}, "reason": "r"}
+    ok = {"case_id": "c", "label": "correct", "match": "exact", "fix": {"action": "add_dependency", "name": "x"},
+          "faithful": True}
+    written = ok | {"seed": None, "source": "written", "reason": "w"}
+    rationalized = ok | {"seed": 2, "source": "rationalized", "reason": "z"}
+    assert build_datasets({"c": cp}, [wrong, written])[1][0]["chosen_source"] == "written"
+    assert build_datasets({"c": cp}, [wrong, written, rationalized])[1][0]["chosen_source"] == "rationalized"
 
 
 def unique_lines(case):
@@ -258,3 +275,20 @@ def test_no_training_prompt_contains_the_hint(name):
         pytest.skip(f"{name} not generated yet")
     for line in path.read_text(encoding="utf-8").splitlines():
         assert HINT_MARK not in line
+
+
+def test_every_memory_case_has_an_sft_example():
+    path = OUT_DIR / "sft.jsonl"
+    if not (path.exists() and (OUT_DIR / "rationalized.jsonl").exists()):
+        pytest.skip("sft.jsonl not built with rationalization yet")
+    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    assert {r["case_id"] for r in rows} == set(MEMORY)
+    assert all(r["source"] in ("sampled", "rationalized", "written") for r in rows)
+
+
+@pytest.mark.parametrize("reason", ["pkgutil.ImpImporter is gone in 3.12; switching to 3.9, as verified, fixes it.",
+                                    "The hint says pkgutil fails on 3.12, so use 3.9."])
+def test_a_reason_that_mentions_the_hint_is_not_kept(mini, reason):  # noqa: F811
+    row = judge({"response": answer({"action": "set_python_version", "version": "3.9"}, reason)},
+                MEMORY["gen-004"], prompt_for(mini, "gen-004"))
+    assert not row["kept"] and "refers to the hint" in row["why"]

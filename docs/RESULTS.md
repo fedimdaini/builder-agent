@@ -175,9 +175,50 @@ the gen-011 reruns end in `__guard`. Prompts: `prompts/diagnose_v1.md` to `diagn
 
 ---
 
+## 5. Fine-tuning data from the memory faults (sampling, then STaR rationalization)
+
+**What was done.** Training data for QLoRA and DPO, from the 9 memory faults only (the 4 test faults
+are never used; a test checks it).
+
+1. **Sampling.** For each fault, the `diagnose_v3` prompt as the fix loop renders it, with the advanced
+   retriever and the fault itself left out of memory (so the model can't copy it). 8 answers at
+   temperature 0.7.
+2. **Labels.** Correct = the verified fix, the same package with another version, or another fix
+   that passed the sandbox. A correct answer is used for training only if its reason is
+   **faithful**: it names a term of this fault's error line, and nothing copied from a retrieved
+   other fault or false about the image.
+3. **Rationalization (STaR, Zelikman et al. 2022)** for the missing reasons. The same prompt plus a
+   hint with the verified fix; 4 answers; kept if faithful and not mentioning the hint. If none is
+   kept, a reason is written from the recorded case. The training prompt never contains the hint.
+
+| | Sampled answers | Correct | Correct but unfaithful | SFT examples (sampled / rationalized / written) | DPO pairs |
+|---|---|---|---|---|---|
+| Before rationalization | 72 | 45 | 17 | 28 (28 / 0 / 0) | 4 |
+| After rationalization | 72 | 45 | 17 | **53** (28 / 24 / 1) | **34** |
+
+Per family, SFT examples: version mismatch 5, missing dependency 11, incompatible pin 16, Python
+version 1, env var 8, system library 12. DPO pairs: 12, 0, 7, 8, 7, 0.
+
+**Lessons.**
+
+- **38% of the correct fixes had copied reasons** (for example "mlflow==3.0.1" or "mlflow-server"
+  from a retrieved fault). Fine-tuning on them would teach the habit that made v4 worse (section 4).
+- **The hint itself leaks.** 4 rationalized reasons quoted it ("the verified fix is ..."). They are
+  filtered out, because the training prompt has no hint.
+- **The Python-version blind spot again.** gen-004 (Python 3.12) is the only fault with no reason from
+  the model, even when told the fix. Its one example is written, the same failure as the held-out
+  gen-011.
+- **Small and unbalanced.** 53 examples and 34 pairs from 9 faults. Two families have no DPO pairs
+  because the model was always right. Enough to try QLoRA as a direction, not to measure it.
+
+Logs: `experiments/finetune/` (`report.md`, every model call in `samples.jsonl` and
+`rationalized.jsonl`, labels, sandbox checks, `sft.jsonl`, `dpo.jsonl`).
+
+---
+
 ## Not run yet
 
-- Fine-tuning (QLoRA) and DPO (roadmap item 9 steps 3 and 4).
+- Fine-tuning (QLoRA) and DPO training (roadmap item 9 steps 3 and 4); the data is in section 5.
 - Families 2 (missing dependency) and 6 (system library) have no held-out test case on the taxi repo:
   each has only one variant that breaks, and it is in memory.
 - 4 test faults are few: one fault can change a total by 25 points. Read the tables as directions,
