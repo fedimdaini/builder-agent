@@ -317,3 +317,24 @@ def test_the_loop_passes_the_image_python_version(mini, tmp_path):  # noqa: F811
     r = loop(mini, FakeModel(same, PIN), fix_log=None)
     assert r.final_ok and r.attempts[0].calls[0].reasons == [
         "set_python_version: the image already uses Python 3.11 (python:3.11-slim)"]
+
+
+def test_python_text_states_the_image_and_the_declared_version(mini, contracts):  # noqa: F811
+    from builder_agent.fix import python_text
+    from builder_agent.render import validate_slots
+    from builder_agent.render.configs import config_context
+    ctx = mini
+    slots = validate_slots(ctx, MINI_GOLD).slots
+
+    def line(overrides):
+        return python_text(ctx, config_context(ctx, contracts, plan_build(ctx, contracts), slots, None, overrides))
+    assert line(Overrides()) == "PYTHON: image python:3.11-slim (Python 3.11); .python-version 3.11"
+    assert line(Overrides(python_version="3.13")) == \
+        "PYTHON: image python:3.13-slim (Python 3.13); .python-version 3.11"     # from the Dockerfile, not the repo
+
+
+def test_v5_is_v3_plus_the_python_line():
+    v3, v5 = load_prompt("diagnose_v3"), load_prompt("diagnose_v5")
+    assert v5.sections["system"] == v3.sections["system"] and v5.sections["retry"] == v3.sections["retry"]
+    assert v5.sections["user"] == v3.sections["user"].replace("{{ scan_summary }}\n",
+                                                              "{{ scan_summary }}\n{{ python_text }}\n")

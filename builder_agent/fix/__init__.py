@@ -11,6 +11,7 @@ files are never touched. At most 3 fixes; every attempt is logged.
 from __future__ import annotations
 
 import json
+import re
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -22,7 +23,7 @@ from ..llm import ChatClient
 from ..llm.ollama import inline_refs
 from ..llm.prompts import PromptFile, load_prompt
 from ..render import validate_slots
-from ..render.configs import MLFLOW_IMAGE, Overrides, config_context
+from ..render.configs import MLFLOW_IMAGE, Overrides, _env, config_context
 from ..sandbox import DEFAULT_CONTRACTS, DEFAULT_LOG, STAGES, SandboxResult, run_sandbox, subprocess_runner
 from ..scan import scan_repo
 from ..scan.deps import declared_names, normalize
@@ -111,6 +112,27 @@ def _outcome(r: SandboxResult) -> str:
     return "passed" if r.ok else f"failed at {r.failed_stage}"
 
 
+# how a declared Python version is named in python_text; scanner kinds not listed here are left out
+# (pyc-cache, for example, is a trace of a past run, not a declaration)
+PYTHON_DECLARED = {"pipfile": "{source} python_version {value}", "pipfile-lock": "{source} built for {value}",
+                   "requires-python": "{source} requires-python {value}",
+                   "python_requires": "{source} python_requires {value}", "poetry": "{source} python {value}",
+                   "conda": "{source} python {value}", "python-version-file": "{source} {value}",
+                   "runtime.txt": "{source} {value}"}
+
+
+def python_text(ctx, tctx: dict) -> str:
+    """One line of facts, no verdict: the generated Dockerfile's base image and its Python version,
+    then the Python versions the repo's own files declare (diagnose_v5)."""
+    dockerfile = _env().get_template("Dockerfile.j2").render(**tctx)
+    image = re.search(r"^FROM\s+(\S+)", dockerfile, re.M).group(1)
+    m = re.match(r"python:(\d+\.\d+)", image)
+    parts = [f"image {image}" + (f" (Python {m.group(1)})" if m else "")]
+    parts += [PYTHON_DECLARED[h.kind].format(source=h.source, value=h.value)
+              for h in ctx.python_version_hints if h.kind in PYTHON_DECLARED]
+    return "PYTHON: " + "; ".join(parts)
+
+
 def prompt_variables(ctx, r: SandboxResult, tctx: dict, attempt: int, history: list[FixAttempt]) -> dict:
     stage = _failed(r)
     prev = [f"- {h.action_text}: then {h.outcome}" for h in history if h.action_text]
@@ -122,6 +144,7 @@ def prompt_variables(ctx, r: SandboxResult, tctx: dict, attempt: int, history: l
         "previous_fixes": [h.model_dump() for h in history],
         "previous_fixes_text": "\n".join(prev) or "none",
         "menu_text": "\n".join(f"- {k} {v}" for k, v in MENU.items()),
+        "python_text": python_text(ctx, tctx),                     # image vs declared Python (diagnose_v5)
         # what the Builder generated for this attempt, fixes already applied included (diagnose_v4)
         "pipeline_text": "\n".join([
             f"base image: python:{tctx['python_version']}-slim",
