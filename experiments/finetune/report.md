@@ -142,26 +142,31 @@ mismatch and env var lean on rationalized answers.
 **Human source.** `human_reasons.json` maps a memory fault to reasons written by hand, each with the
 fault's verified fix. They go through the same faithfulness filter as the model's answers. Ones that
 pass go into SFT as source `human`. For DPO "chosen" the order is sampled, rationalized, human,
-written: human comes before written. The file starts with one empty placeholder for gen-004 (the only
-fault with just a written reason); empty reasons are skipped, so the counts below don't change until
-it's filled. Problems (wrong fix, unfaithful reason, a non-memory fault) are reported by `build`, and
-the entry is left out.
+written: human comes before written. Problems (wrong fix, unfaithful reason, a non-memory fault) are
+reported by `build`, and the entry is left out.
+
+**3 human reasons for gen-004** (Python 3.12, fix `set_python_version 3.9`), the only fault the model
+couldn't explain even with the hint. All 3 pass the filter. The first one ("... setting the image back
+to Python 3.9 fixes the build") was first rejected: the Python check read "image back to Python 3.9"
+as a claim that the image *is* 3.9. That phrase describes the fix, so the check now accepts the
+version the fix sets (a test covers both cases). gen-004 now has 3 human examples and 1 written, and
+its 8 DPO pairs use a human reason as "chosen" instead of the written one.
 
 **Cap of 4 examples per fault** (`cap_per_case`, applied in `notebooks/qlora_sft.ipynb` with the same
 rule). It keeps human first, then sampled, rationalized, written. Without it, the 3 faults the model
-always got right (gen-002, gen-003, gen-006) would be 35 of the 53 examples.
+always got right (gen-002, gen-003, gen-006) would be 35 of the 56 examples.
 
 | | Examples | sampled | rationalized | human | written |
 |---|---|---|---|---|---|
-| `sft.jsonl` | 53 | 28 | 24 | 0 | 1 |
-| Trained on (cap 4 per fault) | 30 | 16 | 13 | 0 | 1 |
+| `sft.jsonl` | 56 | 28 | 24 | 3 | 1 |
+| Trained on (cap 4 per fault) | 33 | 16 | 13 | 3 | 1 |
 
-Per fault after the cap: gen-002 4, gen-003 4, gen-004 1, gen-005 4, gen-006 4, gen-007 3, gen-008 2,
-gen-009 4, gen-012 4. Per family: version mismatch 5, missing dependency 4, incompatible pin 8,
-Python version 1, env var 8, system library 4.
+Per fault after the cap: gen-002 4, gen-003 4, gen-004 4 (3 human, then the written one), gen-005 4,
+gen-006 4, gen-007 3, gen-008 2, gen-009 4, gen-012 4. Per family: version mismatch 5, missing
+dependency 4, incompatible pin 8, Python version 4, env var 8, system library 4.
 
 **Training.** `notebooks/qlora_sft.ipynb` (Colab, T4): Qwen/Qwen2.5-Coder-7B-Instruct in 4-bit,
-LoRA r=16 on every projection, 3 epochs, loss on the answers only. It exports a GGUF Q4_K_M and a
+LoRA r=16 on every projection, 3 epochs over the 33 capped examples, loss on the answers only. It exports a GGUF Q4_K_M and a
 Modelfile for `qwen-builder-sft`. Not run yet. The fix loop takes `--model qwen-builder-sft` (an
 Ollama model created by name is listed as `:latest`; the client now finds it).
 
@@ -179,6 +184,6 @@ Ollama model created by name is listed as `:latest`; the client now finds it).
   family, seed and match type.
 - `dpo.jsonl`: `prompt` (system + user messages), `chosen`, `rejected`.
 - `stats.json`: the per-family counts above.
-- `human_reasons.json`: hand-written reasons (to fill; gen-004 placeholder).
+- `human_reasons.json`: hand-written reasons (3 for gen-004).
 
 Rebuild: `python -m builder_agent.finetune sample|check|build` (see `builder_agent/finetune/__main__.py`).

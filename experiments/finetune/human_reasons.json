@@ -6,7 +6,21 @@
         "action": "set_python_version",
         "version": "3.9"
       },
-      "reason": ""
+      "reason": "The build fails with AttributeError: module ‘pkgutil’ has no attribute ‘ImpImporter’, because ImpImporter was removed from the standard library in Python 3.12. The packages locked in Pipfile.lock were pinned for Python 3.9 and still use it, so setting the image back to Python 3.9 fixes the build."
+    },
+    {
+      "fix": {
+        "action": "set_python_version",
+        "version": "3.9"
+      },
+      "reason": "Pipfile.lock pins packages for Python 3.9, but the image runs Python 3.12, where pkgutil.ImpImporter no longer exists. Installing those pinned packages calls it and raises AttributeError, so the image’s Python version must match the lock file: 3.9."
+    },
+    {
+      "fix": {
+        "action": "set_python_version",
+        "version": "3.9"
+      },
+      "reason": "The AttributeError on pkgutil.ImpImporter comes from the Python version, not from a missing or broken package: Python 3.12 removed ImpImporter, and the locked dependencies were built for 3.9. Pinning or adding packages can’t bring it back, so the fix is to set the Python version to 3.9."
     }
   ]
 }

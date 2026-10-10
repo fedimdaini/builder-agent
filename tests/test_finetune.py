@@ -283,7 +283,7 @@ def test_every_memory_case_has_an_sft_example():
         pytest.skip("sft.jsonl not built with rationalization yet")
     rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
     assert {r["case_id"] for r in rows} == set(MEMORY)
-    assert all(r["source"] in ("sampled", "rationalized", "written") for r in rows)
+    assert all(r["source"] in ("sampled", "rationalized", "human", "written") for r in rows)
 
 
 @pytest.mark.parametrize("reason", ["pkgutil.ImpImporter is gone in 3.12; switching to 3.9, as verified, fixes it.",
@@ -369,3 +369,12 @@ def test_qlora_notebook_parses_and_matches_the_cap_rule():
     assert ast.literal_eval(cap_order) == SFT_CAP_ORDER
     assert 'MODEL_NAME = "Qwen/Qwen2.5-Coder-7B-Instruct"' in hyper and 'GGUF_QUANT = "q4_k_m"' in hyper
     assert 'OLLAMA_NAME = "qwen-builder-sft"' in hyper and "train_on_responses_only" in "".join(code)
+
+
+def test_the_image_version_the_fix_sets_is_not_a_false_claim():
+    case = MEMORY["gen-004"]                                 # Python 3.12 image, fix: set_python_version 3.9
+    reason = ("The build fails with AttributeError: module 'pkgutil' has no attribute 'ImpImporter'. The locked "
+              "packages were pinned for Python 3.9, so setting the image back to Python 3.9 fixes the build.")
+    assert faithful(reason, case, [], "set_python_version 3.9", "3.12")[0]
+    assert not faithful(reason.replace("back to Python 3.9", "back to Python 3.10"), case, [],
+                        "set_python_version 3.9", "3.12")[0]

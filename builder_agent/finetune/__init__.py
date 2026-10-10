@@ -237,10 +237,11 @@ def faithful(reason: str, case: dict, retrieved: list[dict], fix_text: str = "",
     """The reason names a term of this case's error line and nothing that only a retrieved other case has.
     Not counted as copied: the answer's own fix (e.g. the version it pins) and the case's own recorded
     cause (true facts of this fault). With current_python, a claim that the image runs another Python
-    version is false."""
+    version is false, unless it is the version the fix sets ("set the image back to Python 3.9")."""
     if current_python:
         claimed = {v for pair in IMAGE_PY_RE.findall(reason or "") for v in pair if v}
-        wrong = sorted(claimed - {current_python})
+        fix_version = re.findall(r"^set_python_version (3\.\d{1,2})$", fix_text)
+        wrong = sorted(claimed - {current_python} - set(fix_version))
         if wrong:
             return False, f"says the image is Python {', '.join(wrong)}; it is Python {current_python}"
     words = _terms(reason or "")
