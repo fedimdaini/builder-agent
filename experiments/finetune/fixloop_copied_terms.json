@@ -1,0 +1,248 @@
+{
+ "base gen-001": {
+  "score": {
+   "first_fix_passed": true,
+   "fixes_to_pass": 1,
+   "exact": true,
+   "loose": true
+  },
+  "attempts": [
+   {
+    "fix": "pin_package mlflow==2.17.2",
+    "outcome": "passed",
+    "copied": [],
+    "retrieved": [
+     "gen-007",
+     "gen-008",
+     "fault-001"
+    ],
+    "reason": "The error indicates a version mismatch between the MLflow client and server. Pinning the client to version 2.17.2 should resolve this issue."
+   }
+  ]
+ },
+ "base gen-010": {
+  "score": {
+   "first_fix_passed": true,
+   "fixes_to_pass": 1,
+   "exact": false,
+   "loose": false
+  },
+  "attempts": [
+   {
+    "fix": "pin_package werkzeug==2.3.1",
+    "outcome": "passed",
+    "copied": [
+     "3.9"
+    ],
+    "retrieved": [
+     "gen-006",
+     "gen-004",
+     "gen-003"
+    ],
+    "reason": "The error indicates an import issue with 'werkzeug.urls'. Pinning a specific version of 'werkzeug' that is known to work with Python 3.9 can resolve this issue."
+   }
+  ]
+ },
+ "base gen-011": {
+  "score": {
+   "first_fix_passed": false,
+   "fixes_to_pass": null,
+   "exact": false,
+   "loose": false
+  },
+  "attempts": [
+   {
+    "fix": "add_system_package build-essential",
+    "outcome": "failed at build",
+    "copied": [],
+    "retrieved": [
+     "gen-009",
+     "gen-004",
+     "fault-001"
+    ],
+    "reason": "The error indicates that the 'clang++' compiler is missing, which is required for building some packages. Installing 'build-essential' should resolve this issue, as it includes a C/C++ compiler and other necessary tools."
+   },
+   {
+    "fix": "add_system_package gdal-bin",
+    "outcome": "failed at build",
+    "copied": [],
+    "retrieved": [
+     "gen-009",
+     "gen-004",
+     "fault-001"
+    ],
+    "reason": "The error indicates a missing GDAL API version. Installing 'gdal-bin' should provide the necessary GDAL tools and libraries."
+   },
+   {
+    "fix": "set_env_var GDAL_CONFIG=/usr/bin/gdal-config",
+    "outcome": "failed at build",
+    "copied": [],
+    "retrieved": [
+     "gen-009",
+     "gen-004",
+     "fault-001"
+    ],
+    "reason": "The error indicates that the 'gdal-config' command is not found, which is required for building some packages that depend on GDAL. Setting the GDAL_CONFIG environment variable to the path of the gdal-config executable should resolve this issue."
+   }
+  ]
+ },
+ "base gen-013": {
+  "score": {
+   "first_fix_passed": false,
+   "fixes_to_pass": 2,
+   "exact": false,
+   "loose": false
+  },
+  "attempts": [
+   {
+    "fix": "pin_package mlflow==2.17.2",
+    "outcome": "failed at evaluate",
+    "copied": [
+     "3.0.1"
+    ],
+    "retrieved": [
+     "gen-007",
+     "gen-012",
+     "gen-008"
+    ],
+    "reason": "The error indicates that the MLflow client version 3.0.1 is incompatible with the server version 2.17.2. Pinning the client to version 2.17.2 should resolve the issue."
+   },
+   {
+    "fix": "set_env_var MLFLOW_TRACKING_URI=http://mlflow:5000",
+    "outcome": "passed",
+    "copied": [
+     "5001",
+     "port"
+    ],
+    "retrieved": [
+     "gen-007",
+     "gen-012",
+     "gen-008"
+    ],
+    "reason": "The error suggests that the MLflow client is trying to connect to the tracking server on port 5001, but the server is listening on port 5000. Setting the MLFLOW_TRACKING_URI environment variable to http://mlflow:5000 should resolve the connection issue."
+   }
+  ]
+ },
+ "sft gen-001": {
+  "score": {
+   "first_fix_passed": true,
+   "fixes_to_pass": 1,
+   "exact": true,
+   "loose": true
+  },
+  "attempts": [
+   {
+    "fix": "pin_package mlflow==2.17.2",
+    "outcome": "passed",
+    "copied": [],
+    "retrieved": [
+     "gen-007",
+     "gen-008",
+     "fault-001"
+    ],
+    "reason": "The error indicates that the MLflow client version 3.x is not compatible with the MLflow server version 2.17.2. Pinning the MLflow package to version 2.17.2 should resolve the compatibility issue."
+   }
+  ]
+ },
+ "sft gen-010": {
+  "score": {
+   "first_fix_passed": true,
+   "fixes_to_pass": 1,
+   "exact": false,
+   "loose": false
+  },
+  "attempts": [
+   {
+    "fix": "pin_package werkzeug==2.0.3",
+    "outcome": "passed",
+    "copied": [],
+    "retrieved": [
+     "gen-006",
+     "gen-004",
+     "gen-003"
+    ],
+    "reason": "The error indicates that the 'url_quote' import from 'werkzeug.urls' failed, likely due to a version mismatch or missing package in the Python environment. Pinning Werkzeug to version 2.0.3 should resolve the import issue."
+   }
+  ]
+ },
+ "sft gen-011": {
+  "score": {
+   "first_fix_passed": false,
+   "fixes_to_pass": null,
+   "exact": false,
+   "loose": false
+  },
+  "attempts": [
+   {
+    "fix": "add_system_package build-essential",
+    "outcome": "failed at build",
+    "copied": [],
+    "retrieved": [
+     "gen-009",
+     "gen-004",
+     "fault-001"
+    ],
+    "reason": "The error indicates that the 'clang++' compiler is missing, which is required for building some packages. Installing 'build-essential' via apt-get should resolve the issue as it includes a C/C++ compiler."
+   },
+   {
+    "fix": "add_dependency gdal",
+    "outcome": "failed at build",
+    "copied": [],
+    "retrieved": [
+     "gen-009",
+     "gen-004",
+     "fault-001"
+    ],
+    "reason": "The error indicates a missing GDAL package, which is required for some of the dependencies. Installing gdal should resolve the issue."
+   },
+   {
+    "fix": "add_system_package gdal-bin",
+    "outcome": "failed at build",
+    "copied": [],
+    "retrieved": [
+     "gen-009",
+     "gen-004",
+     "fault-001"
+    ],
+    "reason": "The error indicates that the 'gdal-config' command is not found, which is required by some packages to build native extensions. Installing 'gdal-bin' should provide the necessary binaries for GDAL."
+   }
+  ]
+ },
+ "sft gen-013": {
+  "score": {
+   "first_fix_passed": false,
+   "fixes_to_pass": 2,
+   "exact": false,
+   "loose": false
+  },
+  "attempts": [
+   {
+    "fix": "pin_package mlflow==2.17.2",
+    "outcome": "failed at evaluate",
+    "copied": [
+     "3.x"
+    ],
+    "retrieved": [
+     "gen-007",
+     "gen-012",
+     "gen-008"
+    ],
+    "reason": "The error indicates that the MLflow client version 3.x is not compatible with the server version 2.17.2. Pinning to version 2.17.2 should resolve the compatibility issue."
+   },
+   {
+    "fix": "set_env_var MLFLOW_TRACKING_URI=http://mlflow:5000",
+    "outcome": "passed",
+    "copied": [
+     "5001",
+     "port"
+    ],
+    "retrieved": [
+     "gen-012",
+     "gen-008",
+     "gen-007"
+    ],
+    "reason": "The error indicates that the MLflow client is trying to connect to port 5001, but the server is running on port 5000. Setting the environment variable to use port 5000 should resolve this issue."
+   }
+  ]
+ }
+}

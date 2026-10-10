@@ -1,10 +1,11 @@
 # LLM experiment results
 
 All LLM experiments of the Builder so far, in one place. Every run used **qwen2.5-coder:7b** through
-Ollama (temperature 0, seed 42, context 8192) on the taxi dev repo (`../taxi-trip-regression`). The
-team's main project is a held-out test and was not used for any of these.
+Ollama (temperature 0, seed 42, context 8192) on the taxi dev repo (`../taxi-trip-regression`);
+section 6 also uses its QLoRA fine-tune, `qwen-builder-sft`. The team's main project is a held-out test and was not used for any of these.
 
 **Best configuration so far:** the fix loop with **`diagnose_v3` + the advanced retriever** (see 3 and 4).
+The QLoRA fine-tuned model (section 6) tied with the base model in it, so the base model stays.
 
 The LLM does two jobs, and both answer as strict JSON:
 
@@ -228,17 +229,80 @@ version 1, env var 8, system library 12. DPO pairs: 12, 0, 7, 8, 7, 0.
   (16 sampled, 13 rationalized, 3 human, 1 written); the Python-version family goes from 1 example to
   4. Without the cap, the 3 faults the model always got right would be two thirds of the data.
 
-The QLoRA notebook (`notebooks/qlora_sft.ipynb`, Colab T4) is written but not run. It trains on
-these 33 examples and exports `qwen-builder-sft` for Ollama; the fix loop takes it with `--model`.
+**Training run.** `notebooks/qlora_sft.ipynb` on Colab (T4): Qwen2.5-Coder-7B-Instruct in 4-bit,
+LoRA r=16, 3 epochs over the 33 capped examples: 27 steps, 974 s, train loss 0.254. Versions:
+unsloth 2026.10.3, torch 2.11.0+cu130, transformers 5.17.0, trl 1.13.0, peft 0.21.1,
+bitsandbytes 0.50.2. Data: `sft.jsonl`, sha256 `337c80f3…`. Exported as GGUF Q4_K_M and created in
+Ollama as `qwen-builder-sft`. The notebook's export cell crashed after the GGUF was written (Unsloth
+saves it in `qwen-builder-sft_gguf/`, which the cell didn't search, and the Modelfile came after the
+search); the cell is fixed. Results in section 6.
 
 Logs: `experiments/finetune/` (`report.md`, every model call in `samples.jsonl` and
 `rationalized.jsonl`, labels, sandbox checks, `sft.jsonl`, `dpo.jsonl`).
 
 ---
 
+## 6. Fix loop with the fine-tuned model: `qwen-builder-sft` vs the base model
+
+**Setup.** The same as the best configuration in section 4: `diagnose_v3`, the advanced retriever, the
+4 held-out faults, temperature 0, seed 42. Only `--model` changes: `qwen-builder-sft` (QLoRA on the
+33 capped examples of section 5) instead of `qwen2.5-coder:7b`. The base column is the v3-advanced
+column of section 4 (gen-011: the `__guard` rerun).
+
+Each cell: first fix passes / fixes to pass / true reasons. "Copied" = reasons that name a term only a
+retrieved other fault has (its error line, or a version, port or library of its cause), and that is
+not in this attempt's error output, the fix itself or the fault's own cause: the rule of the
+fine-tuning filter (`finetune.foreign_terms`), applied to every fix of the run.
+
+| Fault | Base: result | Base: copied | Fine-tuned: result | Fine-tuned: copied |
+|---|---|---|---|---|
+| gen-001 MLflow client 3.1.4 | yes / 1 / 1 of 1 | 0 of 1 | yes / 1 / 1 of 1 | 0 of 1 |
+| gen-010 flask 2.0.3 | yes / 1 / 1 of 1 | 1 of 1 ("3.9", a false positive) | yes / 1 / 1 of 1 | 0 of 1 |
+| gen-011 Python 3.13 | no / not fixed / 3 of 3 | 0 of 3 | no / not fixed / 3 of 3 | 0 of 3 |
+| gen-013 empty tracking URI | no / 2 / 0 of 2 | 2 of 2 ("3.0.1"; "5001") | no / 2 / 0 of 2 | 2 of 2 ("3.x"; "5001") |
+| **First fix passes** | 2 of 4 | | 2 of 4 | |
+| **Fixed** | 3 of 4 | | 3 of 4 | |
+| **True reasons** | 5 of 7 | **3 of 7** copied | 5 of 7 | **2 of 7** copied |
+
+The base gen-010 hit is not a real copy: "works with Python 3.9" is true of the image, but 3.9 is not in
+the error output, so the rule flags it. Without it, both models copy in the same 2 fixes (gen-013).
+
+### What happened, per fault
+
+- **gen-001, gen-013, gen-011: the same fixes as the base model**, with reworded reasons. gen-013 still
+  pins mlflow first ("client 3.x is not compatible with the server", copied from the retrieved MLflow
+  client faults), then sets the right URI with the reason "the client connects to port 5001", copied
+  from the retrieved wrong-port fault. gen-011 still chases compiler and GDAL errors (fix 2 is now
+  `add_dependency gdal` instead of `add_system_package gdal-bin`) and never names the Python version.
+- **gen-010: a new mistake, caught by the validator.** The first call answered `set_python_version 3.9`
+  ("aligns with the requirements in the Pipfile"), on an image that already runs 3.9. The validator
+  rule added after section 4's v4 runs rejected it, and the second call pinned `werkzeug 2.0.3`, which
+  passed. That counts as one fix, so the cell reads "yes / 1", but without that rule the first fix
+  would have been a no-op. The base model never proposed it. Likely source: 4 of the 33 training
+  examples (gen-004) answer `set_python_version 3.9`. The model reused that answer where it doesn't
+  fit, and still didn't give it on gen-011, where it is the fix.
+
+### Lessons
+
+- **No measurable gain from SFT on 33 examples.** Same first fix passes (2 of 4), same faults fixed
+  (3 of 4), same true reasons (5 of 7). 4 faults can't show a small effect either way.
+- **Copied reasons remain.** The training data had only faithful reasons, but in the fix loop the
+  model still took "port 5001" and "client 3.x" from retrieved cases on gen-013. 33 examples didn't
+  remove the habit.
+- **The Python-version blind spot remains.** Training included 4 examples where the fix is
+  `set_python_version` (gen-004, 3 of them human); the model learned the answer as a phrase
+  (proposed wrongly on gen-010), not when to use it (gen-011).
+- **The validator matters more with the fine-tuned model.** The rejection of a version the image
+  already has turned a wasted fix into a pass.
+
+Logs: `experiments/fixes/gen-NNN-<variant>__diagnose_v3-advanced__qwen-builder-sft/`; the copied-term
+check per fix, for both models: `experiments/finetune/fixloop_copied_terms.json`.
+
+---
+
 ## Not run yet
 
-- Fine-tuning (QLoRA) and DPO training (roadmap item 9 steps 3 and 4); the data is in section 5.
+- DPO training (roadmap item 9 step 4); the pairs are in section 5.
 - Families 2 (missing dependency) and 6 (system library) have no held-out test case on the taxi repo:
   each has only one variant that breaks, and it is in memory.
 - 4 test faults are few: one fault can change a total by 25 points. Read the tables as directions,

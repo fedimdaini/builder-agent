@@ -174,8 +174,26 @@ dependency 4, incompatible pin 8, Python version 4, env var 8, system library 4.
 
 **Training.** `notebooks/qlora_sft.ipynb` (Colab, T4): Qwen/Qwen2.5-Coder-7B-Instruct in 4-bit,
 LoRA r=16 on every projection, 3 epochs over the 33 capped examples, loss on the answers only. It exports a GGUF Q4_K_M and a
-Modelfile for `qwen-builder-sft`. Not run yet. The fix loop takes `--model qwen-builder-sft` (an
+Modelfile for `qwen-builder-sft`. The fix loop takes `--model qwen-builder-sft` (an
 Ollama model created by name is listed as `:latest`; the client now finds it).
+
+**Training run** (Colab T4, on `sft.jsonl` with sha256 `337c80f3…`, the file in this folder):
+
+| Steps | Time | Train loss | unsloth | torch | transformers | trl | peft | bitsandbytes |
+|---|---|---|---|---|---|---|---|---|
+| 27 | 974 s | 0.254 | 2026.10.3 | 2.11.0+cu130 | 5.17.0 | 1.13.0 | 0.21.1 | 0.50.2 |
+
+The export cell crashed after the GGUF was written: Unsloth saves it as
+`qwen-builder-sft_gguf/Qwen2.5-Coder-7B-Instruct.Q4_K_M.gguf`, outside the folder the cell searched,
+and the Modelfile was written after the search, so it was skipped too. The cell now writes the
+Modelfile first, also searches `qwen-builder-sft_gguf/`, and moves the file instead of copying it.
+In Ollama the model is `qwen-builder-sft` (id `36c93d2b1b76`).
+
+**Fix loop on the 4 held-out faults** (`diagnose_v3`, advanced retriever, as the base run): the same
+first fix passes (2 of 4), faults fixed (3 of 4) and true reasons (5 of 7) as the base model. Copied
+reasons remain on gen-013 ("client 3.x", "port 5001"), and on gen-010 the first call proposed
+`set_python_version 3.9` on a 3.9 image (rejected by the validator). Details: `docs/RESULTS.md`
+section 6; copied-term check per fix: `fixloop_copied_terms.json`.
 
 ## Files
 
