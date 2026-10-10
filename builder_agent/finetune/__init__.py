@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -45,7 +46,8 @@ SAME_FAULT = {"gen-008": {"fault-001"}}
 # words that say nothing about which error it is
 STOP = {"the", "and", "for", "with", "from", "not", "error", "errors", "failed", "failure", "module", "named",
         "file", "line", "object", "exception", "exceptions", "has", "have", "can", "cannot", "this", "that",
-        "into", "was", "are", "any", "found", "such", "api", "request", "code", "type", "mean", "did", "you"}
+        "into", "was", "are", "any", "found", "such", "api", "request", "code", "type", "mean", "did", "you",
+        "get", "apt"}                                   # "apt-get" splits into apt + get
 
 
 class DataError(ValueError):
@@ -226,9 +228,19 @@ def foreign_terms(case: dict, retrieved: list[dict]) -> set[str]:
     return out - own
 
 
-def faithful(reason: str, case: dict, retrieved: list[dict], fix_text: str = "") -> tuple[bool, str]:
+PY_VERSION_RE = re.compile(r"python\s*(?:version\s*)?(?:of\s*)?[<>=]*\s*(3\.\d{1,2})\b", re.I)
+
+
+def faithful(reason: str, case: dict, retrieved: list[dict], fix_text: str = "",
+             current_python: str | None = None) -> tuple[bool, str]:
     """The reason names a term of this case's error line and nothing that only a retrieved other case has
-    (the answer's own fix, e.g. the version it pins, doesn't count as copied)."""
+    (the answer's own fix, e.g. the version it pins, doesn't count as copied). With current_python, a
+    Python version that is neither the image's nor the fix's is a false statement about the image."""
+    if current_python:
+        fix_versions = set(re.findall(r"\b3\.\d{1,2}\b", fix_text))
+        wrong = sorted(set(PY_VERSION_RE.findall(reason or "")) - {current_python} - fix_versions)
+        if wrong:
+            return False, f"says Python {', '.join(wrong)}; the image is Python {current_python}"
     words = _terms(reason or "")
     own = words & key_terms(case)
     foreign = words & (foreign_terms(case, retrieved) - _terms(fix_text))

@@ -122,6 +122,17 @@ def test_build_datasets_dedupes_and_pairs():
                                "invalid": 1, "sft_examples": 1, "dpo_pairs": 1}
 
 
+def unique_lines(case):
+    """Lines of a test case's error output that no memory case has (its own run names, ids, paths).
+    Its error line alone can be shared: gen-001 has the same 404 as the memory cases gen-007 and gen-008."""
+    memory_lines = {line for c in MEMORY.values() for line in c["error_tail"]}
+    return [line for line in case["error_tail"] if len(line) > 40 and line not in memory_lines]
+
+
+def test_every_test_case_has_lines_of_its_own():
+    assert all(unique_lines(case) for case in TEST)
+
+
 @pytest.mark.parametrize("name", ["sft.jsonl", "dpo.jsonl"])
 def test_no_held_out_test_case_in_the_datasets(name):
     """Fails if a split=test case appears in a dataset: as the source case, or anywhere in a prompt or answer."""
@@ -134,5 +145,21 @@ def test_no_held_out_test_case_in_the_datasets(name):
         assert row["case_id"] in MEMORY and row["variant"] == MEMORY[row["case_id"]]["variant"]
         text = json.dumps(row, ensure_ascii=False)
         for case in TEST:
-            assert case["variant"] not in text and case["error_signature"][:60] not in text, (name, case["id"])
-            assert f'"{case["id"]}"' not in text
+            assert case["variant"] not in text and f'"{case["id"]}"' not in text, (name, case["id"])
+            for line in unique_lines(case):
+                assert json.dumps(line)[1:-1] not in text, (name, case["id"], line)
+
+
+def test_a_wrong_claim_about_the_image_python_version_is_unfaithful():
+    case = MEMORY["gen-009"]                                 # xgboost 3.0.0 on a Python 3.9 image
+    lie = "xgboost requires Python >= 3.10, and the image is currently using Python 3.12."
+    assert faithful(lie, case, [], "set_python_version 3.10", "3.9") == (
+        False, "says Python 3.12; the image is Python 3.9")
+    ok = "xgboost 3.0.0 requires Python 3.10 or later; the image has Python 3.9."
+    assert faithful(ok, case, [], "set_python_version 3.10", "3.9")[0]
+
+
+def test_apt_get_is_not_a_copied_term():
+    case = MEMORY["gen-006"]
+    retrieved = [{"id": "gen-005", "error": MEMORY["gen-005"]["error_signature"], "cause": "x"}]
+    assert faithful("libffi.so.8 is missing; install libffi8 with apt-get.", case, retrieved)[0]

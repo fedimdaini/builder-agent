@@ -1,0 +1,62 @@
+{
+  "system_library": {
+    "cases": 1,
+    "samples": 8,
+    "correct": 8,
+    "correct_dropped_unfaithful": 0,
+    "wrong": 0,
+    "invalid": 0,
+    "sft_examples": 8,
+    "dpo_pairs": 0
+  },
+  "version_mismatch": {
+    "cases": 2,
+    "samples": 16,
+    "correct": 8,
+    "correct_dropped_unfaithful": 7,
+    "wrong": 8,
+    "invalid": 0,
+    "sft_examples": 1,
+    "dpo_pairs": 0
+  },
+  "env_var": {
+    "cases": 2,
+    "samples": 16,
+    "correct": 8,
+    "correct_dropped_unfaithful": 6,
+    "wrong": 0,
+    "invalid": 8,
+    "sft_examples": 2,
+    "dpo_pairs": 0
+  },
+  "incompatible_pin": {
+    "cases": 2,
+    "samples": 16,
+    "correct": 12,
+    "correct_dropped_unfaithful": 3,
+    "wrong": 0,
+    "invalid": 4,
+    "sft_examples": 9,
+    "dpo_pairs": 4
+  },
+  "python_version": {
+    "cases": 1,
+    "samples": 8,
+    "correct": 1,
+    "correct_dropped_unfaithful": 1,
+    "wrong": 7,
+    "invalid": 0,
+    "sft_examples": 0,
+    "dpo_pairs": 0
+  },
+  "missing_dependency": {
+    "cases": 1,
+    "samples": 8,
+    "correct": 8,
+    "correct_dropped_unfaithful": 0,
+    "wrong": 0,
+    "invalid": 0,
+    "sft_examples": 8,
+    "dpo_pairs": 0
+  }
+}

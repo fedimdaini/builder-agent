@@ -79,8 +79,9 @@ def cmd_build(args) -> None:
             row = row | {"label": "correct" if check["ok"] else "wrong", "match": "sandbox" if check["ok"] else None,
                          "sandbox_attempt_id": check["attempt_id"]}
         if row["label"] == "correct":
-            ok, why = faithful(row["reason"], cases[row["case_id"]], CasePrompt(**prompts[row["case_id"]]).retrieved,
-                               row.get("fix_text", ""))
+            cp = CasePrompt(**prompts[row["case_id"]])
+            ok, why = faithful(row["reason"], cases[row["case_id"]], cp.retrieved, row.get("fix_text", ""),
+                               cp.current_python)
             row = row | {"faithful": ok, "faithful_why": why}
         rows.append(row)
     sft, dpo, stats = build_datasets(prompts, rows)
