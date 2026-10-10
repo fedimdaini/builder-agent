@@ -131,7 +131,7 @@ def test_build_datasets_dedupes_and_pairs():
     assert [(d["rejected_kind"], d["chosen_source"]) for d in dpo] == [
         ("unfaithful", "sampled"), ("wrong", "sampled"), ("invalid", "sampled")]
     assert stats["f"] == {"cases": 1, "samples": 6, "correct": 3, "correct_dropped_unfaithful": 1, "wrong": 1,
-                          "invalid": 2, "sft_examples": 2, "sft_sampled": 1, "sft_rationalized": 1, "sft_written": 0,
+                          "invalid": 2, "sft_examples": 2, "sft_sampled": 1, "sft_rationalized": 1, "sft_human": 0, "sft_written": 0,
                           "dpo_pairs": 3, "dpo_rejected_wrong": 1, "dpo_rejected_invalid": 1,
                           "dpo_rejected_unfaithful": 1}
 
@@ -292,3 +292,80 @@ def test_a_reason_that_mentions_the_hint_is_not_kept(mini, reason):  # noqa: F81
     row = judge({"response": answer({"action": "set_python_version", "version": "3.9"}, reason)},
                 MEMORY["gen-004"], prompt_for(mini, "gen-004"))
     assert not row["kept"] and "refers to the hint" in row["why"]
+
+
+# --- human reasons and the per-case cap ---------------------------------------------------------------------
+
+from builder_agent.finetune import SOURCE_PRIORITY, cap_per_case  # noqa: E402
+from builder_agent.finetune.human import TEMPLATE, load_human  # noqa: E402
+
+
+def test_human_reasons_are_checked_like_the_models(mini, tmp_path):  # noqa: F811
+    fix = MEMORY["gen-004"]["expected_fix"]
+    good = ("AttributeError: pkgutil has no attribute ImpImporter: the old setuptools in Pipfile.lock "
+            "needs pkgutil.ImpImporter, which Python 3.12 removed; Python 3.9 still has it.")
+    path = tmp_path / "human.json"
+    path.write_text(json.dumps({"_how": "notes", "gen-004": [
+        {"fix": fix, "reason": ""},                                                   # placeholder: skipped
+        {"fix": fix, "reason": good},
+        {"fix": {"action": "set_python_version", "version": "3.10"}, "reason": good},  # not the verified fix
+        {"fix": fix, "reason": "Use the right Python."}],                             # names no term of the error
+        "gen-001": [{"fix": {}, "reason": "x"}]}), encoding="utf-8")                  # a test case
+    rows, problems = load_human(path, MEMORY, {"gen-004": prompt_for(mini, "gen-004")})
+    assert [(r["source"], r["reason"]) for r in rows] == [("human", good)]
+    assert [p.split(":")[0] for p in problems] == ["gen-004 #3", "gen-004 #4", "gen-001"]
+    assert "not the verified fix" in problems[0] and "names no term" in problems[1] and "not a memory case" in problems[2]
+    assert load_human(tmp_path / "missing.json", MEMORY, {}) == ([], [])
+
+
+def test_human_template_is_a_memory_case_with_its_verified_fix():
+    assert [k for k in TEMPLATE if not k.startswith("_")] == ["gen-004"]
+    assert TEMPLATE["gen-004"] == [{"fix": MEMORY["gen-004"]["expected_fix"], "reason": ""}]
+
+
+def test_dpo_prefers_human_over_written_but_not_over_the_models_answers():
+    assert SOURCE_PRIORITY == ("sampled", "rationalized", "human", "written")
+    cp = {"variant": "v", "family": "f", "prompt_version": "diagnose_v3", "prompt_sha256": "s", "messages": []}
+    wrong = {"case_id": "c", "seed": 1, "label": "wrong", "fix": {"action": "add_dependency", "name": "y"}, "reason": "r"}
+    ok = {"case_id": "c", "seed": None, "label": "correct", "match": "exact", "faithful": True,
+          "fix": {"action": "add_dependency", "name": "x"}}
+    sft, dpo, stats = build_datasets({"c": cp}, [wrong, ok | {"source": "written", "reason": "w"},
+                                                 ok | {"source": "human", "reason": "h"}])
+    assert dpo[0]["chosen_source"] == "human" and stats["f"]["sft_human"] == 1 and len(sft) == 2
+
+
+def test_cap_keeps_at_most_four_per_case_human_first():
+    rows = ([{"case_id": "a", "source": "rationalized", "n": i} for i in range(3)]
+            + [{"case_id": "a", "source": "sampled", "n": i} for i in range(3)]
+            + [{"case_id": "a", "source": "human", "n": 0}, {"case_id": "b", "source": "written", "n": 0}])
+    capped = cap_per_case(rows)
+    assert [(r["case_id"], r["source"], r["n"]) for r in capped] == [
+        ("a", "human", 0), ("a", "sampled", 0), ("a", "sampled", 1), ("a", "sampled", 2), ("b", "written", 0)]
+
+
+def test_human_reasons_file_holds_only_memory_cases():
+    path = OUT_DIR / "human_reasons.json"
+    if not path.exists():
+        pytest.skip("human_reasons.json not created yet")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    assert {k for k in data if not k.startswith("_")} <= set(MEMORY)
+
+
+def test_qlora_notebook_parses_and_matches_the_cap_rule():
+    import ast
+    import re
+    from builder_agent.finetune import MAX_PER_CASE, SFT_CAP_ORDER
+
+    nb = json.loads((Path(__file__).parents[1] / "notebooks" / "qlora_sft.ipynb").read_text(encoding="utf-8"))
+    code = ["".join(c["source"]) for c in nb["cells"] if c["cell_type"] == "code"]
+    for src in code:
+        ast.parse("\n".join(line for line in src.splitlines() if not line.lstrip().startswith(("!", "%"))))
+    assert all(not c.get("outputs") for c in nb["cells"] if c["cell_type"] == "code")      # not run
+    hyper = next(src for src in code if "LORA_R = " in src)
+    settings = [line for line in hyper.splitlines() if re.match(r"^[A-Z_0-9]+ = ", line)]
+    assert len(settings) >= 15 and all("  # " in line for line in settings)                 # one comment each
+    assert f"MAX_PER_CASE = {MAX_PER_CASE} " in hyper
+    cap_order = re.search(r"^CAP_ORDER = (\(.*\))$", "\n".join(code), re.M).group(1)
+    assert ast.literal_eval(cap_order) == SFT_CAP_ORDER
+    assert 'MODEL_NAME = "Qwen/Qwen2.5-Coder-7B-Instruct"' in hyper and 'GGUF_QUANT = "q4_k_m"' in hyper
+    assert 'OLLAMA_NAME = "qwen-builder-sft"' in hyper and "train_on_responses_only" in "".join(code)

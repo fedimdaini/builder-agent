@@ -21,7 +21,8 @@ def main() -> None:
     p.add_argument("repo")
     p.add_argument("--slots", required=True)
     p.add_argument("--prompt", required=True, help="prompt version, e.g. diagnose_v1")
-    p.add_argument("--model", required=True)
+    p.add_argument("--model", default="qwen2.5-coder:7b",
+                   help="Ollama model name, e.g. qwen-builder-sft (the QLoRA model from notebooks/qlora_sft.ipynb)")
     p.add_argument("--expected", help="expected prediction JSON for the smoke test")
     p.add_argument("--mlflow-client", help='fault injection, e.g. "mlflow" (unpinned) to reproduce fault-001')
     p.add_argument("--fault", help="fault case.json with an expected_fix to score against")

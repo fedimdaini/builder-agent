@@ -259,25 +259,27 @@ def _assistant(row: dict) -> str:
     return json.dumps({"fix": row["fix"], "reason": row["reason"]}, ensure_ascii=False)
 
 
-SOURCE_PRIORITY = ("sampled", "rationalized", "written")      # for DPO "chosen": the model's own answer first
+SOURCE_PRIORITY = ("sampled", "rationalized", "human", "written")   # DPO "chosen": the model's own answer first
+SFT_CAP_ORDER = ("human", "sampled", "rationalized", "written")       # which examples the per-case cap keeps first
+MAX_PER_CASE = 4
 
 
 def build_datasets(prompts: dict[str, dict], rows: list[dict]) -> tuple[list[dict], list[dict], dict]:
     """prompts: case_id -> CasePrompt dump (the prompt WITHOUT any hint); rows: labelled answers (label in
-    correct/wrong/invalid after the sandbox checks), each with a source: "sampled" (default), "rationalized"
-    or "written".
+    correct/wrong/invalid after the sandbox checks), each with a source: "sampled" (default), "rationalized",
+    "human" or "written".
 
     SFT: every distinct correct and faithful answer, from all sources.
     DPO: rejected = every distinct sampled answer that is wrong, invalid, or correct with an unfaithful
     reason (its kind recorded); chosen = a faithful correct answer of the best source available
-    (sampled, then rationalized, then written), cycling through that source's answers.
+    (sampled, rationalized, human, written), cycling through that source's answers.
     Returns sft examples, dpo pairs and per-family counts."""
     sft, dpo, stats = [], [], {}
     for case_id, cp in prompts.items():
         case_rows = [r for r in rows if r["case_id"] == case_id]
         fam = stats.setdefault(cp["family"], {
             "cases": 0, "samples": 0, "correct": 0, "correct_dropped_unfaithful": 0, "wrong": 0, "invalid": 0,
-            "sft_examples": 0, "sft_sampled": 0, "sft_rationalized": 0, "sft_written": 0,
+            "sft_examples": 0, "sft_sampled": 0, "sft_rationalized": 0, "sft_human": 0, "sft_written": 0,
             "dpo_pairs": 0, "dpo_rejected_wrong": 0, "dpo_rejected_invalid": 0, "dpo_rejected_unfaithful": 0})
         fam["cases"] += 1
         chosen, rejected, seen_c, seen_r = [], [], set(), set()
@@ -321,6 +323,17 @@ def build_datasets(prompts: dict[str, dict], rows: list[dict]) -> tuple[list[dic
         fam["sft_examples"] += len(chosen)
         fam["dpo_pairs"] += len(rejected) if best else 0
     return sft, dpo, stats
+
+
+def cap_per_case(sft: list[dict], k: int = MAX_PER_CASE) -> list[dict]:
+    """At most k examples per case, so the faults with many correct answers don't dominate training:
+    human first, then sampled, rationalized, written; file order within a source.
+    notebooks/qlora_sft.ipynb applies the same rule."""
+    out = []
+    for case_id in dict.fromkeys(r["case_id"] for r in sft):
+        rows = [r for r in sft if r["case_id"] == case_id]
+        out += sorted(rows, key=lambda r: SFT_CAP_ORDER.index(r["source"]))[:k]
+    return out
 
 
 def write_jsonl(path: Path, rows: list[dict]) -> None:

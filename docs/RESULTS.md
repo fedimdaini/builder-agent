@@ -211,6 +211,18 @@ version 1, env var 8, system library 12. DPO pairs: 12, 0, 7, 8, 7, 0.
 - **Small and unbalanced.** 53 examples and 34 pairs from 9 faults. Two families have no DPO pairs
   because the model was always right. Enough to try QLoRA as a direction, not to measure it.
 
+**Two later additions.**
+
+- **Human reasons:** a hand-written source (`human_reasons.json`), checked by the same filter, used
+  for DPO "chosen" before written reasons. Only an empty placeholder for gen-004 so far, so no counts
+  change.
+- **A cap of 4 examples per fault for training.** The 53 SFT examples become **30** (16 sampled,
+  13 rationalized, 1 written). Without the cap, the 3 faults the model always got right would be two
+  thirds of the data.
+
+The QLoRA notebook (`notebooks/qlora_sft.ipynb`, Colab T4) is written but not run. It trains on
+these 30 examples and exports `qwen-builder-sft` for Ollama; the fix loop takes it with `--model`.
+
 Logs: `experiments/finetune/` (`report.md`, every model call in `samples.jsonl` and
 `rationalized.jsonl`, labels, sandbox checks, `sft.jsonl`, `dpo.jsonl`).
 

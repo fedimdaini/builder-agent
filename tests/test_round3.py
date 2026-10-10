@@ -235,3 +235,13 @@ def test_ollama_unloads_the_model_after_each_call_by_default(monkeypatch):
     OllamaClient("m").chat([])
     OllamaClient("m", keep_alive="5m").chat([])
     assert [b["keep_alive"] for b in sent] == [0, "5m"]
+
+
+def test_a_created_model_is_found_without_its_latest_tag(monkeypatch):
+    tags = {"models": [{"name": "qwen-builder-sft:latest", "digest": "sha256:ft"}, {"name": "qwen2.5-coder:7b",
+                                                                                  "digest": "sha256:base"}]}
+    monkeypatch.setattr("urllib.request.urlopen", lambda *a, **k: io.BytesIO(json.dumps(tags).encode()))
+    assert OllamaClient("qwen-builder-sft").digest == "sha256:ft"
+    assert OllamaClient("qwen2.5-coder:7b").digest == "sha256:base"
+    with pytest.raises(RuntimeError, match="not pulled"):
+        OllamaClient("qwen-builder").digest

@@ -17,6 +17,7 @@ from ..render.slots import load_answer
 from ..sandbox import DEFAULT_LOG, run_sandbox
 from . import (OUT_DIR, SAMPLES_PER_CASE, TEMPERATURE, alternative_overrides, build_datasets, faithful, label_sample,
                read_jsonl, render_case_prompt, sample_case, split_cases, write_json, write_jsonl, CasePrompt)
+from .human import TEMPLATE as HUMAN_TEMPLATE, load_human
 from .rationalize import RATIONALIZE_SAMPLES, judge, rationalize_case, training_rows
 
 
@@ -103,6 +104,13 @@ def cmd_build(args) -> None:
         hinted = [r | judge(r, cases[r["case_id"]], cps[r["case_id"]]) for r in read_jsonl(rationalized)]
         write_jsonl(OUT_DIR / "rationalized_final.jsonl", hinted)
         rows += training_rows(hinted, cases, cps)
+    human_path = OUT_DIR / "human_reasons.json"
+    if not human_path.exists():
+        write_json(human_path, HUMAN_TEMPLATE)            # a placeholder to fill by hand
+    human, problems = load_human(human_path, cases, {cid: CasePrompt(**p) for cid, p in prompts.items()})
+    rows += human
+    for p in problems:
+        print("human_reasons.json:", p, file=sys.stderr)
     sft, dpo, stats = build_datasets(prompts, rows)
     write_jsonl(OUT_DIR / "sft.jsonl", sft)
     write_jsonl(OUT_DIR / "dpo.jsonl", dpo)

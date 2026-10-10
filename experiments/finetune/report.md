@@ -137,6 +137,34 @@ Python 3.12). This is the same blind spot as the held-out gen-011 (Python 3.13).
 the model was always right there. Python version has 1 SFT example (written) and 8 pairs. Version
 mismatch and env var lean on rationalized answers.
 
+## Human reasons and the per-fault cap for training
+
+**Human source.** `human_reasons.json` maps a memory fault to reasons written by hand, each with the
+fault's verified fix. They go through the same faithfulness filter as the model's answers. Ones that
+pass go into SFT as source `human`. For DPO "chosen" the order is sampled, rationalized, human,
+written: human comes before written. The file starts with one empty placeholder for gen-004 (the only
+fault with just a written reason); empty reasons are skipped, so the counts below don't change until
+it's filled. Problems (wrong fix, unfaithful reason, a non-memory fault) are reported by `build`, and
+the entry is left out.
+
+**Cap of 4 examples per fault** (`cap_per_case`, applied in `notebooks/qlora_sft.ipynb` with the same
+rule). It keeps human first, then sampled, rationalized, written. Without it, the 3 faults the model
+always got right (gen-002, gen-003, gen-006) would be 35 of the 53 examples.
+
+| | Examples | sampled | rationalized | human | written |
+|---|---|---|---|---|---|
+| `sft.jsonl` | 53 | 28 | 24 | 0 | 1 |
+| Trained on (cap 4 per fault) | 30 | 16 | 13 | 0 | 1 |
+
+Per fault after the cap: gen-002 4, gen-003 4, gen-004 1, gen-005 4, gen-006 4, gen-007 3, gen-008 2,
+gen-009 4, gen-012 4. Per family: version mismatch 5, missing dependency 4, incompatible pin 8,
+Python version 1, env var 8, system library 4.
+
+**Training.** `notebooks/qlora_sft.ipynb` (Colab, T4): Qwen/Qwen2.5-Coder-7B-Instruct in 4-bit,
+LoRA r=16 on every projection, 3 epochs, loss on the answers only. It exports a GGUF Q4_K_M and a
+Modelfile for `qwen-builder-sft`. Not run yet. The fix loop takes `--model qwen-builder-sft` (an
+Ollama model created by name is listed as `:latest`; the client now finds it).
+
 ## Files
 
 - `prompts.json`: the rendered prompt per fault, what was retrieved and excluded.
@@ -151,5 +179,6 @@ mismatch and env var lean on rationalized answers.
   family, seed and match type.
 - `dpo.jsonl`: `prompt` (system + user messages), `chosen`, `rejected`.
 - `stats.json`: the per-family counts above.
+- `human_reasons.json`: hand-written reasons (to fill; gen-004 placeholder).
 
 Rebuild: `python -m builder_agent.finetune sample|check|build` (see `builder_agent/finetune/__main__.py`).

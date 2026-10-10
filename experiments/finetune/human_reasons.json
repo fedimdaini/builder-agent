@@ -1,0 +1,12 @@
+{
+  "_how": "case_id -> list of {fix, reason}. fix must be the case's verified fix (tests/faults/generated/<variant>/case.json expected_fix). reason: one or two sentences from the case's error output. Empty reasons are skipped. Only split=memory cases.",
+  "gen-004": [
+    {
+      "fix": {
+        "action": "set_python_version",
+        "version": "3.9"
+      },
+      "reason": ""
+    }
+  ]
+}

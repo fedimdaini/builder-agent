@@ -64,7 +64,9 @@ class OllamaClient:
         if self._digest is None:
             with urllib.request.urlopen(f"{self.host}/api/tags", timeout=10) as r:
                 tags = json.load(r)["models"]
-            match = next((m for m in tags if m["name"] == self.model), None)
+            # a model created with `ollama create qwen-builder-sft` is listed as "qwen-builder-sft:latest"
+            wanted = self.model if ":" in self.model else self.model + ":latest"
+            match = next((m for m in tags if m["name"] in (self.model, wanted)), None)
             if match is None:
                 raise RuntimeError(f"model {self.model!r} is not pulled in Ollama "
                                    f"(have: {', '.join(m['name'] for m in tags)})")
