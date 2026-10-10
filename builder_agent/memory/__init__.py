@@ -104,7 +104,10 @@ class FixMemory:
         self.bm25 = BM25Okapi([tokens(d.text()) for d in docs])
 
     @classmethod
-    def build(cls, embedder, cases: list[dict] | None = None) -> FixMemory:
+    def build(cls, embedder, cases: list[dict] | None = None, docs: list[MemoryDoc] | None = None) -> FixMemory:
+        """docs: ready documents (memory/learned.py memory_docs); else cases, else the base memory cases."""
+        if docs is not None:
+            return cls(docs, embedder)
         return cls([doc_from_case(c) for c in (memory_cases() if cases is None else cases)], embedder)
 
     def _vector_ranking(self, query: str) -> list[tuple[str, float]]:

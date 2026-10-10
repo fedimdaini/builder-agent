@@ -4,6 +4,7 @@ import tempfile
 # before any builder_agent import: the attempt and call logs of the tests go to a temp folder, never to
 # the real logs/ (a test run appended fake-model entries there, in a OneDrive-synced folder)
 os.environ["BUILDER_LOG_DIR"] = tempfile.mkdtemp(prefix="builder-test-logs-")
+os.environ["BUILDER_MEMORY_DIR"] = tempfile.mkdtemp(prefix="builder-test-memory-")   # learned fix memory
 
 import pytest  # noqa: E402
 

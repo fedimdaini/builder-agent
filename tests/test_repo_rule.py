@@ -176,6 +176,7 @@ ALLOWED_WRITERS = {
     "verify/__init__.py": "report outside the target (checked); temp export to check the patch",
     "finetune/__init__.py": "fine-tuning data in builder-agent's experiments/finetune/",
     "faults/__init__.py": "generated fault cases in builder-agent's tests/faults/generated/",
+    "memory/learned.py": "fixes written back from real runs in builder-agent's memory/learned/",
 }
 
 

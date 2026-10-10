@@ -121,7 +121,15 @@ been run end to end.
 
 ## 3. Does the memory learn from real runs?
 
-**No.** `memory_cases()` (`builder_agent/memory/__init__.py`) indexes only `tests/faults/`: the
+**Update (step 3, 2026-10-10): yes, opt-in and versioned.** `builder_agent/memory/learned.py` writes
+every sandbox-checked fix of a fix-loop run to `memory/learned/` (outcome passed/failed/reverted, the
+source repo, date, model, prompt and sandbox attempt; the model's reason is kept but never indexed).
+`--memory base` (the default) is the memory of every RESULTS.md experiment, snapshot
+`4aa9a3ad…` (10 documents). `--memory learned` adds the passed learned fixes. Runs from a split=test
+fault and runs with `--memory-snapshot SHA` (evaluation mode, which refuses a changed memory) never write
+back. No real run has written back yet. The text below describes the state before this step.
+
+**Before step 3: no.** `memory_cases()` (`builder_agent/memory/__init__.py`) indexes only `tests/faults/`: the
 hand-recorded fault-001, plus the generated faults with split `memory`. Fix-loop runs are exported
 to `experiments/fixes/` for analysis, but nothing writes them back into the memory. A fix that worked
 on a real run is never retrieved for the next one. CLAUDE.md's design rule "Store both successful and

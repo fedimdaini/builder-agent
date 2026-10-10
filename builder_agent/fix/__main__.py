@@ -2,7 +2,10 @@
     [--fault tests/faults/<name>/case.json]   # score the first fix against the case's expected_fix
     [--case tests/faults/generated/<variant>/case.json]   # start from a generated fault, score against it
     [--out experiments/fixes/<run>]           # copy this run's logs and summary there
-    [--retriever naive|advanced]              # RAG over the fix memory (prompts with {{ retrieved_text }})"""
+    [--retriever naive|advanced]              # RAG over the fix memory (prompts with {{ retrieved_text }})
+    [--memory base|learned]                   # base: the memory of every RESULTS.md run (default)
+    [--memory-snapshot SHA256]                # evaluation: refuse unless the memory has this hash; no write-back
+    [--no-write-back]                         # don't add this run's checked fixes to memory/learned/"""
 
 import argparse
 import json
@@ -30,6 +33,12 @@ def main() -> None:
     p.add_argument("--out", help="folder for this run's logs and summary")
     p.add_argument("--retriever", choices=["naive", "advanced"], help="RAG retriever over the fix memory")
     p.add_argument("--embed-model", default="nomic-embed-text", help="Ollama embedding model for --retriever")
+    p.add_argument("--memory", choices=["base", "learned"], default="base",
+                   help="base: fault-001 + generated memory faults (every RESULTS.md run); learned: + passed fixes "
+                        "written back from real runs")
+    p.add_argument("--memory-snapshot", metavar="SHA256",
+                   help="evaluation mode: refuse to run unless the memory has this snapshot hash; never writes back")
+    p.add_argument("--no-write-back", action="store_true", help="don't write this run's checked fixes to memory")
     args = p.parse_args()
 
     slots, _ = load_answer(args.slots)
@@ -41,19 +50,34 @@ def main() -> None:
         fault = dict(case["injection"])
         mlflow_client = fault.pop("mlflow_client", mlflow_client)
         injection = Overrides(**fault)
+    from ..memory.learned import check_snapshot, memory_docs, snapshot_sha256, write_back
+    docs = memory_docs(args.memory)
+    memory_sha = snapshot_sha256(docs)
+    if args.memory_snapshot:
+        check_snapshot(docs, args.memory_snapshot)    # raises SnapshotMismatch: the run doesn't start
     retrieve = None
     if args.retriever:
         from ..llm.ollama import OllamaEmbedder
         from ..memory import FixMemory, retriever
-        retrieve = retriever(FixMemory.build(OllamaEmbedder(args.embed_model)), args.retriever)
+        retrieve = retriever(FixMemory.build(OllamaEmbedder(args.embed_model), docs=docs), args.retriever)
     result = run_fix_loop(args.repo, slots, args.prompt, OllamaClient(args.model), expected=expected,
                           mlflow_client=mlflow_client, injection=injection, retriever=retrieve,
                           retriever_name=args.retriever)
+    if args.retriever:
+        result.memory_set, result.memory_sha256 = args.memory, memory_sha
     sys.stdout.reconfigure(encoding="utf-8")
     text = result.text()
     score = score_fix(result, case["expected_fix"]) | {"case": case["id"]} if case else None
     if case:
         text += f"\nscore vs {case['id']} ({case.get('variant', case['name'])}): " + json.dumps(score)
+    if args.retriever:
+        text += f"\nmemory: {args.memory} {memory_sha[:12]} ({len(docs)} documents)"
+    if args.no_write_back:
+        text += "\nwrite-back: off (--no-write-back)"
+    else:
+        written, why = write_back(result, case, evaluation=bool(args.memory_snapshot), memory_set=args.memory,
+                                  memory_sha256=memory_sha)
+        text += f"\nwrite-back: none, {why}" if why else f"\nwrite-back: {len(written)} document(s) to memory/learned/"
     print(text)
     if args.out:
         print("logs ->", export_run(result, args.out, text, DEFAULT_FIX_LOG, DEFAULT_LOG, score))

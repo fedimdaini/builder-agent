@@ -84,6 +84,8 @@ class FixLoopResult(BaseModel):
     applied: Overrides                # the injected fault (if any) plus the fixes on top
     injection: Overrides | None = None
     retriever: str | None = None      # RAG retriever name (builder_agent.memory), if any
+    memory_set: str | None = None     # "base" or "learned" (builder_agent/memory/learned.py), with a retriever
+    memory_sha256: str | None = None  # snapshot hash of that memory
 
     def text(self) -> str:
         out = [f"FIX LOOP {self.repo} ({self.prompt_version} x {self.model}): "
