@@ -127,6 +127,23 @@ Each technique is measured against a baseline on the same faults, with the same 
    hand labels.
 5. **Already done:** slots v1 vs v2, zero-shot vs few-shot (`experiments/evals/`).
 
+**Status after the QLoRA run** (`docs/RESULTS.md` sections 4–6). RAG (`diagnose_v3` + the advanced
+retriever) is the best configuration: 2 of 4 first fix passes, 3 of 4 faults fixed. QLoRA on 33
+examples tied with it. gen-011 (Python 3.13) is unsolved by every model and prompt, and the v3 prompt
+never states the image's Python version. Next steps, in order:
+
+- (a) **`diagnose_v5`** = v3 plus one line that states the image's and the Pipfile's Python versions
+  side by side, facts only (no hint that they should match). Run it on the base model and contrast
+  it with v4: one targeted fact vs a block of build settings.
+- (b) **Only if v5 helps:** regenerate the fine-tuning data with v5 prompts and retrain, since the
+  training and test prompts must match.
+- (c) **One more Python-version memory fault.** The planned Python 3.8 fault didn't break when tried
+  (2026-10-09, every stage passed), so it can't be added as is. Try 3.7 first, and drop this step if
+  it doesn't break either.
+- (d) **DPO** on the existing 34 pairs (`experiments/finetune/dpo.jsonl`).
+- (e) **For the final discussion:** a deterministic Python-version check outside the LLM (image vs
+  Pipfile), reported separately from the LLM-only results.
+
 **Not used, with reasons:**
 
 - Tree of Thoughts: each branch would need its own sandbox run.

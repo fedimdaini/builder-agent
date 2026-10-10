@@ -295,6 +295,24 @@ the error output, so the rule flags it. Without it, both models copy in the same
 - **The validator matters more with the fine-tuned model.** The rejection of a version the image
   already has turned a wasted fix into a pass.
 
+### Why it didn't improve
+
+- **It learned surface pairings, not the cause.** It proposed `set_python_version 3.9` where it
+  doesn't fit (gen-010, the image is already 3.9) and not where it does (gen-011). With one training
+  fault per family, the model can't tell which part of an example matters: the error text or the cause.
+- **The evidence was missing from the prompt.** `diagnose_v3`'s repository facts state the Pipfile's
+  Python version, as a hint (`PYTHON HINTS: 3.9 (pipfile, pipfile-lock, pyc-cache)`), but never the
+  image's. On gen-011 the image version appears only inside file paths in the error output
+  (`/usr/local/lib/python3.13/subprocess.py`). So neither the base nor the fine-tuned model was shown
+  the mismatch. Fine-tuning can't teach a comparison whose inputs are absent.
+- **More data is limited on the taxi repo.** No other image version is known to give a new
+  Python-mismatch error. 3.8 was tried on 2026-10-09 and every stage passed (ROADMAP item 9). 3.10
+  passed the sandbox checks (section 5). 3.11 has wheels for every heavy pin, so it likely passes.
+  3.7 is untested: it might fail on the pins that need Python ≥ 3.9 (geopandas 0.14.1, pyproj 3.6.1,
+  scipy 1.11.1), but 3.8 should have failed on the same pins and didn't.
+- **Caveat.** 4 test faults, one run each at temperature 0. A tie means no measurable gain, not proof
+  of no effect.
+
 Logs: `experiments/fixes/gen-NNN-<variant>__diagnose_v3-advanced__qwen-builder-sft/`; the copied-term
 check per fix, for both models: `experiments/finetune/fixloop_copied_terms.json`.
 
