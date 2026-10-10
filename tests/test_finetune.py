@@ -96,11 +96,18 @@ def test_faithful_reason_refers_to_this_error_and_not_a_retrieved_one():
 
 
 def test_the_answers_own_fix_terms_are_not_counted_as_copied():
-    case = MEMORY["gen-004"]                                 # Python 3.12 image; a retrieved case mentions 3.9
-    retrieved = [{"id": "gen-009", "error": "x", "cause": "xgboost 3.x requires Python 3.10; the image is Python 3.9"}]
-    reason = "pkgutil.ImpImporter is gone in Python 3.12; the lock file is for 3.9"
-    assert not faithful(reason, case, retrieved)[0]
-    assert faithful(reason, case, retrieved, "set_python_version 3.9")[0]
+    case = MEMORY["gen-004"]                                 # Python 3.12 image; only a retrieved case says 3.10
+    retrieved = [{"id": "gen-009", "error": "x", "cause": "xgboost 3.x requires Python 3.10 or newer"}]
+    reason = "pkgutil.ImpImporter is gone in Python 3.12; Python 3.10 still has it"
+    assert faithful(reason, case, retrieved) == (False, "names 3.10 from a retrieved case, not from this error")
+    assert faithful(reason, case, retrieved, "set_python_version 3.10")[0]
+
+
+def test_the_cases_own_cause_is_not_counted_as_copied():
+    case = MEMORY["gen-007"]                                 # its cause names the server image v2.17.2
+    retrieved = [{"id": "gen-008", "error": "x", "cause": "the tracking server is ghcr.io/mlflow/mlflow:v2.17.2"}]
+    reason = "The 404 on /logged-models: the 3.x client calls an endpoint the v2.17.2 server doesn't have."
+    assert faithful(reason, case, retrieved, "pin_package mlflow==2.17.2")[0]
 
 
 # --- datasets ---------------------------------------------------------------------------------------------------------
@@ -119,7 +126,8 @@ def test_build_datasets_dedupes_and_pairs():
         {"fix": fix_ok, "reason": "a"})}
     assert len(dpo) == 1 and json.loads(dpo[0]["rejected"])["fix"] == fix_bad
     assert stats["f"] | {} == {"cases": 1, "samples": 5, "correct": 3, "correct_dropped_unfaithful": 1, "wrong": 1,
-                               "invalid": 1, "sft_examples": 1, "dpo_pairs": 1}
+                               "invalid": 1, "sft_examples": 1, "dpo_pairs": 1, "sft_sampled": 1,
+                               "sft_rationalized": 0, "sft_written": 0}
 
 
 def unique_lines(case):
@@ -154,7 +162,9 @@ def test_a_wrong_claim_about_the_image_python_version_is_unfaithful():
     case = MEMORY["gen-009"]                                 # xgboost 3.0.0 on a Python 3.9 image
     lie = "xgboost requires Python >= 3.10, and the image is currently using Python 3.12."
     assert faithful(lie, case, [], "set_python_version 3.10", "3.9") == (
-        False, "says Python 3.12; the image is Python 3.9")
+        False, "says the image is Python 3.12; it is Python 3.9")
+    requirement = "No matching distribution for xgboost==3.0.0: xgboost 3.x requires Python 3.10 or newer."
+    assert faithful(requirement, case, [], "pin_package xgboost==2.0.0", "3.9")[0]   # a requirement, not the image
     ok = "xgboost 3.0.0 requires Python 3.10 or later; the image has Python 3.9."
     assert faithful(ok, case, [], "set_python_version 3.10", "3.9")[0]
 
@@ -163,3 +173,88 @@ def test_apt_get_is_not_a_copied_term():
     case = MEMORY["gen-006"]
     retrieved = [{"id": "gen-005", "error": MEMORY["gen-005"]["error_signature"], "cause": "x"}]
     assert faithful("libffi.so.8 is missing; install libffi8 with apt-get.", case, retrieved)[0]
+
+
+# --- rationalization (STaR): hinted reasons, written fallback, sources, no hint in training data -----------
+
+from builder_agent.finetune.rationalize import (HINT_MARK, hinted, judge, rationalize_case,  # noqa: E402
+                                                training_rows, written_reason, written_row)
+
+
+def test_hint_goes_at_the_end_of_the_user_message_only(mini):  # noqa: F811
+    cp = prompt_for(mini, "gen-004")
+    h = hinted(cp, MEMORY["gen-004"])
+    assert h.messages[0] == cp.messages[0]
+    assert h.messages[1]["content"].startswith(cp.messages[1]["content"])
+    assert h.messages[1]["content"].endswith("not on the past failures from memory.")
+    assert "`set_python_version 3.9`" in h.messages[1]["content"] and HINT_MARK not in cp.messages[1]["content"]
+
+
+@pytest.mark.parametrize("fix,reason,kept,why", [
+    ({"action": "set_python_version", "version": "3.9"},
+     "pkgutil.ImpImporter was removed after Python 3.9, so the build fails on the 3.12 image.", True, "refers to"),
+    ({"action": "set_python_version", "version": "3.10"}, "pkgutil is gone.", False, "changed the fix"),
+    ({"action": "set_python_version", "version": "3.9"}, "Something is wrong with the build.", False, "names no term"),
+])
+def test_judge(mini, fix, reason, kept, why):  # noqa: F811
+    cp = prompt_for(mini, "gen-004")
+    row = judge({"response": answer(fix, reason)}, MEMORY["gen-004"], cp)
+    assert row["kept"] is kept and why in row["why"] and row["source"] == "rationalized"
+
+
+def test_rationalize_case_samples_the_hinted_prompt(mini):  # noqa: F811
+    cp = prompt_for(mini, "gen-002")
+    good = json.loads(answer({"action": "add_dependency", "name": "xgboost"}, "ModuleNotFoundError: no xgboost."))
+    models = []
+
+    def factory(seed):
+        models.append(FakeModel(good))
+        return models[-1]
+    rows = rationalize_case(cp, MEMORY["gen-002"], factory, n=4)
+    assert len(rows) == 4 and all(r["hinted"] and r["kept"] for r in rows)
+    assert all(HINT_MARK in m.sent[0][1]["content"] for m in models)
+
+
+@pytest.mark.parametrize("case_id", sorted(MEMORY))
+def test_written_reasons_are_two_sentences_and_pass_the_filter(case_id):
+    """On the real taxi prompts (the recorded causes are about the taxi repo, e.g. its Python 3.9)."""
+    path = OUT_DIR / "prompts.json"
+    if not path.exists():
+        pytest.skip("prompts.json not generated yet")
+    cp = CasePrompt(**json.loads(path.read_text(encoding="utf-8"))[case_id])
+    row = written_row(MEMORY[case_id], cp)
+    assert row["kept"], row["why"]
+    assert row["reason"].startswith(f"The {MEMORY[case_id]['stage']} stage fails with: ")
+    assert len(written_reason(MEMORY[case_id])) < 400
+
+
+def test_training_rows_fall_back_to_a_written_reason(mini):  # noqa: F811
+    prompts = {cid: prompt_for(mini, cid) for cid in ("gen-002", "gen-007")}
+    kept = {"case_id": "gen-002", "seed": 1, "source": "rationalized", "kept": True, "why": "refers to xgboost",
+            "fix": MEMORY["gen-002"]["expected_fix"], "fix_text": "add_dependency xgboost", "reason": "No xgboost."}
+    lost = kept | {"case_id": "gen-007", "kept": False}
+    rows = training_rows([kept, lost], {cid: MEMORY[cid] for cid in prompts}, prompts)
+    assert [(r["case_id"], r["source"]) for r in rows] == [("gen-002", "rationalized"), ("gen-007", "written")]
+
+
+def test_training_records_use_the_prompt_without_the_hint(mini):  # noqa: F811
+    from builder_agent.finetune import build_datasets
+    cp = prompt_for(mini, "gen-007")
+    prompts = {"gen-007": cp.model_dump()}
+    wrong = {"case_id": "gen-007", "seed": 1, "label": "wrong", "fix": {"action": "set_env_var",
+             "name": "GIT_PYTHON_REFRESH", "value": "quiet"}, "reason": "git warning"}
+    rows = [wrong] + training_rows([], {"gen-007": MEMORY["gen-007"]}, {"gen-007": cp})
+    sft, dpo, stats = build_datasets(prompts, rows)
+    assert [r["source"] for r in sft] == ["written"] and dpo[0]["chosen_source"] == "written"
+    assert stats["version_mismatch"]["samples"] == 1 and stats["version_mismatch"]["sft_written"] == 1
+    for text in [json.dumps(r) for r in sft + dpo]:
+        assert HINT_MARK not in text
+
+
+@pytest.mark.parametrize("name", ["sft.jsonl", "dpo.jsonl"])
+def test_no_training_prompt_contains_the_hint(name):
+    path = OUT_DIR / name
+    if not path.exists():
+        pytest.skip(f"{name} not generated yet")
+    for line in path.read_text(encoding="utf-8").splitlines():
+        assert HINT_MARK not in line

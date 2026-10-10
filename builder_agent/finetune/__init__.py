@@ -228,22 +228,24 @@ def foreign_terms(case: dict, retrieved: list[dict]) -> set[str]:
     return out - own
 
 
-PY_VERSION_RE = re.compile(r"python\s*(?:version\s*)?(?:of\s*)?[<>=]*\s*(3\.\d{1,2})\b", re.I)
+# a claim about the image's Python version: "the image is (currently using) Python 3.12", "a Python 3.12 image"
+IMAGE_PY_RE = re.compile(r"image\b[^.;]{0,30}?python\s*(3\.\d{1,2})\b|python\s*(3\.\d{1,2})[-\s]*(?:slim\s*)?image", re.I)
 
 
 def faithful(reason: str, case: dict, retrieved: list[dict], fix_text: str = "",
              current_python: str | None = None) -> tuple[bool, str]:
-    """The reason names a term of this case's error line and nothing that only a retrieved other case has
-    (the answer's own fix, e.g. the version it pins, doesn't count as copied). With current_python, a
-    Python version that is neither the image's nor the fix's is a false statement about the image."""
+    """The reason names a term of this case's error line and nothing that only a retrieved other case has.
+    Not counted as copied: the answer's own fix (e.g. the version it pins) and the case's own recorded
+    cause (true facts of this fault). With current_python, a claim that the image runs another Python
+    version is false."""
     if current_python:
-        fix_versions = set(re.findall(r"\b3\.\d{1,2}\b", fix_text))
-        wrong = sorted(set(PY_VERSION_RE.findall(reason or "")) - {current_python} - fix_versions)
+        claimed = {v for pair in IMAGE_PY_RE.findall(reason or "") for v in pair if v}
+        wrong = sorted(claimed - {current_python})
         if wrong:
-            return False, f"says Python {', '.join(wrong)}; the image is Python {current_python}"
+            return False, f"says the image is Python {', '.join(wrong)}; it is Python {current_python}"
     words = _terms(reason or "")
     own = words & key_terms(case)
-    foreign = words & (foreign_terms(case, retrieved) - _terms(fix_text))
+    foreign = words & (foreign_terms(case, retrieved) - _terms(fix_text) - _terms(case["cause"]["summary"]))
     if foreign:
         return False, f"names {', '.join(sorted(foreign))} from a retrieved case, not from this error"
     if not own:
@@ -258,21 +260,24 @@ def _assistant(row: dict) -> str:
 
 
 def build_datasets(prompts: dict[str, dict], rows: list[dict]) -> tuple[list[dict], list[dict], dict]:
-    """prompts: case_id -> CasePrompt dump; rows: labelled samples (label in correct/wrong/invalid after the
-    sandbox checks). Returns sft examples, dpo pairs and per-family counts."""
+    """prompts: case_id -> CasePrompt dump (the prompt WITHOUT any hint); rows: labelled answers (label in
+    correct/wrong/invalid after the sandbox checks), each with a source: "sampled" (default), "rationalized"
+    or "written". Returns sft examples, dpo pairs and per-family counts."""
     sft, dpo, stats = [], [], {}
     for case_id, cp in prompts.items():
         case_rows = [r for r in rows if r["case_id"] == case_id]
         fam = stats.setdefault(cp["family"], {"cases": 0, "samples": 0, "correct": 0, "correct_dropped_unfaithful": 0,
-                                              "wrong": 0, "invalid": 0, "sft_examples": 0, "dpo_pairs": 0})
+                                              "wrong": 0, "invalid": 0, "sft_examples": 0, "dpo_pairs": 0,
+                                              "sft_sampled": 0, "sft_rationalized": 0, "sft_written": 0})
         fam["cases"] += 1
-        fam["samples"] += len(case_rows)
+        fam["samples"] += sum(1 for r in case_rows if r.get("source", "sampled") == "sampled")
         chosen, rejected, seen_c, seen_r = [], [], set(), set()
         for r in case_rows:
+            sampled = r.get("source", "sampled") == "sampled"
             if r["label"] == "correct":
-                fam["correct"] += 1
+                fam["correct"] += sampled
                 if not r["faithful"]:
-                    fam["correct_dropped_unfaithful"] += 1
+                    fam["correct_dropped_unfaithful"] += sampled
                     continue
                 key = _assistant(r)
                 if key not in seen_c:
@@ -287,12 +292,15 @@ def build_datasets(prompts: dict[str, dict], rows: list[dict]) -> tuple[list[dic
         meta = {"case_id": case_id, "variant": cp["variant"], "family": cp["family"],
                 "prompt_version": cp["prompt_version"], "prompt_sha256": cp["prompt_sha256"]}
         for r in chosen:
-            sft.append(meta | {"seed": r["seed"], "match": r["match"],
+            source = r.get("source", "sampled")
+            fam[f"sft_{source}"] += 1
+            sft.append(meta | {"seed": r["seed"], "match": r["match"], "source": source,
                                "messages": cp["messages"] + [{"role": "assistant", "content": _assistant(r)}]})
         pairs = [(chosen[n % len(chosen)], r) for n, r in enumerate(rejected)] if chosen else []
         for c, r in pairs:
             dpo.append(meta | {"prompt": cp["messages"], "chosen": _assistant(c), "rejected": _assistant(r),
-                               "chosen_seed": c["seed"], "rejected_seed": r["seed"], "rejected_label": r["label"]})
+                               "chosen_source": c.get("source", "sampled"), "chosen_seed": c["seed"],
+                               "rejected_seed": r["seed"], "rejected_label": r["label"]})
         fam["sft_examples"] += len(chosen)
         fam["dpo_pairs"] += len(pairs)
     return sft, dpo, stats
