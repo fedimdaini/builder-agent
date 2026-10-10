@@ -195,7 +195,51 @@ reasons remain on gen-013 ("client 3.x", "port 5001"), and on gen-010 the first 
 `set_python_version 3.9` on a 3.9 image (rejected by the validator). Details: `docs/RESULTS.md`
 section 6; copied-term check per fix: `fixloop_copied_terms.json`.
 
+## Data with the `diagnose_v5` prompt (roadmap item 9 step (b))
+
+The same 9 memory faults, exclusions, sampling (8 at temperature 0.7, seeds 1–8), sandbox checks,
+rationalization (4 hinted), human reasons and filter; only the prompt is `diagnose_v5` (v3 plus the
+PYTHON line). The v3 data is unchanged in `v3/` (a rebuild gives the same `sft.jsonl`, sha256
+`337c80f3…`); the v5 data is in `v5/`. `checks.json` is shared: a fix's sandbox result doesn't
+depend on the prompt. 5 new possible alternatives were checked; all failed.
+
+**Sampled answers (72 per version).**
+
+| | Correct | Correct but unfaithful | Wrong | Invalid |
+|---|---|---|---|---|
+| v3 | 45 | 17 | 15 | 12 |
+| v5 | 31 | 6 | 26 | 15 |
+
+Per fault, what changed: gen-008 went from 8 correct to 8 wrong (`set_env_var GIT_PYTHON_REFRESH`,
+the gen-007 mistake); gen-009 from 4 correct (Python 3.10) to 1, with 7 invalid (`add_dependency
+xgboost`, already installed); gen-006 from 8 to 6 correct (2 `libffi`, failed in the sandbox);
+gen-004 from 1 correct to 0. **Even with the PYTHON line showing 3.12 against 3.9, all 8 gen-004
+answers pin pipenv**; none sets the Python version. Fewer copied reasons (6 vs 17), mostly because
+there are fewer correct answers to copy in.
+
+**Rationalization** kept 29 of 36 hinted reasons after the current filter and hint check (v3: 25). gen-004 got its first model reason
+(1 of 4: "the image is Python 3.12, which is not compatible ..."), so it no longer needs the written
+one.
+
+**Datasets, per family** (SFT: sampled / rationalized / human / written; after the cap of 4 per fault):
+
+| Family | v3 SFT | v3 capped | v3 DPO | v5 SFT | v5 capped | v5 DPO |
+|---|---|---|---|---|---|---|
+| version mismatch | 5 (1/4/0/0) | 5 | 12 | 6 (0/6/0/0) | 6 | 16 |
+| missing dependency | 11 (8/3/0/0) | 4 | 0 | 11 (8/3/0/0) | 4 | 0 |
+| incompatible pin | 16 (9/7/0/0) | 8 | 7 | 16 (9/7/0/0) | 8 | 4 |
+| Python version | 4 (0/0/3/1) | 4 | 8 | 4 (0/1/3/0) | 4 | 8 |
+| env var | 8 (2/6/0/0) | 8 | 7 | 9 (2/7/0/0) | 8 | 7 |
+| system library | 12 (8/4/0/0) | 4 | 0 | 10 (6/4/0/0) | 4 | 2 |
+| **Total** | **56** (28/24/3/1) | **33** | **34** | **56** (25/28/3/0) | **34** | **37** |
+
+The v5 training set leans more on rationalized answers (16 of 34 after the cap, v3: 13 of 33), and
+version mismatch has no sampled example left. Not trained yet: `notebooks/qlora_sft.ipynb` now reads
+`v5/sft.jsonl` (`DATA_VERSION`) and names the model `qwen-builder-sft-v5`.
+
 ## Files
+
+All per prompt version in `v3/` or `v5/`, except `checks.json` and `human_reasons.json` (shared).
 
 - `prompts.json`: the rendered prompt per fault, what was retrieved and excluded.
 - `samples.jsonl`: every model call (seed, options, model digest, latency, response).
@@ -211,4 +255,5 @@ section 6; copied-term check per fix: `fixloop_copied_terms.json`.
 - `stats.json`: the per-family counts above.
 - `human_reasons.json`: hand-written reasons (3 for gen-004).
 
-Rebuild: `python -m builder_agent.finetune sample|check|build` (see `builder_agent/finetune/__main__.py`).
+Rebuild: `python -m builder_agent.finetune sample|check|rationalize|build --prompt diagnose_v3|diagnose_v5`
+(see `builder_agent/finetune/__main__.py`).

@@ -142,5 +142,64 @@
     "failed_stage": null,
     "attempt_id": "20261010T102309Z-1c3f4a",
     "kind": "loose"
+  },
+  "gen-006 {\"action\": \"add_system_package\", \"name\": \"libffi\"}": {
+    "case_id": "gen-006",
+    "fix": {
+      "action": "add_system_package",
+      "name": "libffi"
+    },
+    "ok": false,
+    "failed_stage": "build",
+    "attempt_id": "20261010T191412Z-7909f3",
+    "kind": "alternative"
+  },
+  "gen-008 {\"action\": \"set_env_var\", \"name\": \"GIT_PYTHON_REFRESH\", \"value\": \"quiet\"}": {
+    "case_id": "gen-008",
+    "fix": {
+      "action": "set_env_var",
+      "name": "GIT_PYTHON_REFRESH",
+      "value": "quiet"
+    },
+    "ok": false,
+    "failed_stage": "train",
+    "attempt_id": "20261010T191417Z-921615",
+    "kind": "alternative"
+  },
+  "gen-004 {\"action\": \"pin_package\", \"name\": \"pipenv\", \"version\": \"2023.11.27\"}": {
+    "case_id": "gen-004",
+    "fix": {
+      "action": "pin_package",
+      "name": "pipenv",
+      "version": "2023.11.27"
+    },
+    "ok": false,
+    "failed_stage": "build",
+    "attempt_id": "20261010T191720Z-e3fd75",
+    "kind": "alternative"
+  },
+  "gen-004 {\"action\": \"pin_package\", \"name\": \"pipenv\", \"version\": \"2023.11.29\"}": {
+    "case_id": "gen-004",
+    "fix": {
+      "action": "pin_package",
+      "name": "pipenv",
+      "version": "2023.11.29"
+    },
+    "ok": false,
+    "failed_stage": "build",
+    "attempt_id": "20261010T191758Z-75a8a8",
+    "kind": "alternative"
+  },
+  "gen-004 {\"action\": \"pin_package\", \"name\": \"pipenv\", \"version\": \"2023.11.22\"}": {
+    "case_id": "gen-004",
+    "fix": {
+      "action": "pin_package",
+      "name": "pipenv",
+      "version": "2023.11.22"
+    },
+    "ok": false,
+    "failed_stage": "build",
+    "attempt_id": "20261010T191850Z-de2cee",
+    "kind": "alternative"
   }
 }

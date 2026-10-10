@@ -238,8 +238,8 @@ Ollama as `qwen-builder-sft`. The notebook's export cell crashed after the GGUF 
 saves it in `qwen-builder-sft_gguf/`, which the cell didn't search, and the Modelfile came after the
 search); the cell is fixed. Results in section 6.
 
-Logs: `experiments/finetune/` (`report.md`, every model call in `samples.jsonl` and
-`rationalized.jsonl`, labels, sandbox checks, `sft.jsonl`, `dpo.jsonl`).
+Logs: `experiments/finetune/` (`report.md`, sandbox checks, human reasons) and `experiments/finetune/v3/`
+(every model call in `samples.jsonl` and `rationalized.jsonl`, labels, `sft.jsonl`, `dpo.jsonl`).
 
 ---
 
@@ -388,9 +388,23 @@ declared version.
   supports section 6: the model couldn't compare versions it wasn't shown.
 - **But it's slow and has a cost.** It took the last of 3 fixes, and the same line led the model to
   propose a version change where none was needed (gen-010).
-- **No clear winner.** v3 is better on first fix passes, v5 on faults fixed. With one run per fault,
-  a one-fault difference is within noise. A deterministic Python check outside the LLM (roadmap
+- **A trade-off, not a win.** The main metric was declared before these runs (section 4): first fix
+  passes. On it v5 is worse than v3 (1 vs 2 of 4); it is better only on faults fixed (4 vs 3 of 4).
+  With one run per fault, a one-fault difference either way is within noise.
+- **The line didn't stop a wrong Python change.** On gen-010 the PYTHON line showed matching
+  versions (`image python:3.9-slim (Python 3.9); Pipfile python_version 3.9; Pipfile.lock built for
+  3.9`), and the model still proposed `set_python_version 3.9`. Only the validator stopped it. The
+  model reacts to the presence of a Python line, not only to a mismatch in it. A deterministic Python check outside the LLM (roadmap
   item 9 (e)) would fix gen-011 without the cost on gen-010.
+
+### Fine-tuning data with v5 prompts (roadmap step (b), not trained yet)
+
+The section 5 pipeline again, with only the prompt changed to `diagnose_v5`. 56 SFT examples (25
+sampled, 28 rationalized, 3 human, 0 written), 34 after the cap, 37 DPO pairs (v3: 56, 33, 34).
+Correct sampled answers fell from 45 to 31 of 72 (gen-008 and gen-009 got worse), and on gen-004 no
+sample set the Python version even with 3.12 against 3.9 in the PYTHON line. Rationalization gave
+gen-004 its first model reason. Details: `experiments/finetune/report.md`; data in
+`experiments/finetune/v5/` (v3 kept in `v3/`).
 
 Logs: `experiments/fixes/gen-NNN-<variant>__diagnose_v5-advanced__qwen2.5-coder-7b/`; copied-term
 check: `experiments/finetune/fixloop_copied_terms.json` (base v3, fine-tuned and v5).
