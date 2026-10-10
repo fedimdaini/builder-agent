@@ -1,0 +1,11 @@
+{
+  "first_fix_passed": false,
+  "fixes_to_pass": 2,
+  "exact": false,
+  "loose": false,
+  "first_action": {
+    "action": "add_system_package",
+    "name": "libffi8"
+  },
+  "case": "gen-010"
+}

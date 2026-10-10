@@ -244,5 +244,140 @@
     "reason": "The error indicates that the MLflow client is trying to connect to port 5001, but the server is running on port 5000. Setting the environment variable to use port 5000 should resolve this issue."
    }
   ]
+ },
+ "v5 gen-001": {
+  "score": {
+   "first_fix_passed": true,
+   "fixes_to_pass": 1,
+   "exact": true,
+   "loose": true
+  },
+  "attempts": [
+   {
+    "fix": "pin_package mlflow==2.17.2",
+    "outcome": "passed",
+    "copied": [],
+    "retrieved": [
+     "gen-007",
+     "gen-008",
+     "fault-001"
+    ],
+    "reason": "The error indicates a mismatch between the MLflow client and server versions. Pinning the client to version 2.17.2 should resolve this compatibility issue."
+   }
+  ]
+ },
+ "v5 gen-010": {
+  "score": {
+   "first_fix_passed": false,
+   "fixes_to_pass": 2,
+   "exact": false,
+   "loose": false
+  },
+  "attempts": [
+   {
+    "fix": "add_system_package libffi8",
+    "outcome": "failed at health",
+    "copied": [
+     "shared"
+    ],
+    "retrieved": [
+     "gen-006",
+     "gen-004",
+     "gen-003"
+    ],
+    "reason": "The error indicates a missing shared library, likely due to a slimmer base image. Installing libffi8 should resolve the issue."
+   },
+   {
+    "fix": "pin_package werkzeug==2.3.1",
+    "outcome": "passed",
+    "copied": [],
+    "retrieved": [
+     "gen-006",
+     "gen-004",
+     "gen-003"
+    ],
+    "reason": "The error is specifically related to Werkzeug. Pinning Werkzeug to a version that is known to be compatible with Flask 2.0.1 should resolve the ImportError."
+   }
+  ]
+ },
+ "v5 gen-011": {
+  "score": {
+   "first_fix_passed": false,
+   "fixes_to_pass": 3,
+   "exact": false,
+   "loose": false
+  },
+  "attempts": [
+   {
+    "fix": "add_system_package build-essential",
+    "outcome": "failed at build",
+    "copied": [],
+    "retrieved": [
+     "gen-009",
+     "gen-004",
+     "fault-001"
+    ],
+    "reason": "The error indicates that the 'clang++' compiler is missing, which is required for building some packages. Installing 'build-essential' via apt-get will provide the necessary C/C++ compilers, including 'clang++', without causing conflicts or installing unrelated packages."
+   },
+   {
+    "fix": "add_system_package gdal-bin",
+    "outcome": "failed at build",
+    "copied": [],
+    "retrieved": [
+     "gen-009",
+     "gen-004",
+     "fault-001"
+    ],
+    "reason": "The error indicates a missing GDAL API version. Installing 'gdal-bin' should provide the necessary GDAL binaries and libraries."
+   },
+   {
+    "fix": "set_python_version 3.9",
+    "outcome": "passed",
+    "copied": [],
+    "retrieved": [
+     "gen-009",
+     "gen-004",
+     "fault-001"
+    ],
+    "reason": "The error indicates a dependency issue related to GDAL, which is not compatible with Python 3.13. Setting the Python version to 3.9 aligns with the requirements specified in the Pipfile and Pipfile.lock."
+   }
+  ]
+ },
+ "v5 gen-013": {
+  "score": {
+   "first_fix_passed": false,
+   "fixes_to_pass": 2,
+   "exact": false,
+   "loose": false
+  },
+  "attempts": [
+   {
+    "fix": "pin_package mlflow==2.17.2",
+    "outcome": "failed at evaluate",
+    "copied": [
+     "3.0.1"
+    ],
+    "retrieved": [
+     "gen-007",
+     "gen-012",
+     "gen-008"
+    ],
+    "reason": "The error indicates that the MLflow client version 3.0.1 is incompatible with the server version 2.17.2. Pinning the client to version 2.17.2 should resolve the issue."
+   },
+   {
+    "fix": "set_env_var MLFLOW_TRACKING_URI=http://mlflow:5000",
+    "outcome": "passed",
+    "copied": [
+     "5001",
+     "port"
+    ],
+    "retrieved": [
+     "gen-012",
+     "gen-007",
+     "gen-009"
+    ],
+    "reason": "The tracking URI uses port 5001; the mlflow service listens on 5000."
+   }
+  ]
  }
 }

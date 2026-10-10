@@ -135,6 +135,9 @@ never states the image's Python version. Next steps, in order:
 - (a) **`diagnose_v5`** = v3 plus one line that states the image's and the Pipfile's Python versions
   side by side, facts only (no hint that they should match). Run it on the base model and contrast
   it with v4: one targeted fact vs a block of build settings.
+  *Done* (`docs/RESULTS.md` section 7): fixed 4 of 4 (v3: 3 of 4), gen-011 for the first time, on the
+  third fix; first fix passes 1 of 4 (v3: 2 of 4), because gen-010 got worse. A mixed result, so
+  whether it "helps" enough for (b) is still to decide.
 - (b) **Only if v5 helps:** regenerate the fine-tuning data with v5 prompts and retrain, since the
   training and test prompts must match.
 - (c) **One more Python-version memory fault.** The planned Python 3.8 fault didn't break when tried

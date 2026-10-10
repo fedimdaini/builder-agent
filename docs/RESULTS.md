@@ -6,6 +6,7 @@ section 6 also uses its QLoRA fine-tune, `qwen-builder-sft`. The team's main pro
 
 **Best configuration so far:** the fix loop with **`diagnose_v3` + the advanced retriever** (see 3 and 4).
 The QLoRA fine-tuned model (section 6) tied with the base model in it, so the base model stays.
+`diagnose_v5` (section 7) fixed all 4 held-out faults but passed fewer on the first fix (1 vs 2 of 4).
 
 The LLM does two jobs, and both answer as strict JSON:
 
@@ -314,7 +315,86 @@ the error output, so the rule flags it. Without it, both models copy in the same
   of no effect.
 
 Logs: `experiments/fixes/gen-NNN-<variant>__diagnose_v3-advanced__qwen-builder-sft/`; the copied-term
-check per fix, for both models: `experiments/finetune/fixloop_copied_terms.json`.
+check per fix, for both models: `experiments/finetune/fixloop_copied_terms.json`. Section 7 tests
+the missing-evidence point with `diagnose_v5`.
+
+---
+
+## 7. One targeted fact: `diagnose_v5` vs v3 (and v4)
+
+**What changed.** `diagnose_v5` is `diagnose_v3` plus one line at the end of the repository facts,
+facts only, no verdict. The image comes from the generated Dockerfile's `FROM` line, the rest from
+the repo's own files; it is rebuilt for every attempt:
+
+```
+PYTHON: image python:3.13-slim (Python 3.13); Pipfile python_version 3.9; Pipfile.lock built for 3.9
+```
+
+Same setup as section 4: base model qwen2.5-coder:7b, advanced retriever, the 4 held-out faults,
+temperature 0, seed 42. A first attempt was cut off by a power loss before any sandbox run or model
+call was logged; it left no files, and all 4 faults were run again from scratch.
+
+Each cell: first fix passes / fixes to pass / true reasons. "Copied" uses the rule of section 6.
+
+| Fault | v3: result | v3: copied | v5: result | v5: copied |
+|---|---|---|---|---|
+| gen-001 MLflow client 3.1.4 | yes / 1 / 1 of 1 | 0 of 1 | yes / 1 / 1 of 1 | 0 of 1 |
+| gen-010 flask 2.0.3 | yes / 1 / 1 of 1 | 1 of 1 (false positive) | no / 2 / 1 of 2 | 1 of 2 |
+| gen-011 Python 3.13 | no / not fixed / 3 of 3 | 0 of 3 | **no / 3 / 3 of 3** | 0 of 3 |
+| gen-013 empty tracking URI | no / 2 / 0 of 2 | 2 of 2 | no / 2 / 0 of 2 | 2 of 2 |
+| **First fix passes** | 2 of 4 | | 1 of 4 | |
+| **Fixed** | 3 of 4 | | **4 of 4** | |
+| **True reasons** | 5 of 7 | 3 of 7 (2 real) | 5 of 8 | 3 of 8 |
+
+For comparison, v4 (section 4: the full block of build settings) had 1 of 4 first fix passes,
+3 of 4 fixed, 4 of 9 true reasons.
+
+### What happened, per fault
+
+- **gen-011: fixed for the first time, by any model or prompt.** Fixes 1 and 2 still chased the
+  compiler and GDAL errors. Fix 3 was `set_python_version 3.9`, with the reason "GDAL ... is not
+  compatible with Python 3.13. Setting the Python version to 3.9 aligns with the requirements specified
+  in the Pipfile and Pipfile.lock". This is the first reason in any run that names the image's Python
+  version as the problem. It came on the last allowed fix; with a budget of 2 it would still be
+  "not fixed".
+- **gen-010: worse.** Fix 1 copied `add_system_package libffi8` and "a missing shared library" from
+  the retrieved libffi8 fault; it failed. In fix 2 the first call proposed `set_python_version 3.9`
+  on a 3.9 image (rejected by the validator), and the second pinned `werkzeug 2.3.1`, which passed
+  (its reason names Werkzeug, but "Flask 2.0.1" is wrong: the fault pins 2.0.3). With v3 the same model
+  pinned werkzeug on the first try.
+- **gen-001, gen-013: the same as v3.** gen-013 still copies "3.0.1" and "port 5001" from retrieved
+  faults.
+
+### One targeted fact vs a block of build settings (v5 vs v4)
+
+Both add the image's Python version. v4 put it in a block of six build settings (image, apt packages,
+install commands, environment, MLflow image, serve command), v5 in one line next to the repo's
+declared version.
+
+- **gen-011.** v4 showed `base image: python:3.13-slim` and the model never linked it to the error;
+  v5 put `3.13` next to `3.9` and the model got there on the third fix. A comparison placed side
+  by side was used; the same fact inside a block was not.
+- **Distraction.** Both made gen-010 worse, the same way: a fix copied from a retrieved fault
+  (libffi8 in both) and a `set_python_version 3.9` on a 3.9 image. Any Python line seems to invite
+  that answer when nothing is wrong with the version. v4 also lost true reasons (4 of 9);
+  v5 kept them (5 of 8).
+- **Overall.** v5 is the only prompt that fixed all 4 faults, but on the main score (first fix
+  passes) it is behind v3 (1 vs 2 of 4), tied with v4.
+
+### Lessons
+
+- **The missing evidence was part of the blind spot.** Once the mismatch was stated, the base model
+  found the Python fix for gen-011, which neither more retrieval nor fine-tuning had done. That
+  supports section 6: the model couldn't compare versions it wasn't shown.
+- **But it's slow and has a cost.** It took the last of 3 fixes, and the same line led the model to
+  propose a version change where none was needed (gen-010).
+- **No clear winner.** v3 is better on first fix passes, v5 on faults fixed. With one run per fault,
+  a one-fault difference is within noise. A deterministic Python check outside the LLM (roadmap
+  item 9 (e)) would fix gen-011 without the cost on gen-010.
+
+Logs: `experiments/fixes/gen-NNN-<variant>__diagnose_v5-advanced__qwen2.5-coder-7b/`; copied-term
+check: `experiments/finetune/fixloop_copied_terms.json` (base v3, fine-tuned and v5).
+Prompt: `prompts/diagnose_v5.md`; the line is `python_text()` in `builder_agent/fix/__init__.py`.
 
 ---
 
