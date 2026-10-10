@@ -1,0 +1,177 @@
+{
+  "label": "script mode, file output (rerun, no taxi reference)",
+  "seed": 42,
+  "error": null,
+  "time": "2026-10-10T20:56:11.877378+00:00",
+  "repo": "script-file-demo",
+  "prompt_version": "train_script_v1",
+  "prompt_sha256": "6b2f2ab324eddf171455ad83781062597eff9d158af96bd534b9be28749bb4cf",
+  "model": "qwen2.5-coder:7b",
+  "model_digest": "dae161e27b0e90dd1856c8bb3209201fd6736d8eb66298e75ed87571486f4364",
+  "slots_correct": 13,
+  "slots_correct_lenient": 13,
+  "slots_total": 14,
+  "per_slot": [
+    {
+      "slot": "task",
+      "gold": "regression",
+      "answer": "regression",
+      "correct": true,
+      "correct_lenient": true
+    },
+    {
+      "slot": "target_column",
+      "gold": "price",
+      "answer": "price",
+      "correct": true,
+      "correct_lenient": true
+    },
+    {
+      "slot": "target_transform",
+      "gold": "none",
+      "answer": "none",
+      "correct": true,
+      "correct_lenient": true
+    },
+    {
+      "slot": "model_flavor",
+      "gold": "sklearn",
+      "answer": "sklearn",
+      "correct": true,
+      "correct_lenient": true
+    },
+    {
+      "slot": "model_input",
+      "gold": "dataframe",
+      "answer": "dataframe",
+      "correct": true,
+      "correct_lenient": true
+    },
+    {
+      "slot": "train_script.script",
+      "gold": "scripts/train.py",
+      "answer": "scripts/train.py",
+      "correct": true,
+      "correct_lenient": true
+    },
+    {
+      "slot": "train_script.args",
+      "gold": [
+        "--data",
+        "$train_path",
+        "--out",
+        "$model_dir/model.joblib"
+      ],
+      "answer": [
+        "--data",
+        "$train_path",
+        "--out",
+        "$model_dir/model.joblib"
+      ],
+      "correct": true,
+      "correct_lenient": true
+    },
+    {
+      "slot": "train_script.train_file",
+      "gold": "data/processed/train.csv",
+      "answer": "data/processed/train.csv",
+      "correct": true,
+      "correct_lenient": true
+    },
+    {
+      "slot": "train_script.model_output",
+      "gold": "file",
+      "answer": "file",
+      "correct": true,
+      "correct_lenient": true
+    },
+    {
+      "slot": "train_script.mlflow_artifact_path",
+      "gold": null,
+      "answer": null,
+      "correct": true,
+      "correct_lenient": true
+    },
+    {
+      "slot": "train_script.model_file",
+      "gold": "$model_dir/model.joblib",
+      "answer": "$model_dir/model.joblib",
+      "correct": true,
+      "correct_lenient": true
+    },
+    {
+      "slot": "evaluate.eval_file",
+      "gold": "data/processed/test.csv",
+      "answer": "data/processed/test.csv",
+      "correct": true,
+      "correct_lenient": true
+    },
+    {
+      "slot": "evaluate.group_column",
+      "gold": "g",
+      "answer": "a",
+      "correct": false,
+      "correct_lenient": false
+    },
+    {
+      "slot": "data.data_step",
+      "gold": "existing",
+      "answer": "existing",
+      "correct": true,
+      "correct_lenient": true
+    }
+  ],
+  "final_answer": {
+    "target_column": "price",
+    "target_transform": "none",
+    "model_flavor": "sklearn",
+    "model_input": "dataframe",
+    "task": "regression",
+    "train_script": {
+      "script": "scripts/train.py",
+      "args": [
+        "--data",
+        "$train_path",
+        "--out",
+        "$model_dir/model.joblib"
+      ],
+      "train_file": "data/processed/train.csv",
+      "model_output": "file",
+      "mlflow_artifact_path": null,
+      "model_file": "$model_dir/model.joblib"
+    },
+    "evaluate": {
+      "eval_file": "data/processed/test.csv",
+      "group_column": "a"
+    },
+    "data": {
+      "data_step": "existing"
+    }
+  },
+  "valid_final": true,
+  "valid_on_first_try": true,
+  "attempts": 1,
+  "rejection_reasons": [
+    []
+  ],
+  "total_tokens": 2112,
+  "llm_s": 7.5,
+  "wall_s": 7.62,
+  "sandbox": {
+    "ok": true,
+    "failed_stage": null,
+    "stages": {
+      "render": "ok",
+      "build": "ok",
+      "mlflow": "ok",
+      "data": "ok",
+      "train": "ok",
+      "evaluate": "ok",
+      "serve": "ok",
+      "health": "ok",
+      "predict": "ok"
+    },
+    "prediction": 11.835467016421743,
+    "attempt_id": "20261010T205611Z-361339"
+  }
+}

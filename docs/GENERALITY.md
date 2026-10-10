@@ -161,6 +161,49 @@ rejects evaluating on the training file (inflated metrics).
 Its task is also a real case for the LLM: the target values (integers 3–9) point to classification,
 the code (ElasticNet, MSE) to regression, so the rule asks.
 
+**Proposed fixes for the two blockers (not implemented; for approval):**
+
+1. **Conda install.** A rule for `environment.yml` / `conda.yaml` in `plan_install`:
+   - Default: keep `python:<version>-slim`. Install the env's `pip:` section as it is, plus its
+     conda dependencies by their pip names: drop `python` (already a version hint), `pip`, build
+     strings and channels, and map the few names that differ (`py-xgboost` → `xgboost`,
+     `pytorch` → `torch`).
+   - It is recorded as an assumption ("conda env installed with pip"), like the default Python version.
+   - The list goes straight into the Dockerfile's `RUN pip install`, so no file is added to the repo.
+   - A conda-only package (e.g. `cudatoolkit`, `libgcc`) makes it a `needs_llm` item instead of a guess.
+   - Fallback, only for such envs: a `micromamba` base image installing the env file as it is. It is
+     closer to the original, but it means another base image, another way to pin Python, and a
+     bigger image.
+   - Tests: the translation per entry kind; mlflow-example's `conda.yaml` (numpy, pandas, scikit-learn,
+     pip: mlflow); then the sandbox on mlflow-example.
+2. **One data file: the Builder splits it.**
+   - When no second data file has the target and the training features, the data step adapter
+     writes `train.csv` and `eval.csv` from the single file. The eval share is 20%, seed 42, and the
+     split is stratified for classification.
+   - It also writes `split.json`: source file, its sha256, seed, share, row counts.
+   - Every later run reuses that split while the source hash is unchanged, so training and
+     evaluation always see the same rows.
+   - The plan reports it as an assumption ("ASSUMED: one data file; Builder split 80/20, seed 42").
+   - Two constraints:
+     - (a) Data folders are mounted read-only, so the split needs a writable Builder-owned place:
+       a new contract path, e.g. `paths.builder_split: .builder/split`. That is a contracts.yaml
+       change, for the team.
+     - (b) A script that reads a fixed path (mlflow-example reads `wine-quality.csv` next to
+       itself) would still train on the whole file. Then the train adapter runs the script in a
+       temporary copy of the repo whose data file is the train split. The repo itself is never changed.
+   - Tests: the split is reproducible (same hash → same rows), train and eval rows are disjoint, the
+     stratification holds, the fixed-path script trains on the split; then the sandbox on mlflow-example.
+
+**For later:** required script values with no default (mlflow-example's `sys.argv[1]`/`[2]`, the alpha
+the model got wrong in RESULTS.md section 8) could come from the repo instead of the model:
+- an `MLproject` file declares entry-point parameters with types and defaults
+  (mlflow-example: `alpha`, `l1_ratio`);
+- a README often shows the command line.
+
+The scanner would offer those values as candidates, and the model would pick among them. Also
+for later: reject a `group_column` with many distinct values (the model chose a continuous column
+in both script repos).
+
 
 Chosen to differ from taxi (Pipfile, XGBoost regression, a train function, CSV in the repo). **These
 are from memory and not checked.** Before cloning, confirm each one's current layout,

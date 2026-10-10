@@ -1,4 +1,4 @@
-# prompt: train_script_v1 (DRAFT, not approved yet: slots_v3's questions for a repo trained by a script instead of a function)
+# prompt: train_script_v1 (slots_v3's questions for a repo trained by a script instead of a function)
 
 ## system
 

@@ -37,6 +37,11 @@ REPORTS_DIR = ROOT / "experiments" / "evals"
 SLOTS = ["target_column", "target_transform", "transform_inside_train_fn", "model_flavor", "model_input",
          "train.train_function", "train.train_file", "train.arg_map",
          "evaluate.eval_file", "evaluate.group_column", "data.data_step"]
+# script-training mode (prompts/train_script_v1.md): picked when the gold answer has train_script
+SCRIPT_SLOTS = ["task", "target_column", "target_transform", "model_flavor", "model_input",
+                "train_script.script", "train_script.args", "train_script.train_file", "train_script.model_output",
+                "train_script.mlflow_artifact_path", "train_script.model_file",
+                "evaluate.eval_file", "evaluate.group_column", "data.data_step"]
 MISSING = object()
 
 
@@ -121,7 +126,7 @@ def _get(d, dotted: str):
 
 def compare(answer: dict | None, gold: dict, alternatives: dict[str, list] | None = None) -> list[SlotScore]:
     scores = []
-    for slot in SLOTS:
+    for slot in (SCRIPT_SLOTS if "train_script" in gold else SLOTS):
         g, a = _get(gold, slot), _get(answer or {}, slot)
         strict = a is not MISSING and a == g
         lenient = strict or (a is not MISSING and a in (alternatives or {}).get(slot, []))
@@ -291,7 +296,8 @@ def main() -> None:
     parser.add_argument("--repo", default=str(ROOT.parent / "taxi-trip-regression"))
     parser.add_argument("--gold", default=str(ROOT / "tests" / "gold" / "taxi_slots.json"))
     parser.add_argument("--sandbox", action="store_true", help="also run the final answer in the sandbox")
-    parser.add_argument("--expected", default=str(ROOT / "tests" / "gold" / "taxi_expected.json"))
+    parser.add_argument("--expected", help="expected prediction JSON for the smoke test; default: the taxi "
+                        "reference, only when --repo is the taxi dev repo")
     parser.add_argument("--seeds", nargs="+", type=int, help="run once per seed and summarize the spread")
     parser.add_argument("--compare", nargs="+", metavar="REPORT", help="print saved reports side by side")
     args = parser.parse_args()
@@ -303,7 +309,9 @@ def main() -> None:
         return
     if not (args.prompt and args.model):
         parser.error("--prompt and --model are required (or use --compare)")
-    expected = json.loads(Path(args.expected).read_text(encoding="utf-8")) if args.sandbox else None
+    taxi_default = Path(args.repo).resolve() == (ROOT.parent / "taxi-trip-regression").resolve()
+    expected_path = args.expected or (str(ROOT / "tests" / "gold" / "taxi_expected.json") if taxi_default else None)
+    expected = json.loads(Path(expected_path).read_text(encoding="utf-8")) if args.sandbox and expected_path else None
     reports, files = [], []
     for seed in args.seeds or [None]:
         report = run_eval(args.prompt, args.model, args.repo, args.gold, label=args.label,

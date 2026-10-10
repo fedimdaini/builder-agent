@@ -422,10 +422,10 @@ Prompt: `prompts/diagnose_v5.md`; the line is `python_text()` in `builder_agent/
 
 ---
 
-## 8. Script-training mode: first check (no LLM yet)
+## 8. Script-training mode: first check
 
 **What changed.** Repos whose model is trained by a script, not a function, get their own slot set
-(`render/script_slots.py`) and prompt (`prompts/train_script_v1.md`, not approved or run yet). The
+(`render/script_slots.py`) and prompt (`prompts/train_script_v1.md`, approved 2026-10-10). The
 train adapter runs the script inside an MLflow run and takes the model from the run or from the file
 the script writes (`docs/GENERALITY.md`).
 
@@ -434,7 +434,34 @@ script logs it with `mlflow.sklearn.log_model`, each ran every sandbox stage wit
 **The scratch repos and their gold answers were written by me (Claude), together with the code
 they test**, so this run is a first check that the adapter works, not an independent evaluation:
 the repos fit the design by construction. The independent test is the pinned public repos
-(`docs/GENERALITY.md` section 4) and the LLM filling the slots with `train_script_v1`.
+(`docs/GENERALITY.md` section 4).
+
+**`train_script_v1` on the two scratch repos** (qwen2.5-coder:7b, seed 42, against the gold answers
+in `tests/gold/script_*_demo.json`; repos rebuilt by `experiments/script_mode/make_demo_repos.py`):
+
+| Repo | Slots right (strict, of 14) | Valid on first try | Tries | Tokens | Sandbox end to end |
+|---|---|---|---|---|---|
+| file output (argparse, `joblib.dump`) | 13 | yes | 1 | 2,112 | all stages ok |
+| MLflow output (`sys.argv`, `log_model`) | 12 | no | 3 | 6,891 | **failed at train** |
+
+- **The script fields were right in both but one.** Script, train file, output kind, model file and
+  MLflow artifact path were all correct. The miss: in the MLflow repo the model passed
+  `["$train_path", "$target_column"]`, but the script reads `sys.argv[2]` as `alpha` (a float), so
+  `float("price")` crashed in training. The validator can't see what a `sys.argv` position means,
+  but the sandbox did, as designed. Required values without a default are the weak spot (see
+  GENERALITY.md section 4: take them from the README or MLproject).
+- **Both chose a continuous column (`a`) for `group_column`** instead of the categorical `g`. The
+  validator accepts any column in the header. In the MLflow repo the first two tries answered
+  `"none"`, which isn't allowed.
+- **A harness bug, fixed:** the eval tool used taxi's reference prediction (531 s) as the default
+  for every repo, so the first file-output run "failed at predict" (11.8 against 531). The tool now
+  uses that reference only for the taxi repo. The rerun gave the same answer, and every stage passed:
+  prediction 11.8 for a true value of 13.3.
+
+One seed, two repos I wrote. This shows the mode works end to end and where the model fails. It
+doesn't measure it.
+
+Logs: `experiments/evals/train_script_v1__*.json` (three runs: file output, file output rerun, MLflow output).
 
 ---
 
