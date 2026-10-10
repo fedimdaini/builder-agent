@@ -8,9 +8,9 @@ import re
 from dataclasses import dataclass, field
 from pathlib import PurePosixPath
 
-from . import targets, task
+from . import scripts, targets, task
 from .layout import DATA_EXTS, MODEL_EXTS
-from .models import EntryRole, FunctionSig, PortHint, Route, WebApp
+from .models import EntryRole, FunctionSig, PortHint, Route, TrainScript, WebApp
 
 MAX_FUNCTIONS = 10
 CLI_LIBS = ("typer", "click", "fire", "argparse")
@@ -44,6 +44,7 @@ class ModuleFacts:
     ports: list[PortHint] = field(default_factory=list)
     path_literals: set[str] = field(default_factory=set)
     task_signals: list = field(default_factory=list)     # scan/task.py TaskSignal, regression vs classification
+    script: object = None                                # scan/models.py TrainScript, if the module is one
 
 
 def role_for(path: str) -> EntryRole | None:
@@ -159,6 +160,10 @@ def analyze_tree(tree: ast.Module, path: str, *, is_notebook: bool = False) -> M
                                  and isinstance(n.value, ast.Name) and n.value.id == "sys"
                                  for n in ast.walk(tree)):
         facts.cli = "sys.argv"
+    if (facts.has_main_guard or facts.cli) and scripts.trains(tree):
+        facts.script = TrainScript(path=path, has_main_guard=facts.has_main_guard, cli=facts.cli,
+                                   cli_args=scripts.cli_args(tree), argv=scripts.argv_positions(tree),
+                                   outputs=scripts.model_outputs(tree), imports_mlflow="mlflow" in top)
 
     # app = Flask(__name__) / app = FastAPI(); router = APIRouter()
     apps: dict[str, str] = {}

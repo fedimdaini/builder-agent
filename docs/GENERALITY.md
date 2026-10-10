@@ -112,8 +112,8 @@ been run end to end.
 | Dependency format | Pipfile + Pipfile.lock; Pipfile alone; poetry (`pyproject.toml` + `poetry.lock`); `requirements*.txt` / `.in` at the repo root; `pyproject.toml` with `[project]` deps, `setup.py`, `setup.cfg` (`pip install .`, no layer caching) | conda `environment.yml` (scanned for the Python version, but no install rule, so `needs_llm` and render fails); `uv.lock` (detected, no rule); requirements files only in subfolders |
 | Python version | an exact hint or a constraint with a lower bound | no hint at all (render fails unless `contracts.yaml` forces a version) |
 | ML framework | scikit-learn, XGBoost, LightGBM, CatBoost; regression, and classification since step 2c (sklearn-API models; accuracy, macro F1, ROC AUC for binary) | PyTorch, TensorFlow/Keras, transformers, statsmodels, prophet, Spark; classification with the xgboost Booster API (returns probabilities); clustering, ranking, multi-output |
-| Training code | an importable `.py` function that returns a model, args filled from data path, DataFrame, `X`, `y`, target name or literals | notebooks-only repos (notebooks give facts, not callable functions); top-level scripts; argparse CLIs; Kedro/DVC/Airflow pipelines (Airflow is roadmap item 5); models saved to disk instead of returned |
-| Data | CSV/TSV files in the repo (also via Git LFS, pulled), mounted read-only | Parquet/Excel/feather headers (detected as data, columns not read); data downloaded at run time (`dvc pull`, Kaggle, URLs); no data folder; databases |
+| Training code | an importable `.py` function that returns a model (function mode); since the script-training step, a script with a main guard or CLI (argparse, sys.argv) that trains a model and logs it to MLflow or writes it to a file (script mode, slots from `prompts/train_script_v1.md`) | notebooks-only repos (notebooks give facts, not callable functions); Kedro/DVC/Airflow pipelines (Airflow is roadmap item 5); click/typer option parsing (only argparse and sys.argv are read) |
+| Data | CSV/TSV files in the repo (also via Git LFS, pulled), mounted read-only; a CSV outside any data folder when no data folder has one | Parquet/Excel/feather headers (detected as data, columns not read); data downloaded at run time (`dvc pull`, Kaggle, URLs); no data folder; databases |
 | Data step | `existing` (the processed CSV is already there) or a no-argument function | a step that needs arguments or configuration |
 | Serving | the repo's Flask/FastAPI app if it meets the contract, else a generated Flask adapter that loads the model from MLflow | the main project's batch API without the bridge (roadmap item 8) |
 | Experiment tracking | none in the repo, or MLflow (the Builder adds its own server) | a repo already on mlflow 3.x, W&B/Neptune calls in the repo's own train function (not handled; untested) |
@@ -142,6 +142,25 @@ clean. Then tag every document with the repo it came from, so one repo's fixes d
 another's retrieval.
 
 ## 4. Candidate repos for a generalization test
+
+**Pinned commits** (checked on GitHub 2026-10-10; clone and check out exactly these):
+
+| Repo | Commit | Committed | Scope |
+|---|---|---|---|
+| `mlflow/mlflow-example` | `0651d1c962aa35e4dd02608c51a7b0efc2412407` | 2022-08-15 | in scope (script mode, regression), but two blockers below |
+| `alexmart1997/MLOps` | `74ed7ae3a77dab7128f459f7fa13ef75f75678b6` | 2026-10-05 | in scope (poetry, CatBoost classification); data from Kaggle, downloaded once by hand |
+| `DiogoRibeiro7/mlops-starter-kit` | `0b40c4127545188e49fca5b9d8648f26c1a824ef` | 2026-10-08 | partly: training is a config-driven job class |
+| `treeverse/example-get-started` | `06ea48980a34ef57041c9b905cafcb40d9c3ddbc` | 2023-08-26 | out of scope (DVC, XML text data) |
+
+**mlflow-example at that commit, read by the Builder (no run):** script mode is chosen (`train.py`
+reads `sys.argv[1..2]` and logs the model with `mlflow.sklearn` under `'model'`), and the root CSV
+`wine-quality.csv` is read. Two blockers remain:
+(1) install: `conda.yaml` has no install rule, so render stops;
+(2) one data file only: the script splits it internally, so no separate eval file exists and the validator
+rejects evaluating on the training file (inflated metrics).
+Its task is also a real case for the LLM: the target values (integers 3–9) point to classification,
+the code (ElasticNet, MSE) to regression, so the rule asks.
+
 
 Chosen to differ from taxi (Pipfile, XGBoost regression, a train function, CSV in the repo). **These
 are from memory and not checked.** Before cloning, confirm each one's current layout,

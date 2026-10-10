@@ -15,7 +15,7 @@ from packaging.version import Version
 from ..scan.deps import declared_names, normalize
 from ..scan.models import EntryPoint, RepoContext, WebApp
 from .contracts import Contracts, Endpoint
-from .models import InstallPlan, MakeTarget, NeedsLLM, PythonChoice, ServingPlan, TaskChoice
+from .models import InstallPlan, MakeTarget, NeedsLLM, PythonChoice, ServingPlan, TaskChoice, TrainModeChoice
 
 # Exact-version hint sources, most trusted first. Builder-internal, not a team decision.
 EXACT_PRIORITY = ["pipfile", "python-version-file", "runtime.txt", "pipfile-lock",
@@ -151,6 +151,27 @@ def choose_task(ctx: RepoContext) -> tuple[TaskChoice, NeedsLLM | None]:
               else "task signals disagree")
     return (TaskChoice(status="needs_llm", reason=reason, evidence=lines),
             NeedsLLM(item="task", reason=reason, context=lines))
+
+
+# --- training mode ---------------------------------------------------------
+
+def choose_train_mode(ctx: RepoContext) -> tuple[TrainModeChoice, NeedsLLM | None]:
+    """function: a repo function trains a model (it calls .fit() or xgb/lgb.train()), so the adapter can
+    call it and get the model back. script: no such function, but a script with a main guard or a CLI
+    trains one; the adapter runs it. Function mode wins when both exist (it returns the model directly)."""
+    tests = set(ctx.test_files)
+    functions = [f"{e.path}:{s.name}" for e in ctx.entry_points if e.path not in tests
+                 for s in e.signatures if s.trains]
+    scripts = [f"{t.path} (script{', ' + t.cli if t.cli else ''})" for t in ctx.train_scripts]
+    if functions:
+        return TrainModeChoice(status="decided", mode="function", candidates=functions + scripts,
+                               reason=f"{len(functions)} repo function(s) train a model"), None
+    if scripts:
+        return TrainModeChoice(status="decided", mode="script", candidates=scripts,
+                               reason=f"no function trains a model; {len(scripts)} script(s) do"), None
+    reason = "no function or script that trains a model (no .fit() or xgb/lgb.train() call)"
+    return (TrainModeChoice(status="needs_llm", reason=reason),
+            NeedsLLM(item="train_mode", reason=reason, context=[]))
 
 
 # --- serving ---------------------------------------------------------------

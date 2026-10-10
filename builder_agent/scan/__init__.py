@@ -174,7 +174,8 @@ def scan_repo(path: str | Path) -> RepoContext:
     lfs = layout.scan_lfs(root, files)
 
     # --- slot candidates: data columns, target, target transforms ---
-    data_columns = layout.read_headers(root, files, data_dirs, {p.path for p in lfs.pointer_files})
+    data_columns = layout.read_headers(root, files, data_dirs, {p.path for p in lfs.pointer_files},
+                                       [f.path for f in layout.find_loose_data_files(files, data_dirs)])
     samples = rows.sample_rows(root, [d.path for d in data_columns])
     for d in data_columns:
         d.n_rows = samples[d.path][0]
@@ -188,6 +189,9 @@ def scan_repo(path: str | Path) -> RepoContext:
         [(f.path, f.target) for f in module_facts + notebook_facts], sigs,
         {c for d in data_columns for c in d.columns},
     )
+
+    # --- training scripts (script-training mode) ---
+    train_scripts = [f.script for f in module_facts if f.script is not None and f.path not in test_files]
 
     # --- task signals: regression or classification ---
     task_signals = task.merge([s for f in module_facts + notebook_facts if f.path not in test_files
@@ -231,4 +235,5 @@ def scan_repo(path: str | Path) -> RepoContext:
         target_transforms=target_transforms,
         task_signals=task_signals,
         target_values=target_values,
+        train_scripts=train_scripts,
     )

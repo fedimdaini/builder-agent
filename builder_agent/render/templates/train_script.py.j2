@@ -1,0 +1,108 @@
+{{ marker }}
+"""Train by running the repo's own script {{ script }}, inside an MLflow run, and record the model.
+
+Run from anywhere: python {{ adapters_dir }}/train.py
+{{ sample_var }}=1 trains on a {{ fraction }} sample of the rows when the script takes the data path
+as an argument ($train_path); a script that reads a fixed path trains on all of it.
+The script runs with MLFLOW_RUN_ID set to this adapter's run, so its own mlflow calls log into it.
+"""
+import json
+import os
+{% if model_output == "file" %}
+import pickle
+{% endif %}
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+import mlflow
+import mlflow.{{ flavor }}
+import pandas as pd
+
+ROOT = Path(__file__).resolve().parents[{{ depth }}]
+
+SCRIPT = {{ script | py }}
+ARGS = {{ script_args | py }}
+TRAIN_FILE = {{ train_file | py }}
+TARGET = {{ target | py }}
+FEATURES = {{ features | py }}
+TARGET_TRANSFORM = {{ transform | py }}
+MODEL_OUTPUT = {{ model_output | py }}
+{% if model_output == "file" %}
+MODEL_FILE = {{ model_file | py }}
+ARTIFACT_PATH = "model"
+{% else %}
+ARTIFACT_PATH = {{ mlflow_artifact_path | py }}
+{% endif %}
+SAMPLE = os.environ.get({{ sample_var | py }}, "0") == "1"
+SAMPLE_FRACTION = {{ fraction | py }}
+MLFLOW_URI = os.environ.get("MLFLOW_TRACKING_URI", {{ mlflow_uri | py }})
+EXPERIMENT = {{ experiment | py }}
+MODEL_URI_FILE = {{ model_uri_file | py }}
+
+
+def training_path():
+    """The data file for $train_path: a sampled temp copy when SAMPLE=1."""
+    path = ROOT / TRAIN_FILE
+    if not SAMPLE:
+        return str(path)
+    df = pd.read_csv(path).sample(frac=SAMPLE_FRACTION, random_state=42)
+    fd, sampled = tempfile.mkstemp(suffix=".csv")
+    os.close(fd)
+    df.to_csv(sampled, index=False)
+    return sampled
+{% if model_output == "file" %}
+
+
+def load_model_file(path):
+    """The model the script wrote: joblib if it's installed (scikit-learn brings it), else pickle."""
+    try:
+        import joblib
+    except ImportError:
+        with open(path, "rb") as f:
+            return pickle.load(f)
+    return joblib.load(path)
+{% endif %}
+
+
+def substitute(arg, values):
+    """A token ("$train_path"), or a token followed by a path ("$model_dir/model.joblib"), or a literal."""
+    head, sep, rest = arg.partition("/")
+    return values[head] + sep + rest if head in values else arg
+
+
+def main():
+    mlflow.set_tracking_uri(MLFLOW_URI)
+    mlflow.set_experiment(EXPERIMENT)
+    model_dir = tempfile.mkdtemp(prefix="model-")
+    train_path = training_path() if "$train_path" in ARGS else str(ROOT / TRAIN_FILE)
+    if SAMPLE and "$train_path" not in ARGS:
+        print(f"note: {SCRIPT} reads its data itself, so {{ sample_var }}=1 can't sample it", file=sys.stderr)
+    values = {"$train_path": train_path, "$target_column": TARGET, "$model_dir": model_dir}
+    args = [substitute(a, values) for a in ARGS]
+
+    with mlflow.start_run() as run:
+        mlflow.log_params({"train_script": SCRIPT, "train_args": " ".join(ARGS), "train_file": TRAIN_FILE,
+                           "target": TARGET, "target_transform": TARGET_TRANSFORM, "sample": SAMPLE})
+        mlflow.log_dict({"features": FEATURES, "target": TARGET, "target_transform": TARGET_TRANSFORM},
+                        "builder/schema.json")
+        env = dict(os.environ, MLFLOW_TRACKING_URI=MLFLOW_URI, MLFLOW_RUN_ID=run.info.run_id,
+                   MLFLOW_EXPERIMENT_NAME=EXPERIMENT)
+        subprocess.run([sys.executable, str(ROOT / SCRIPT), *args], cwd=ROOT, env=env, check=True)
+{% if model_output == "file" %}
+        path = Path(MODEL_FILE.replace("$model_dir", model_dir))
+        model = load_model_file(path if path.is_absolute() else ROOT / path)
+        mlflow.{{ flavor }}.log_model(model, ARTIFACT_PATH)
+{% endif %}
+
+    uri = f"runs:/{run.info.run_id}/{ARTIFACT_PATH}"
+    mlflow.{{ flavor }}.load_model(uri)   # fails here, clearly, if the model isn't where the slots say
+    out = ROOT / MODEL_URI_FILE
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(uri + "\n", encoding="utf-8")
+    print(json.dumps({"model_uri": uri, "script": SCRIPT, "sample": SAMPLE}))
+
+
+if __name__ == "__main__":
+    main()

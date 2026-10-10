@@ -182,8 +182,17 @@ MAX_COLUMNS = 300
 
 
 def read_headers(root: Path, files: dict[str, int], data_dirs: list[ArtifactDir],
-                 lfs_pointers: set[str]) -> list[DataColumns]:
-    """Column names from the first line of each CSV/TSV in the data folders (never the rows)."""
+                 lfs_pointers: set[str], loose: list[str] | None = None) -> list[DataColumns]:
+    """Column names from the first line of each CSV/TSV in the data folders (never the rows).
+    When no data folder has one, the loose data files (outside data folders, e.g. a CSV at the root)
+    are read instead, so a repo without a data folder still has columns; repos with one are unchanged."""
+    out = _headers(root, files, lambda f: any(f.startswith(d.path + "/") for d in data_dirs), lfs_pointers)
+    if not out and loose:
+        out = _headers(root, files, set(loose).__contains__, lfs_pointers)
+    return out
+
+
+def _headers(root: Path, files: dict[str, int], wanted, lfs_pointers: set[str]) -> list[DataColumns]:
     out = []
     for f in files:
         if len(out) >= MAX_HEADER_FILES:
@@ -191,7 +200,7 @@ def read_headers(root: Path, files: dict[str, int], data_dirs: list[ArtifactDir]
         ext = _suffix(f)
         if ext not in {".csv", ".tsv"} or f in lfs_pointers:
             continue
-        if not any(f.startswith(d.path + "/") for d in data_dirs):
+        if not wanted(f):
             continue
         try:
             with open(root / f, encoding="utf-8-sig", errors="replace", newline="") as fh:

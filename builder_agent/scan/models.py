@@ -62,6 +62,7 @@ class FunctionSig(BaseModel):
     doc: str | None = None                           # first docstring line
     model_api: str | None = None                     # xgboost-native, xgboost-sklearn, lightgbm-native, ...
     api_evidence: list[str] = Field(default_factory=list)   # the calls that show it, e.g. xgb.train
+    trains: bool = False           # calls .fit() or xgb/lgb.train() and returns a value (scan/scripts.py); not in render()
 
     def render(self) -> str:
         return f"{self.name}({', '.join(self.params)})"
@@ -74,6 +75,34 @@ class EntryPoint(BaseModel):
     cli: str | None = None         # argparse, click, typer, fire, sys.argv
     functions: list[str] = Field(default_factory=list)  # top-level defs (capped)
     signatures: list[FunctionSig] = Field(default_factory=list)  # same defs with parameters
+
+
+class CliArg(BaseModel):
+    """One argparse add_argument(...) of a training script."""
+    flags: list[str]               # ["--alpha", "-a"] or ["data_path"] (positional)
+    required: bool
+    default: str | None = None     # source text
+    type: str | None = None
+    help: str | None = None
+    action: str | None = None      # "store_true", ...
+
+
+class ModelOutput(BaseModel):
+    """A place the script may write its model."""
+    kind: str                      # joblib, pickle, save_model, mlflow.sklearn, ...
+    target: str                    # source text of the path or artifact path argument
+    line: int
+
+
+class TrainScript(BaseModel):
+    """A script that trains a model and runs from the command line (script-training mode)."""
+    path: str
+    has_main_guard: bool
+    cli: str | None = None         # argparse, click, typer, fire, sys.argv
+    cli_args: list[CliArg] = Field(default_factory=list)
+    argv: list[int] = Field(default_factory=list)       # sys.argv positions read
+    outputs: list[ModelOutput] = Field(default_factory=list)
+    imports_mlflow: bool = False
 
 
 class DataColumns(BaseModel):
@@ -227,6 +256,7 @@ class RepoContext(BaseModel):
     data_overlaps: list[DataOverlap] = Field(default_factory=list)  # data files sharing rows
     task_signals: list[TaskSignal] = Field(default_factory=list)    # model classes, metrics, objectives
     target_values: TargetValues | None = None                       # values of the top target column
+    train_scripts: list[TrainScript] = Field(default_factory=list)  # script-training mode candidates
 
     existing_pipeline_files: list[str] = Field(default_factory=list)  # Dockerfile, Makefile, CI, ...
     test_files: list[str] = Field(default_factory=list)

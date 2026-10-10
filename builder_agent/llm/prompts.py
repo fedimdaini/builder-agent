@@ -26,6 +26,7 @@ from pydantic import BaseModel
 
 from ..decide.models import BuildPlan
 from ..decide.rules import choose_task
+from ..render.script_slots import ScriptSlotAnswers, script_candidates
 from ..render.slots import TASKS, SlotAnswers, SlotAnswersV3, slot_candidates
 from ..scan.models import RepoContext
 
@@ -77,9 +78,43 @@ def load_prompt(version: str, prompts_dir: str | Path = PROMPTS_DIR) -> PromptFi
                       sections=sections)
 
 
-def slots_model(prompt: PromptFile) -> type[SlotAnswers]:
-    """The answer schema a slot prompt asks for: with the task (slots_v3 on) if it shows {{ task_facts }}."""
-    return SlotAnswersV3 if "{{ task_facts }}" in prompt.sections.get("user", "") else SlotAnswers
+def slots_model(prompt: PromptFile) -> type:
+    """The answer schema a slot prompt asks for: script mode if it shows {{ script_sources }}
+    (train_script_v1 on), with the task (slots_v3 on) if it shows {{ task_facts }}, else SlotAnswers."""
+    user = prompt.sections.get("user", "")
+    if "{{ script_sources }}" in user:
+        return ScriptSlotAnswers
+    return SlotAnswersV3 if "{{ task_facts }}" in user else SlotAnswers
+
+
+MAX_SCRIPT_LINES = 150     # lines of each training script shown to the LLM (script mode)
+
+
+def script_facts(ctx: RepoContext) -> str:
+    """Per training script: its CLI options, sys.argv positions and where it writes a model."""
+    out = []
+    for t in ctx.train_scripts:
+        out.append(f"SCRIPT {t.path} (cli: {t.cli or 'none'}, main guard: {'yes' if t.has_main_guard else 'no'})")
+        for a in t.cli_args:
+            out.append(f"  - option {' / '.join(a.flags)}: {'required' if a.required else 'optional'}"
+                       + (f", default {a.default}" if a.default else "") + (f", type {a.type}" if a.type else "")
+                       + (f", action {a.action}" if a.action else "") + (f" ({a.help})" if a.help else ""))
+        if t.argv:
+            out.append(f"  - reads sys.argv[{'], sys.argv['.join(str(i) for i in t.argv)}]")
+        for o in t.outputs:
+            out.append(f"  - line {o.line}: {o.kind} -> {o.target}")
+    return "\n".join(out) or "none"
+
+
+def script_sources(ctx: RepoContext) -> str:
+    """The training scripts' code with line numbers, at most MAX_SCRIPT_LINES lines each."""
+    blocks = []
+    for t in ctx.train_scripts:
+        lines = (Path(ctx.root) / t.path).read_text(encoding="utf-8", errors="replace").splitlines()
+        shown = "\n".join(f"{i:4d}  {line}" for i, line in enumerate(lines[:MAX_SCRIPT_LINES], 1))
+        more = f"\n      ... ({len(lines) - MAX_SCRIPT_LINES} more lines)" if len(lines) > MAX_SCRIPT_LINES else ""
+        blocks.append(f"--- {t.path} ---\n{shown}{more}")
+    return "\n\n".join(blocks) or "none"
 
 
 def task_facts(ctx: RepoContext) -> str:
@@ -109,6 +144,10 @@ def slot_variables(ctx: RepoContext, plan: BuildPlan) -> dict:
         # slots_v3: the task (regression or classification); v1/v2 don't use these
         "task_facts": task_facts(ctx),
         "task_candidates": TASKS,
+        # train_script_v1 (script-training mode); earlier prompts don't use these
+        "script_candidates": script_candidates(ctx),
+        "script_facts": script_facts(ctx),
+        "script_sources": script_sources(ctx),
     }
 
 

@@ -112,7 +112,9 @@ def experiment_name(ctx: RepoContext, c: Contracts) -> str:
 def template_context(ctx: RepoContext, c: Contracts, s: SlotAnswers) -> dict:
     adapters_dir = c.paths["adapters_dir"].strip("/")
     headers = {d.path: d.columns for d in ctx.data_columns}
-    features = [col for col in headers[s.train.train_file] if col != s.target_column]
+    script = getattr(s, "train_script", None)            # script-training mode (render/script_slots.py)
+    train_file = script.train_file if script else s.train.train_file
+    features = [col for col in headers[train_file] if col != s.target_column]
 
     fmt = (c.model_extra or {}).get("formats", {}).get("eval_report", {})
     unsupported = set(fmt.get("metrics", {})) - SUPPORTED_METRICS
@@ -132,12 +134,17 @@ def template_context(ctx: RepoContext, c: Contracts, s: SlotAnswers) -> dict:
         raise RenderError("contracts.yaml serving.endpoints needs 'predict' and 'health'")
     response = (c.serving.model_extra or {}).get("response", {})
 
-    module, fn_name = s.train.train_function.split(":")
-    tokens = {v for v in s.train.arg_map.values() if isinstance(v, str)}
-    call_args = ", ".join(f"{k}={TOKEN_EXPR[v] if isinstance(v, str) and v in TOKEN_EXPR else repr(v)}"
-                          for k, v in s.train.arg_map.items())
-    uses_y = "$y" in tokens
-    forward = FORWARD.get(s.target_transform) if uses_y and not s.transform_inside_train_fn else None
+    if script:
+        module, fn_name, call_args, forward = None, None, None, None
+        tokens = set(script.args)
+        uses_y = False
+    else:
+        module, fn_name = s.train.train_function.split(":")
+        tokens = {v for v in s.train.arg_map.values() if isinstance(v, str)}
+        call_args = ", ".join(f"{k}={TOKEN_EXPR[v] if isinstance(v, str) and v in TOKEN_EXPR else repr(v)}"
+                              for k, v in s.train.arg_map.items())
+        uses_y = "$y" in tokens
+        forward = FORWARD.get(s.target_transform) if uses_y and not s.transform_inside_train_fn else None
 
     data_module, data_fn = (s.data.data_step.split(":") if s.data.data_step != "existing" else (None, None))
 
@@ -158,8 +165,14 @@ def template_context(ctx: RepoContext, c: Contracts, s: SlotAnswers) -> dict:
         # train
         "fn_module": module,
         "fn_name": fn_name,
-        "train_file": s.train.train_file,
+        "train_file": train_file,
         "call_args": call_args,
+        # train, script mode
+        "script": script.script if script else None,
+        "script_args": script.args if script else [],
+        "model_output": script.model_output if script else None,
+        "mlflow_artifact_path": script.mlflow_artifact_path if script else None,
+        "model_file": script.model_file if script else None,
         "uses_train_path": "$train_path" in tokens,
         "uses_x": "$X" in tokens,
         "uses_y": uses_y,
@@ -171,7 +184,7 @@ def template_context(ctx: RepoContext, c: Contracts, s: SlotAnswers) -> dict:
         "data_step": s.data.data_step,
         "data_fn_module": data_module,
         "data_fn_name": data_fn,
-        "required_files": list(dict.fromkeys([s.train.train_file, s.evaluate.eval_file])),
+        "required_files": list(dict.fromkeys([train_file, s.evaluate.eval_file])),
         # serve
         "sample_record": _first_record(Path(ctx.root), s.evaluate.eval_file, features),
         "port": c.serving.port,
@@ -250,7 +263,9 @@ def render_adapters(ctx: RepoContext, contracts: Contracts, answer: dict | SlotA
         expected = Expected.model_validate(expected)
     tctx = template_context(ctx, contracts, v.slots) | smoke_context(contracts, expected)
     env = _env()
-    rendered = {f"{tctx['adapters_dir']}/{name}": env.get_template(f"{name}.j2").render(**tctx)
+    # script-training mode: train.py runs the repo's script (train_script.py.j2) instead of calling a function
+    template = {name: f"{name}.j2" for name in ADAPTERS} | ({"train.py": "train_script.py.j2"} if tctx["script"] else {})
+    rendered = {f"{tctx['adapters_dir']}/{name}": env.get_template(template[name]).render(**tctx)
                 for name in ADAPTERS}
     out_root = Path(out_root)
     write_new_files(writer or RepoWriter(out_root), manifest_path(contracts), rendered)

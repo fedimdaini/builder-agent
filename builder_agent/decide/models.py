@@ -35,6 +35,14 @@ class TaskChoice(BaseModel):
     evidence: list[str] = Field(default_factory=list)
 
 
+class TrainModeChoice(BaseModel):
+    """How training runs: a repo function the adapter calls, or a repo script the adapter runs."""
+    status: Status
+    mode: Literal["function", "script"] | None = None
+    reason: str
+    candidates: list[str] = Field(default_factory=list)   # "src/train.py:train" or "train.py (script)"
+
+
 class InstallPlan(BaseModel):
     status: Status
     tool: Literal["pipenv", "pip", "poetry"] | None = None
@@ -81,6 +89,7 @@ class BuildPlan(BaseModel):
     make_targets: list[MakeTarget]
     sample: SamplePlan
     task: TaskChoice | None = None      # None only in plans built before the task rule existed
+    train_mode: TrainModeChoice | None = None
     needs_llm: list[NeedsLLM] = Field(default_factory=list)
 
     @property
@@ -95,6 +104,9 @@ class BuildPlan(BaseModel):
         out = [f"PLAN {self.repo} | contract v{self.contract_version} | "
                f"{'complete' if self.is_complete else f'{len(self.needs_llm)} item(s) need the LLM'}"]
         mark = {"decided": "ok ", "needs_llm": "LLM"}
+        if self.train_mode:
+            m = self.train_mode
+            out.append(f"[{mark[m.status]}] training: {m.mode or '-'} — {m.reason}")
         if self.task:
             out.append(f"[{mark[self.task.status]}] task: {self.task.task or '-'} — {self.task.reason}")
         assumed = " (ASSUMED)" if self.python.assumed else ""

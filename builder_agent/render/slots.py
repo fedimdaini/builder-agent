@@ -97,7 +97,7 @@ def answer_task(ctx: RepoContext, s: SlotAnswers) -> str | None:
 class SlotValidation(BaseModel):
     ok: bool
     reasons: list[str]
-    slots: SlotAnswers | None = None
+    slots: Any = None              # SlotAnswers (function mode) or script_slots.ScriptSlotAnswers
 
 
 # --- candidates ------------------------------------------------------------
@@ -201,6 +201,9 @@ def _pydantic_reasons(e: ValidationError) -> list[str]:
 
 
 def validate_slots(ctx: RepoContext, answer: dict | SlotAnswers) -> SlotValidation:
+    from .script_slots import ScriptSlotAnswers, validate_script_slots
+    if isinstance(answer, ScriptSlotAnswers) or (isinstance(answer, dict) and "train_script" in answer):
+        return validate_script_slots(ctx, answer)     # script-training mode
     if isinstance(answer, SlotAnswers):
         s = answer
     else:

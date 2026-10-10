@@ -11,6 +11,7 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass, field
 
+from . import scripts
 from .models import FunctionSig, TargetCandidate, TargetTransform
 
 # Variable/parameter names that usually hold the target: target, target_col, label, y, Y_train, y_val ...
@@ -71,7 +72,8 @@ def signatures(tree: ast.Module) -> list[FunctionSig]:
         api, evidence = model_api(node)
         out.append(FunctionSig(name=node.name, params=params,
                                doc=doc.strip().splitlines()[0][:80] if doc else None,
-                               model_api=api, api_evidence=evidence))
+                               model_api=api, api_evidence=evidence,
+                               trains=scripts.trains(node) and scripts.returns_value(node)))
     return out
 
 

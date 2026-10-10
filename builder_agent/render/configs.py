@@ -99,7 +99,9 @@ def _top_dirs(ctx: RepoContext, c: Contracts) -> tuple[list[str], list[str], lis
 
 
 def _make_rules(plan: BuildPlan, c: Contracts, adapters: str | None, serve_cmd: str,
-                install: list[str]) -> list[MakeRule]:
+                install: list[str], via_adapter: frozenset[str] = frozenset()) -> list[MakeRule]:
+    """via_adapter: targets that must run their adapter even when a rule decided a command
+    (script-training mode: make train runs pipeline/train.py, which runs the script inside an MLflow run)."""
     rules, missing = [], []
     for name, desc in c.make_targets.items():
         planned = plan.target(name) if any(t.name == name for t in plan.make_targets) else None
@@ -110,7 +112,7 @@ def _make_rules(plan: BuildPlan, c: Contracts, adapters: str | None, serve_cmd: 
             cmds = [serve_cmd]   # resolved in config_context (repo app or serve.py adapter)
             if planned and planned.status != "decided":
                 note = f"adapter, because {planned.reason}"
-        elif planned and planned.status == "decided" and planned.command:
+        elif planned and planned.status == "decided" and planned.command and name not in via_adapter:
             cmds = [planned.command]
         elif name in ADAPTER_SCRIPTS and adapters:
             cmds = [f"$(PYTHON) {adapters}/{ADAPTER_SCRIPTS[name]}"]
@@ -221,7 +223,8 @@ def config_context(ctx: RepoContext, c: Contracts, plan: BuildPlan, slots: SlotA
                         f"import urllib.request; urllib.request.urlopen('http://localhost:{port}{health}', timeout=3)"],
         "sample_var": c.sample_mode.variable,
         "fraction": c.sample_mode.fraction,
-        "targets": _make_rules(plan, c, adapters, serve_cmd, install),
+        "targets": _make_rules(plan, c, adapters, serve_cmd, install,
+                               frozenset({"train"}) if getattr(slots, "train_script", None) else frozenset()),
     }
 
 
