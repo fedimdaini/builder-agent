@@ -97,6 +97,13 @@ class OllamaClient:
                 time.sleep(self.retry_wait_s)
         raise OllamaError(errors)
 
+    def unload(self) -> None:
+        """Unload the model now (an empty chat with keep_alive 0)."""
+        body = json.dumps({"model": self.model, "messages": [], "keep_alive": 0}).encode()
+        req = urllib.request.Request(f"{self.host}/api/chat", data=body, headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=60) as r:
+            r.read()
+
     def _post(self, data: bytes, errors: list[str]) -> ChatResponse:
         req = urllib.request.Request(f"{self.host}/api/chat", data=data, headers={"Content-Type": "application/json"})
         t0 = time.perf_counter()

@@ -19,6 +19,7 @@ Two retrievers, top 3:
 from __future__ import annotations
 
 import json
+import uuid
 import re
 from pathlib import Path
 
@@ -93,7 +94,7 @@ class FixMemory:
         self.docs = {d.id: d for d in docs}
         self.embedder = embedder
         client = chromadb.EphemeralClient(Settings(anonymized_telemetry=False))
-        name = f"fix_memory_{id(self)}"
+        name = f"fix_memory_{uuid.uuid4().hex}"       # unique: the ephemeral client is shared per process
         self.collection = client.get_or_create_collection(name, embedding_function=None,
                                                           metadata={"hnsw:space": "cosine"})
         self.collection.add(ids=[d.id for d in docs], documents=[d.text() for d in docs],

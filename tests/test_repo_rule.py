@@ -174,6 +174,7 @@ ALLOWED_WRITERS = {
     "sandbox/__init__.py": "copies the target to a temp folder (read-only on the original); attempts log",
     "scan/rows.py": "row-sample cache in builder-agent's .cache/",
     "verify/__init__.py": "report outside the target (checked); temp export to check the patch",
+    "finetune/__init__.py": "fine-tuning data in builder-agent's experiments/finetune/",
     "faults/__init__.py": "generated fault cases in builder-agent's tests/faults/generated/",
 }
 
