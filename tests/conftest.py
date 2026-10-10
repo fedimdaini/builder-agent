@@ -1,6 +1,13 @@
-import pytest
+import os
+import tempfile
 
-from builder_agent.scan import rows
+# before any builder_agent import: the attempt and call logs of the tests go to a temp folder, never to
+# the real logs/ (a test run appended fake-model entries there, in a OneDrive-synced folder)
+os.environ["BUILDER_LOG_DIR"] = tempfile.mkdtemp(prefix="builder-test-logs-")
+
+import pytest  # noqa: E402
+
+from builder_agent.scan import rows  # noqa: E402
 
 
 @pytest.fixture(autouse=True, scope="session")

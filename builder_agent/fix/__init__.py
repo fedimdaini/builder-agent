@@ -18,6 +18,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
+from .. import LOG_DIR
 from ..decide import load_contracts, plan_build
 from ..llm import ChatClient
 from ..llm.ollama import inline_refs
@@ -32,7 +33,7 @@ from .models import Diagnosis, DiagnosisWithAnalysis, GiveUp, answer_model, appl
 
 MAX_FIXES = 3
 MAX_CALLS = 3                         # LLM calls per diagnosis (rejected answers are retried with reasons)
-DEFAULT_FIX_LOG = Path(__file__).resolve().parents[2] / "logs" / "fix_attempts.jsonl"
+DEFAULT_FIX_LOG = LOG_DIR / "fix_attempts.jsonl"
 
 MENU = {
     "pin_package": "{name, version}: install exactly this version of a Python package",

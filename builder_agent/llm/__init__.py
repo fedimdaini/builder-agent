@@ -17,6 +17,7 @@ from typing import Protocol
 
 from pydantic import BaseModel, Field
 
+from .. import LOG_DIR
 from ..decide.models import BuildPlan
 from ..render.slots import SlotAnswers, validate_slots
 from ..scan.models import RepoContext
@@ -26,7 +27,7 @@ from .prompts import PromptError, PromptFile, load_prompt, retry_variables, slot
 __all__ = ["fill_slots", "load_prompt", "OllamaClient", "PromptError", "SlotFillResult", "DEFAULT_CALL_LOG"]
 
 MAX_ATTEMPTS = 3
-DEFAULT_CALL_LOG = Path(__file__).resolve().parents[2] / "logs" / "llm_calls.jsonl"
+DEFAULT_CALL_LOG = LOG_DIR / "llm_calls.jsonl"
 
 
 class ChatClient(Protocol):

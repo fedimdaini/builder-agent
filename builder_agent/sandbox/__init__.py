@@ -30,6 +30,7 @@ from typing import Literal
 import yaml
 from pydantic import BaseModel, Field
 
+from .. import LOG_DIR
 from ..decide import load_contracts, plan_build
 from ..render import Expected, render_adapters, validate_slots
 from ..repo_writer import RepoWriter
@@ -40,7 +41,7 @@ STAGES = ["render", "build", "mlflow", "data", "train", "evaluate", "serve", "he
 TAIL_LINES = 50
 OVERRIDE_FILE = "compose.sandbox.yml"
 DEFAULT_CONTRACTS = Path(__file__).resolve().parents[2] / "contracts.yaml"
-DEFAULT_LOG = Path(__file__).resolve().parents[2] / "logs" / "sandbox_attempts.jsonl"
+DEFAULT_LOG = LOG_DIR / "sandbox_attempts.jsonl"
 TIMEOUTS = {"build": 1800, "mlflow": 180, "data": 600, "train": 1800, "evaluate": 900,
             "serve": 120, "health": 180, "predict": 120, "teardown": 180}
 COPY_SKIP = {".git", ".venv", "venv", "__pycache__", ".ipynb_checkpoints"}

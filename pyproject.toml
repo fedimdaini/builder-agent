@@ -28,3 +28,4 @@ include = ["builder_agent*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-rfE"          # name every failure and error in the summary
