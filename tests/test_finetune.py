@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from builder_agent.finetune import (OUT_DIR, CasePrompt, DataError, build_datasets, faithful, label_sample, match,
+from builder_agent.finetune import (FINETUNE_DIR, data_dir, CasePrompt, DataError, build_datasets, faithful, label_sample, match,
                                     render_case_prompt, sample_case, split_cases)
 from builder_agent.fix.models import AddDependency, PinPackage, SetEnvVar
 
@@ -14,6 +14,7 @@ from test_llm import FakeModel
 from test_memory import FakeEmbedder
 from test_render import MINI_GOLD, contracts, mini  # noqa: F401 (fixtures)
 
+DATA_DIRS = [data_dir(p) for p in ("diagnose_v3", "diagnose_v5")]     # both datasets are kept
 MEMORY = {c["id"]: c for c in split_cases("memory")}
 TEST = split_cases("test")
 
@@ -158,10 +159,11 @@ def test_every_test_case_has_lines_of_its_own():
     assert all(unique_lines(case) for case in TEST)
 
 
+@pytest.mark.parametrize("d", DATA_DIRS, ids=lambda d: d.name)
 @pytest.mark.parametrize("name", ["sft.jsonl", "dpo.jsonl"])
-def test_no_held_out_test_case_in_the_datasets(name):
+def test_no_held_out_test_case_in_the_datasets(d, name):
     """Fails if a split=test case appears in a dataset: as the source case, or anywhere in a prompt or answer."""
-    path = OUT_DIR / name
+    path = d / name
     if not path.exists():
         pytest.skip(f"{name} not generated yet")
     rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
@@ -232,10 +234,11 @@ def test_rationalize_case_samples_the_hinted_prompt(mini):  # noqa: F811
     assert all(HINT_MARK in m.sent[0][1]["content"] for m in models)
 
 
+@pytest.mark.parametrize("d", DATA_DIRS, ids=lambda d: d.name)
 @pytest.mark.parametrize("case_id", sorted(MEMORY))
-def test_written_reasons_are_two_sentences_and_pass_the_filter(case_id):
+def test_written_reasons_are_two_sentences_and_pass_the_filter(d, case_id):
     """On the real taxi prompts (the recorded causes are about the taxi repo, e.g. its Python 3.9)."""
-    path = OUT_DIR / "prompts.json"
+    path = d / "prompts.json"
     if not path.exists():
         pytest.skip("prompts.json not generated yet")
     cp = CasePrompt(**json.loads(path.read_text(encoding="utf-8"))[case_id])
@@ -268,18 +271,20 @@ def test_training_records_use_the_prompt_without_the_hint(mini):  # noqa: F811
         assert HINT_MARK not in text
 
 
+@pytest.mark.parametrize("d", DATA_DIRS, ids=lambda d: d.name)
 @pytest.mark.parametrize("name", ["sft.jsonl", "dpo.jsonl"])
-def test_no_training_prompt_contains_the_hint(name):
-    path = OUT_DIR / name
+def test_no_training_prompt_contains_the_hint(d, name):
+    path = d / name
     if not path.exists():
         pytest.skip(f"{name} not generated yet")
     for line in path.read_text(encoding="utf-8").splitlines():
         assert HINT_MARK not in line
 
 
-def test_every_memory_case_has_an_sft_example():
-    path = OUT_DIR / "sft.jsonl"
-    if not (path.exists() and (OUT_DIR / "rationalized.jsonl").exists()):
+@pytest.mark.parametrize("d", DATA_DIRS, ids=lambda d: d.name)
+def test_every_memory_case_has_an_sft_example(d):
+    path = d / "sft.jsonl"
+    if not (path.exists() and (d / "rationalized.jsonl").exists()):
         pytest.skip("sft.jsonl not built with rationalization yet")
     rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
     assert {r["case_id"] for r in rows} == set(MEMORY)
@@ -344,7 +349,7 @@ def test_cap_keeps_at_most_four_per_case_human_first():
 
 
 def test_human_reasons_file_holds_only_memory_cases():
-    path = OUT_DIR / "human_reasons.json"
+    path = FINETUNE_DIR / "human_reasons.json"
     if not path.exists():
         pytest.skip("human_reasons.json not created yet")
     data = json.loads(path.read_text(encoding="utf-8"))
@@ -368,7 +373,7 @@ def test_qlora_notebook_parses_and_matches_the_cap_rule():
     cap_order = re.search(r"^CAP_ORDER = (\(.*\))$", "\n".join(code), re.M).group(1)
     assert ast.literal_eval(cap_order) == SFT_CAP_ORDER
     assert 'MODEL_NAME = "Qwen/Qwen2.5-Coder-7B-Instruct"' in hyper and 'GGUF_QUANT = "q4_k_m"' in hyper
-    assert 'OLLAMA_NAME = "qwen-builder-sft"' in hyper and "train_on_responses_only" in "".join(code)
+    assert 'OLLAMA_NAME = f"qwen-builder-sft-{DATA_VERSION}"' in hyper and 'DATA_VERSION = "v5" ' in hyper and "train_on_responses_only" in "".join(code)
 
 
 def test_the_image_version_the_fix_sets_is_not_a_false_claim():

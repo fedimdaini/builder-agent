@@ -4,8 +4,9 @@ python -m builder_agent.finetune check  <repo> --slots S --loose            # sa
 python -m builder_agent.finetune rationalize <repo> --slots S   # STaR: 4 hinted reasons per memory fault
 python -m builder_agent.finetune build                          # label, filter, write sft.jsonl / dpo.jsonl
 
-Files in experiments/finetune/: prompts.json, samples.jsonl, labels.jsonl, checks.json, rationalized.jsonl,
-sft.jsonl, dpo.jsonl, report.md."""
+Every subcommand takes --prompt (default diagnose_v3). Files in experiments/finetune/<v3|v5>/: prompts.json,
+samples.jsonl, labels.jsonl, rationalized.jsonl, sft.jsonl, dpo.jsonl, stats.json; shared in experiments/finetune/:
+checks.json, human_reasons.json, report.md."""
 
 import argparse
 import json
@@ -15,7 +16,7 @@ from pathlib import Path
 from ..llm.ollama import OllamaClient, OllamaEmbedder
 from ..render.slots import load_answer
 from ..sandbox import DEFAULT_LOG, run_sandbox
-from . import (OUT_DIR, SAMPLES_PER_CASE, TEMPERATURE, alternative_overrides, build_datasets, faithful, label_sample,
+from . import (FINETUNE_DIR, data_dir, SAMPLES_PER_CASE, TEMPERATURE, alternative_overrides, build_datasets, faithful, label_sample,
                read_jsonl, render_case_prompt, sample_case, split_cases, write_json, write_jsonl, CasePrompt)
 from .human import TEMPLATE as HUMAN_TEMPLATE, load_human
 from .rationalize import RATIONALIZE_SAMPLES, judge, rationalize_case, training_rows
@@ -26,7 +27,7 @@ def cmd_sample(args) -> None:
     embedder = OllamaEmbedder(args.embed_model)
     prompts, samples, labels = {}, [], []
     for case in split_cases("memory"):
-        cp = render_case_prompt(case, args.repo, slots, embedder)
+        cp = render_case_prompt(case, args.repo, slots, embedder, prompt_version=args.prompt)
         prompts[case["id"]] = cp.model_dump()
 
         def factory(seed, model=args.model):
@@ -38,9 +39,9 @@ def cmd_sample(args) -> None:
         print(f"{case['id']} {case['variant']}: retrieved {[h['id'] for h in cp.retrieved]}; "
               + ", ".join(labels[-k]["label"] for k in range(len(rows), 0, -1)), flush=True)
     OllamaClient(args.model).unload()
-    write_json(OUT_DIR / "prompts.json", prompts)
-    write_jsonl(OUT_DIR / "samples.jsonl", samples)
-    write_jsonl(OUT_DIR / "labels.jsonl", labels)
+    write_json(data_dir(args.prompt) / "prompts.json", prompts)
+    write_jsonl(data_dir(args.prompt) / "samples.jsonl", samples)
+    write_jsonl(data_dir(args.prompt) / "labels.jsonl", labels)
 
 
 def _check_key(row: dict) -> str:
@@ -56,10 +57,10 @@ def cmd_check(args) -> None:
     slots, _ = load_answer(args.slots)
     expected = json.loads(Path(args.expected).read_text(encoding="utf-8")) if args.expected else None
     cases = {c["id"]: c for c in split_cases("memory")}
-    path = OUT_DIR / "checks.json"
+    path = FINETUNE_DIR / "checks.json"
     checks = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
     todo = {}
-    for row in read_jsonl(OUT_DIR / "labels.jsonl"):
+    for row in read_jsonl(data_dir(args.prompt) / "labels.jsonl"):
         if _to_check(row, args.loose) and _check_key(row) not in checks:
             todo[_check_key(row)] = row
     print(f"{len(todo)} distinct {'loose matches' if args.loose else 'possible alternatives'} to check", flush=True)
@@ -75,12 +76,12 @@ def cmd_check(args) -> None:
 
 
 def cmd_build(args) -> None:
-    prompts = json.loads((OUT_DIR / "prompts.json").read_text(encoding="utf-8"))
+    prompts = json.loads((data_dir(args.prompt) / "prompts.json").read_text(encoding="utf-8"))
     cases = {c["id"]: c for c in split_cases("memory")}
-    path = OUT_DIR / "checks.json"
+    path = FINETUNE_DIR / "checks.json"
     checks = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
     rows = []
-    for row in read_jsonl(OUT_DIR / "labels.jsonl"):
+    for row in read_jsonl(data_dir(args.prompt) / "labels.jsonl"):
         if row["label"] == "candidate":
             check = checks.get(_check_key(row))
             if check is None:
@@ -97,14 +98,14 @@ def cmd_build(args) -> None:
                                cp.current_python)
             row = row | {"faithful": ok, "faithful_why": why}
         rows.append(row)
-    rationalized = OUT_DIR / "rationalized.jsonl"
+    rationalized = data_dir(args.prompt) / "rationalized.jsonl"
     if rationalized.exists():
         cps = {cid: CasePrompt(**p) for cid, p in prompts.items()}
         # judged again, so the current filter applies to the stored hinted answers
         hinted = [r | judge(r, cases[r["case_id"]], cps[r["case_id"]]) for r in read_jsonl(rationalized)]
-        write_jsonl(OUT_DIR / "rationalized_final.jsonl", hinted)
+        write_jsonl(data_dir(args.prompt) / "rationalized_final.jsonl", hinted)
         rows += training_rows(hinted, cases, cps)
-    human_path = OUT_DIR / "human_reasons.json"
+    human_path = FINETUNE_DIR / "human_reasons.json"
     if not human_path.exists():
         write_json(human_path, HUMAN_TEMPLATE)            # a placeholder to fill by hand
     human, problems = load_human(human_path, cases, {cid: CasePrompt(**p) for cid, p in prompts.items()})
@@ -112,16 +113,16 @@ def cmd_build(args) -> None:
     for p in problems:
         print("human_reasons.json:", p, file=sys.stderr)
     sft, dpo, stats = build_datasets(prompts, rows)
-    write_jsonl(OUT_DIR / "sft.jsonl", sft)
-    write_jsonl(OUT_DIR / "dpo.jsonl", dpo)
-    write_jsonl(OUT_DIR / "labels_final.jsonl", rows)
-    write_json(OUT_DIR / "stats.json", stats)
+    write_jsonl(data_dir(args.prompt) / "sft.jsonl", sft)
+    write_jsonl(data_dir(args.prompt) / "dpo.jsonl", dpo)
+    write_jsonl(data_dir(args.prompt) / "labels_final.jsonl", rows)
+    write_json(data_dir(args.prompt) / "stats.json", stats)
     print(json.dumps(stats, indent=2))
 
 
 def cmd_rationalize(args) -> None:
     prompts = {cid: CasePrompt(**p) for cid, p in
-               json.loads((OUT_DIR / "prompts.json").read_text(encoding="utf-8")).items()}
+               json.loads((data_dir(args.prompt) / "prompts.json").read_text(encoding="utf-8")).items()}
     out = []
     for case in split_cases("memory"):
         cp = prompts[case["id"]]                       # the same prompt as the sampling step
@@ -133,7 +134,7 @@ def cmd_rationalize(args) -> None:
         out += rows
         print(f"{case['id']} {case['variant']}: kept {sum(r['kept'] for r in rows)} of {len(rows)}", flush=True)
     OllamaClient(args.model).unload()
-    write_jsonl(OUT_DIR / "rationalized.jsonl", out)
+    write_jsonl(data_dir(args.prompt) / "rationalized.jsonl", out)
 
 
 def main() -> None:
@@ -149,6 +150,8 @@ def main() -> None:
         s.add_argument("--n", type=int, default=RATIONALIZE_SAMPLES if name == "rationalize" else SAMPLES_PER_CASE)
         s.add_argument("--loose", action="store_true", help="check: sandbox-check the loose matches instead")
     sub.add_parser("build")
+    for s in sub.choices.values():
+        s.add_argument("--prompt", default="diagnose_v3", help="diagnose prompt version; data in experiments/finetune/<v3|v5>/")
     args = p.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
     {"sample": cmd_sample, "check": cmd_check, "rationalize": cmd_rationalize, "build": cmd_build}[args.cmd](args)

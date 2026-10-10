@@ -5,7 +5,7 @@
     python -m builder_agent.finetune build
 
 Only generated cases with split "memory" are used; a split "test" case is never rendered, sampled or
-written (DataError). For each case the diagnose_v3 prompt is rendered as the fix loop renders its
+written (DataError). For each case the diagnose prompt (v3 by default, --prompt) is rendered as the fix loop renders its
 first attempt, with the advanced retriever over a memory that leaves the case itself out (and
 fault-001 for gen-008, the same fault), so the model can't copy the answer. Answers are sampled at
 temperature 0.7 and labelled against the case's verified fix; non-matching answers that touch
@@ -36,7 +36,9 @@ from ..sandbox import DEFAULT_CONTRACTS, SandboxResult, StageResult
 from ..scan import scan_repo
 from ..scan.deps import normalize
 
-OUT_DIR = Path(__file__).resolve().parents[2] / "experiments" / "finetune"
+# shared by every prompt version: checks.json (sandbox results of fixes, which don't depend on the prompt),
+# human_reasons.json and report.md; each prompt version's data goes to its own subfolder (data_dir)
+FINETUNE_DIR = Path(__file__).resolve().parents[2] / "experiments" / "finetune"
 GENERATED = Path(__file__).resolve().parents[2] / "tests" / "faults" / "generated"
 PROMPT = "diagnose_v3"
 SAMPLES_PER_CASE = 8
@@ -52,6 +54,11 @@ STOP = {"the", "and", "for", "with", "from", "not", "error", "errors", "failed",
 
 class DataError(ValueError):
     pass
+
+
+def data_dir(prompt: str = PROMPT) -> Path:
+    """experiments/finetune/v3/ for diagnose_v3, v5/ for diagnose_v5: prompts, samples, labels, datasets."""
+    return FINETUNE_DIR / prompt.removeprefix("diagnose_")
 
 
 def split_cases(split: str = "memory") -> list[dict]:
@@ -82,7 +89,8 @@ class CasePrompt(BaseModel):
     python_packages: list[str]
 
 
-def render_case_prompt(case: dict, repo, slots: dict, embedder, contracts_path=DEFAULT_CONTRACTS) -> CasePrompt:
+def render_case_prompt(case: dict, repo, slots: dict, embedder, contracts_path=DEFAULT_CONTRACTS,
+                       prompt_version: str = PROMPT) -> CasePrompt:
     """The fix loop's first-attempt prompt for this case, with the case left out of the memory."""
     if case.get("split") != "memory":
         raise DataError(f"{case['id']} has split {case.get('split')!r}: only split=memory cases make training data")
@@ -99,7 +107,7 @@ def render_case_prompt(case: dict, repo, slots: dict, embedder, contracts_path=D
     memory = FixMemory.build(embedder, cases=[m for m in memory_cases() if m["id"] not in excluded])
     hits = memory.advanced(case["stage"], case["error_tail"])
     variables = prompt_variables(ctx, r, tctx, 1, []) | {"retrieved_text": render_retrieved(hits)}
-    prompt = load_prompt(PROMPT)
+    prompt = load_prompt(prompt_version)
     model = answer_model("\n".join(prompt.sections.values()))
     return CasePrompt(case_id=case["id"], variant=case["variant"], family=case["family"],
                       messages=[{"role": "system", "content": prompt.render("system", variables)},
