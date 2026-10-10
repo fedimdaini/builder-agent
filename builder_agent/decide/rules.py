@@ -24,6 +24,9 @@ CONSTRAINT_KINDS = {"requires-python", "python_requires", "poetry"}
 MAJOR_MINOR_RE = re.compile(r"^(\d+)\.(\d+)(?:\.\d+)?$")
 
 PIPENV_VERSION = "2023.12.1"   # known good in docs/reference-run-taxi.md
+# Used only when the repo declares no Python version, and reported as an assumption. Builder-internal:
+# a version the pinned MLflow client (render/configs.py) supports and the common ML wheels exist for.
+DEFAULT_PYTHON = "3.11"
 
 # Which scanner roles can implement each script target.
 SCRIPT_ROLES = {"data": ("data", "features"), "train": ("train",), "evaluate": ("evaluate",)}
@@ -75,6 +78,11 @@ def choose_python(ctx: RepoContext, c: Contracts) -> tuple[PythonChoice, NeedsLL
         return (PythonChoice(status="needs_llm", reason=reason, evidence=evidence),
                 NeedsLLM(item="python", reason=reason, context=evidence))
 
+    def assume(why: str) -> tuple[PythonChoice, None]:
+        return PythonChoice(status="decided", version=DEFAULT_PYTHON, assumed=True, evidence=evidence,
+                            reason=f"assumed: {why}; Builder default {DEFAULT_PYTHON} "
+                                   "(set project.python_version in contracts.yaml to change it)"), None
+
     forced = c.project.python_version
     if forced != "auto":
         version, reason = forced, "forced by contracts.yaml project.python_version"
@@ -96,12 +104,15 @@ def choose_python(ctx: RepoContext, c: Contracts) -> tuple[PythonChoice, NeedsLL
     elif constraints:
         bounds = [b for _, s in constraints if s and (b := _lower_bound(s))]
         if not bounds:
+            if all(s and _allows(s, DEFAULT_PYTHON) for _, s in constraints):
+                return assume("only version constraints without a lower bound ("
+                              + ", ".join(h.value for h, _ in constraints) + f"), which allow {DEFAULT_PYTHON}")
             return fail("only version constraints without a lower bound: "
                         + ", ".join(h.value for h, _ in constraints))
         version = max(bounds, key=Version)
         reason = "no exact hint; lowest version allowed by the constraints"
     else:
-        return fail("no Python version hint in the repo; set project.python_version in contracts.yaml")
+        return assume("no Python version declared in the repo")
 
     for h, spec in constraints:
         if spec is None:

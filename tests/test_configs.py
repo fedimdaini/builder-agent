@@ -159,9 +159,18 @@ def test_mini_requirements_and_generated_service(mini, contracts, tmp_path):  # 
 
 
 def test_refuses_undecided_python(mini, contracts, tmp_path):  # noqa: F811
-    plan = plan_build(mini.model_copy(update={"python_version_hints": []}), contracts)
+    from builder_agent.scan.models import VersionHint
+    clash = [VersionHint(value=v, source=".github/workflows/ci.yml", kind="ci") for v in ("3.10", "3.11")]
+    plan = plan_build(mini.model_copy(update={"python_version_hints": clash}), contracts)
     with pytest.raises(RenderError, match="Python version not decided"):
         render_configs(mini, contracts, plan, MINI_GOLD, tmp_path)
+
+
+def test_no_declared_python_renders_the_assumed_default(mini, contracts, tmp_path):  # noqa: F811
+    plan = plan_build(mini.model_copy(update={"python_version_hints": []}), contracts)
+    assert plan.python.assumed
+    render_configs(mini, contracts, plan, MINI_GOLD, tmp_path)
+    assert "FROM python:3.11-slim" in (tmp_path / "Dockerfile").read_text(encoding="utf-8")
 
 
 def test_refuses_generated_service_without_slots(mini, contracts, tmp_path):  # noqa: F811

@@ -24,6 +24,7 @@ class PythonChoice(BaseModel):
     version: str | None = None     # "3.9"
     reason: str
     evidence: list[str] = Field(default_factory=list)
+    assumed: bool = False          # no version in the repo: the Builder's default, reported as an assumption
 
 
 class InstallPlan(BaseModel):
@@ -85,7 +86,8 @@ class BuildPlan(BaseModel):
         out = [f"PLAN {self.repo} | contract v{self.contract_version} | "
                f"{'complete' if self.is_complete else f'{len(self.needs_llm)} item(s) need the LLM'}"]
         mark = {"decided": "ok ", "needs_llm": "LLM"}
-        out.append(f"[{mark[self.python.status]}] python: {self.python.version or '-'} — {self.python.reason}")
+        assumed = " (ASSUMED)" if self.python.assumed else ""
+        out.append(f"[{mark[self.python.status]}] python: {self.python.version or '-'}{assumed} — {self.python.reason}")
         extras = f" + pip install {' '.join(self.install.extra_packages)}" if self.install.extra_packages else ""
         out.append(f"[{mark[self.install.status]}] install: {self.install.tool or '-'} "
                    f"({self.install.source or '-'}){extras} — {self.install.reason}")

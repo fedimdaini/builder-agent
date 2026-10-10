@@ -66,15 +66,31 @@ def test_python_decided(contracts, hints, version, reason_part):
 
 
 @pytest.mark.parametrize("hints,reason_part", [
-    ([], "no Python version hint"),
     ([hint("3.10", "ci"), hint("3.11", "ci"), hint("3.9", "pyc-cache")], "several versions"),
     ([hint("3.8", "pipfile"), hint(">=3.10", "requires-python")], "violates >=3.10"),
-    ([hint("<3.12", "requires-python")], "without a lower bound"),
+    ([hint("<3.11", "requires-python")], "without a lower bound"),
 ])
 def test_python_needs_llm(contracts, hints, reason_part):
     plan = plan_build(ctx(python_version_hints=hints), contracts)
     assert plan.python.status == "needs_llm" and reason_part in plan.python.reason
     assert any(n.item == "python" for n in plan.needs_llm)
+
+
+@pytest.mark.parametrize("hints,reason_part", [
+    ([], "no Python version declared"),
+    ([hint("<3.12", "requires-python")], "without a lower bound"),
+])
+def test_python_assumed_when_the_repo_declares_none(contracts, hints, reason_part):
+    plan = plan_build(ctx(python_version_hints=hints), contracts)
+    p = plan.python
+    assert (p.status, p.version, p.assumed) == ("decided", "3.11", True) and reason_part in p.reason
+    assert not any(n.item == "python" for n in plan.needs_llm)
+    assert "python: 3.11 (ASSUMED)" in plan.summary()
+
+
+def test_a_declared_version_is_never_marked_assumed(contracts):
+    p = plan_build(ctx(python_version_hints=[hint("3.9", "pipfile")]), contracts).python
+    assert (p.version, p.assumed) == ("3.9", False)
 
 
 def test_python_forced_by_contract(tmp_path):
