@@ -1,0 +1,8 @@
+FIX LOOP taxi-trip-regression (diagnose_v5 x qwen-builder-sft-v5): PASSED, stopped because: passed
+  initial run: failed at evaluate
+  fix 1: stage evaluate -> set_env_var MLFLOW_TRACKING_URI=http://mlflow:5000 -> passed
+         retrieved: gen-012 mlflow_uri_wrong_port, gen-008 mlflow_client_unpinned, gen-007 mlflow_client_3_0_1
+         reason: The error indicates that the MLflow client is trying to connect to port 5001, but the server is running on port 5000. Setting the environment variable to point to the correct port should resolve this issue.
+score vs gen-013 (mlflow_uri_empty): {"first_fix_passed": true, "fixes_to_pass": 1, "exact": true, "loose": true, "first_action": {"action": "set_env_var", "name": "MLFLOW_TRACKING_URI", "value": "http://mlflow:5000"}, "case": "gen-013"}
+memory: base 4aa9a3ad11e5 (10 documents)
+write-back: none, evaluation run (frozen memory snapshot)

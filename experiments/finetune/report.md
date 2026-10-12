@@ -234,8 +234,63 @@ one.
 | **Total** | **56** (28/24/3/1) | **33** | **34** | **56** (25/28/3/0) | **34** | **37** |
 
 The v5 training set leans more on rationalized answers (16 of 34 after the cap, v3: 13 of 33), and
-version mismatch has no sampled example left. Not trained yet: `notebooks/qlora_sft.ipynb` now reads
-`v5/sft.jsonl` (`DATA_VERSION`) and names the model `qwen-builder-sft-v5`.
+version mismatch has no sampled example left. `notebooks/qlora_sft.ipynb` reads `v5/sft.jsonl`
+(`DATA_VERSION`) and names the model `qwen-builder-sft-v5`.
+
+**Training run SFT-v5** (Colab T4, `DATA_VERSION = "v5"`, otherwise the same settings as the v3 run):
+
+| Steps | Time | Train loss | unsloth | torch | transformers | trl | peft | bitsandbytes |
+|---|---|---|---|---|---|---|---|---|
+| 24 | 749 s | 0.269 | **2026.10.4** | 2.11.0+cu130 | 5.17.0 | **1.15.0** | 0.21.1 | 0.50.2 |
+
+unsloth and trl are newer than in the v3 run (2026.10.3, 1.13.0); the rest is the same.
+
+- Data: `v5/sft.jsonl`, sha256 `60c02379…aed1b9` (the file in this folder), 56 examples, 34 after the
+  cap (15 sampled, 16 rationalized, 3 human).
+- Tokens per example: min 1871, max 6183. **4 were longer than `MAX_SEQ_LEN` 6144 and dropped, so 30
+  were trained** (24 steps = 3 epochs of 8 updates; the v3 run trained all 33 in 27 steps).
+- Per-step loss (`loss.csv`, 24 updates): mean 0.269 (the reported train loss), from 0.37 at step 1
+  to 0.07 at step 24, not smoothly: step 8 is 0.97, steps 3-4 are 0.54.
+- Export: GGUF Q4_K_M, sha256 `d5fb5cb0…930ce9`; in Ollama as `qwen-builder-sft-v5` (id
+  `cd9ff68066d3`; its blob is the same file).
+
+**The 4 dropped examples are all of gen-009** (xgboost 3.0.0), the fault with the longest prompt:
+its error output lists every xgboost version pip can see. Recomputed here with the run's own
+tokenizer and chat template (min 1871 and max 6183, as the notebook printed):
+
+| Example | Fix | Tokens |
+|---|---|---|
+| gen-009 sampled, seed 8 | `set_python_version 3.10` (passed the sandbox) | 6153 |
+| gen-009 rationalized, seed 1 | `pin_package xgboost 2.0.0` (the verified fix) | 6171 |
+| gen-009 rationalized, seed 3 | `pin_package xgboost 2.0.0` | 6175 |
+| gen-009 rationalized, seed 2 | `pin_package xgboost 2.0.0` | 6183 |
+
+The next longest example has 3048 tokens (gen-012). With v3 prompts gen-009's longest was 6142, just
+under the limit: the v5 PYTHON line (about 40 tokens) pushed all four over.
+
+**What it means.** gen-009 is the one training fault whose error is about the Python version
+("requires Python >= 3.10") while the image and the Pipfile agree (`PYTHON: image python:3.9-slim
+(Python 3.9); Pipfile python_version 3.9; Pipfile.lock built for 3.9`), and the verified fix is not
+a Python change but a pin back to the locked xgboost 2.0.0. It was the counterexample to gen-004
+(3.12 against 3.9, fix `set_python_version 3.9`): together they show that the PYTHON line, not the
+word "Python" in the error, decides whether to change the version. SFT-v5 saw only gen-004. (One of
+the four, seed 8, did answer `set_python_version 3.10`, which also passed the sandbox, so gen-009 was
+not a pure counterexample even in the data.) The incompatible-pin family went from 8 trained examples
+to 4 (gen-003 only), and the trained set is 8 faults, not 9.
+
+**Proposed `MAX_SEQ_LEN`: 8192** (not changed yet). It keeps all 34 (longest 6183). It is also the
+context the fix loop gives the model at inference (`num_ctx` 8192 in `llm/ollama.py` and in the
+Modelfile), so any prompt the model can be asked fits in training. On a T4 the limit costs nothing
+by itself: with batch 1 and no packing an example is not padded to it, so memory grows only with the
+longest real example, 6183 tokens, 39 more than the 6153-token one that already fits under 6144. It
+would give 27 steps (9 updates per epoch).
+
+**Fix loop on the 4 held-out faults** (`diagnose_v5`, advanced retriever, `--memory base` with its
+snapshot hash, no write-back): first fix passes 3 of 4 (base model on v5: 1; SFT on v3: 2), fixed 3
+of 4, true reasons 5 of 6, copied 1 of 6. The gen-013 pass reuses the retrieved gen-012's fix and
+false reason ("port 5001"); the gen-010 pass needed the validator to refuse `set_python_version 3.9`
+on a 3.9 image; gen-011 was not fixed (no Python change in 3 fixes). Details: `docs/RESULTS.md`
+section 9.
 
 ## Files
 

@@ -2,11 +2,14 @@
 
 All LLM experiments of the Builder so far, in one place. Every run used **qwen2.5-coder:7b** through
 Ollama (temperature 0, seed 42, context 8192) on the taxi dev repo (`../taxi-trip-regression`);
-section 6 also uses its QLoRA fine-tune, `qwen-builder-sft`. The team's main project is a held-out test and was not used for any of these.
+sections 6 and 9 also use its QLoRA fine-tunes, `qwen-builder-sft` and `qwen-builder-sft-v5`. The team's main project is a held-out test and was not used for any of these.
 
 **Best configuration so far:** the fix loop with **`diagnose_v3` + the advanced retriever** (see 3 and 4).
 The QLoRA fine-tuned model (section 6) tied with the base model in it, so the base model stays.
 `diagnose_v5` (section 7) fixed all 4 held-out faults but passed fewer on the first fix (1 vs 2 of 4).
+The fine-tune on v5 data with `diagnose_v5` (section 9) has the highest first fix passes so far (3 of 4),
+but one of the three reuses a retrieved fault's answer with a false reason and another needs the
+validator; one run per fault, so the default is not changed.
 
 The LLM does two jobs, and both answer as strict JSON:
 
@@ -407,7 +410,7 @@ declared version.
   model reacts to the presence of a Python line, not only to a mismatch in it. A deterministic Python check outside the LLM (roadmap
   item 9 (e)) would fix gen-011 without the cost on gen-010.
 
-### Fine-tuning data with v5 prompts (roadmap step (b), not trained yet)
+### Fine-tuning data with v5 prompts (roadmap step (b); trained in section 9)
 
 The section 5 pipeline again, with only the prompt changed to `diagnose_v5`. 56 SFT examples (25
 sampled, 28 rationalized, 3 human, 0 written), 34 after the cap, 37 DPO pairs (v3: 56, 33, 34).
@@ -465,9 +468,97 @@ Logs: `experiments/evals/train_script_v1__*.json` (three runs: file output, file
 
 ---
 
+## 9. Fix loop with the model fine-tuned on v5 data: `qwen-builder-sft-v5`
+
+**Setup.** `diagnose_v5`, the advanced retriever, the 4 held-out faults, temperature 0, seed 42: the
+settings of section 7, with `--memory base --memory-snapshot 4aa9a3ad…` (evaluation mode: the run
+refuses to start if the memory changed, and writes nothing back; the same 10 documents as sections 6
+and 7). Only `--model` changes: `qwen-builder-sft-v5`, QLoRA on the v5 data of section 7. Training
+(details in `experiments/finetune/report.md`): Colab T4, 24 steps, 749 s, train loss 0.269; 30 of the
+34 capped examples, because **the 4 gen-009 examples were longer than `MAX_SEQ_LEN` 6144 and dropped**.
+unsloth (2026.10.4) and trl (1.15.0) are newer than in the section 6 run.
+
+A first launch was invalid: Docker Desktop wasn't running, so every fault "failed at build" with a
+Docker API error and the model gave up. Those 4 folders were deleted and the runs repeated after
+Docker started; nothing else changed.
+
+Each cell: first fix passes / fixes to pass / true reasons, then copied reasons (the rule of section 6).
+
+| Fault | SFT on v3 (section 6) | Base on v5 (section 7) | SFT-v5 on v5 |
+|---|---|---|---|
+| gen-001 MLflow client 3.1.4 | yes / 1 / 1 of 1; 0 copied | yes / 1 / 1 of 1; 0 | yes / 1 / 1 of 1; 0 |
+| gen-010 flask 2.0.3 | yes / 1 / 1 of 1; 0 | no / 2 / 1 of 2; 1 | yes / 1 / 1 of 1; 0 |
+| gen-011 Python 3.13 | no / not fixed / 3 of 3; 0 | no / 3 / 3 of 3; 0 | no / not fixed / 3 of 3; 0 |
+| gen-013 empty tracking URI | no / 2 / 0 of 2; 2 | no / 2 / 0 of 2; 2 | **yes / 1 / 0 of 1; 1** |
+| **First fix passes** (main metric) | 2 of 4 | 1 of 4 | **3 of 4** |
+| **Fixed** | 3 of 4 | 4 of 4 | 3 of 4 |
+| **Fixes, in total, to pass** | 4 (3 faults) | 8 (4 faults) | 3 (3 faults) |
+| **True reasons** | 5 of 7 | 5 of 8 | 5 of 6 |
+| **Copied reasons** | 2 of 7 | 3 of 8 | 1 of 6 |
+
+**The first attempts on gen-010 and gen-011** ("call rejected" = refused by the validator before any
+sandbox run; it doesn't count as a fix):
+
+| | SFT on v3 | Base on v5 | SFT-v5 on v5 |
+|---|---|---|---|
+| gen-010, attempt 1 | `set_python_version 3.9`: call rejected, the image is already 3.9 | `add_system_package libffi8`: failed (copied from the libffi8 fault) | `set_python_version 3.9`: call rejected, the image is already 3.9 |
+| gen-010, attempt 2 | `pin_package werkzeug 2.0.3`: **passed** | `set_python_version 3.9`: call rejected; then `werkzeug 2.3.1` passed | `pin_package werkzeug 2.0.3`: **passed** |
+| gen-011, attempt 1 | `add_system_package clang++`: call rejected; then `build-essential`: failed | the same | the same |
+| gen-011, attempt 2 | `add_dependency gdal`: failed | `add_system_package gdal-bin`: failed | `add_system_package gdal-bin`: failed |
+| gen-011, fix 3 | `add_system_package gdal-bin`: failed | **`set_python_version 3.9`: passed** | `set_env_var GDAL_CONFIG=/usr/bin/gdal-config`: failed |
+
+### What happened
+
+- **gen-013: a first fix pass for the wrong reason.** The top retrieved fault was gen-012 (wrong
+  port), and the answer is gen-012's: its fix (`MLFLOW_TRACKING_URI=http://mlflow:5000`) with its
+  cause ("the client is trying to connect to port 5001, but the server is running on port 5000").
+  The URI in gen-013 is empty; nothing uses port 5001. The fix passed because the two faults share
+  their fix, not because the model read gen-013's error. It counts as a pass under the declared
+  metric, but it is not a diagnosis. The other runs copied too, but pinned mlflow first.
+- **gen-010: the same as SFT on v3.** The model still proposes `set_python_version 3.9` first on a
+  3.9 image, even though the PYTHON line shows 3.9 everywhere. The validator refuses it, and the second
+  call pins werkzeug 2.0.3. Without that validator rule the first fix would be a no-op and the cell
+  would read "no / 2". Compared with the base model on v5, there is no libffi8 copy this time.
+- **gen-011: the v5 gain is lost.** The base model on v5 reached `set_python_version 3.9` on its
+  third fix. SFT-v5 tried `GDAL_CONFIG` instead and never named the Python version, although
+  `PYTHON: image python:3.13-slim (Python 3.13); Pipfile python_version 3.9; ...` was in every prompt.
+
+### Did dropping gen-009 matter?
+
+gen-009 was the one training fault whose error is about the Python version while the image and the
+Pipfile agree, and whose verified fix is a pin, not a Python change: the counterexample to gen-004.
+SFT-v5 trained on gen-004's answer (change the version) without it. On gen-010, where the versions
+also agree, it proposed the Python change first, which fits the missing counterexample. But SFT on v3,
+which did train on gen-009, made the same first call. So this run can't show that the drop caused it.
+The test is to retrain with all 34 examples (proposed `MAX_SEQ_LEN` 8192, report.md) and rerun.
+
+### Lessons
+
+- **On the main metric this is the best run so far (3 of 4), but the gain is thin.** Of the three
+  passes, gen-013's reuses a retrieved answer with a false reason, and gen-010's depends on the
+  validator rule. Against the base model on the same prompt and memory (section 7), it is +2 first
+  fix passes (gen-010, gen-013) and -1 fault fixed (gen-011).
+- **Fine-tuning didn't teach the Python comparison.** With the mismatch stated in the prompt, the
+  base model found the fix on gen-011 and the fine-tuned model didn't, and the fine-tuned model still
+  proposes a version change where the line shows none is needed. The deterministic Python check
+  (roadmap item 9 (e)) remains the direct fix.
+- **Copying remains, now in the fix as well as the reason.** True reasons are 5 of 6 and copied 1 of
+  6 (the best ratio so far), but the one copy decided a fault.
+- **Not a controlled comparison of the data alone.** The training set lost 4 examples (one fault),
+  and unsloth and trl changed. One run per fault at temperature 0, 4 faults: a one-fault difference is
+  within noise.
+
+Logs: `experiments/fixes/gen-NNN-<variant>__diagnose_v5-advanced__qwen-builder-sft-v5/` (each
+`summary.txt` records the memory snapshot and "write-back: none"); copied-term check:
+`experiments/finetune/fixloop_copied_terms.json` (keys `sft-v5 gen-NNN`).
+
+---
+
 ## Not run yet
 
 - DPO training (roadmap item 9 step 4); the pairs are in section 5.
+- SFT-v5 with all 34 capped examples (`MAX_SEQ_LEN` 8192, so gen-009 is kept), to test whether the
+  dropped counterexample matters (section 9).
 - Families 2 (missing dependency) and 6 (system library) have no held-out test case on the taxi repo:
   each has only one variant that breaks, and it is in memory.
 - 4 test faults are few: one fault can change a total by 25 points. Read the tables as directions,

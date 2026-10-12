@@ -1,0 +1,12 @@
+{
+  "first_fix_passed": true,
+  "fixes_to_pass": 1,
+  "exact": true,
+  "loose": true,
+  "first_action": {
+    "action": "set_env_var",
+    "name": "MLFLOW_TRACKING_URI",
+    "value": "http://mlflow:5000"
+  },
+  "case": "gen-013"
+}
