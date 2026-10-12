@@ -8,31 +8,48 @@ can generate, check and deliver every file it owns (gaps: `docs/PIPELINE_GAPS.md
 - **Every value that depends on another agent** goes into an `integration` section of
   `contracts.yaml`. Each one has a working default and a comment naming the agent that will confirm
   it (for example the agents.yaml format: board owner; the router: Deployer).
-- **`docs/INTEGRATION.md`** will list the questions to ask the team.
+- **`docs/INTEGRATION.md`** lists the questions to ask the team and the field each answer changes.
 
-The grade weighs the LLM work most, so the order is:
+**Integration rule.** Any feature that touches another agent:
 
-**A. The Builder works**
+- puts its team-dependent values in the `integration` section;
+- adds its questions to `docs/INTEGRATION.md`;
+- uses a documented format.
 
-1. **Deterministic Python-version check**: image vs Pipfile, outside the LLM, reported separately
-   from the LLM-only results (item 9 (e) below).
-2. **Create command**: writes the files that passed the sandbox to a `builder/<date>` branch
-   through `RepoWriter`.
-3. **A minimal `integration` section** in `contracts.yaml`, **`agents.yaml`**, and
-   **`docs/INTEGRATION.md`**.
+### A. The Builder works
 
-**B. LLM work**
+1. **Deterministic Python-version check.** When the image's Python version and the repo's declared
+   version disagree, the Builder sets the declared version itself, before asking the LLM, and logs
+   it as a rule-based fix. A fix-loop option turns the rule off, so LLM-only evaluations and past
+   runs stay reproducible.
+2. **Docs cleanup.** Mark the main-project phase below as obsolete. Explain in `docs/RESULTS.md`
+   why v3 + advanced stays the default.
+3. **Create command.** Scan, decide, slots, sandbox and fix loop, then write the passing files to a
+   `builder/<date>` branch through `RepoWriter`.
+4. **Integration.** The `integration` section in `contracts.yaml`, `agents.yaml`,
+   `docs/INTEGRATION.md`, and a command that lists the fields still at their defaults.
+   - **4b. Integration rehearsal.** Change every integration field on a test repo, then check that
+     the generated files follow and still pass the sandbox.
 
-4. **DPO** starting from the SFT-v5 adapter, with `MAX_SEQ_LEN` 8192 so gen-009 is kept.
-5. **Retry slot filling when training fails**, with the runtime error as feedback (for example the
-   `sys.argv[2]` mistake in `docs/RESULTS.md` section 8).
-6. **LLM-assisted Pandera schema**, validated in the sandbox against the repo's own data.
-7. **Generalization test on 2 pinned public repos** (`docs/GENERALITY.md` section 4).
+### B. LLM work
 
-**C. Report and demo.**
+5. **Evaluation protocol, written before running.** Then leave-one-out over the 14 faults
+   (fault-001 and gen-001..013), with 5 samples each, for `diagnose_v1`, v3 and v5.
+6. **Retry slot filling from training errors**: the runtime error goes back to the LLM as feedback
+   (for example the `sys.argv[2]` mistake in `docs/RESULTS.md` section 8).
+7. **LLM-assisted Pandera schema**, validated in the sandbox against the repo's own data.
+8. **Two pinned GitHub repos working end to end** (`docs/GENERALITY.md` section 4).
+9. **Fault generator on the 4–5 working repos**, plus Gistable and Shipwright errors in memory.
+10. **Leave-one-repo-out evaluation**, and SFT retrained on the larger data.
+11. **DPO**, if time remains: from the SFT-v5 adapter, with `MAX_SEQ_LEN` 8192 so gen-009 is kept.
 
-**D. Future work:** router and candidate container, model registry, lineage map, conda, single-file
-split, a real GitHub CI run.
+### C. Report and demo
+
+Then the new team project is the final held-out test.
+
+### D. Future work
+
+Router and candidate container, model registry, lineage map, conda, a real GitHub CI run.
 
 ---
 
