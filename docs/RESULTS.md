@@ -10,6 +10,7 @@ The QLoRA fine-tuned model (section 6) tied with the base model in it, so the ba
 The fine-tune on v5 data with `diagnose_v5` (section 9) has the highest first fix passes so far (3 of 4),
 but one of the three reuses a retrieved fault's answer with a false reason and another needs the
 validator; one run per fault, so the default is not changed.
+v3 + advanced on the base model stays the default because section 9's lead is one run per fault on 4 faults, rests on a copied answer (gen-013) and a validator rejection (gen-010), loses gen-011, and needs a fine-tuned model no other configuration does; the leave-one-out evaluation (ROADMAP B5) decides it.
 
 The LLM does two jobs, and both answer as strict JSON:
 

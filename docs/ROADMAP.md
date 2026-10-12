@@ -53,6 +53,10 @@ Router and candidate container, model registry, lineage map, conda, a real GitHu
 
 ---
 
+## Obsolete: the main-project phase (kept as a record)
+
+**Obsolete since 2026-10-12.** The team is choosing a new, smaller project, which will be the final held-out test (plan above, C). Everything below this line describes the earlier phase aimed at `mlops-zoomcamp-project`: what was done stays done (verify mode, fault cases 2-4, the LLM experiments of item 9), and the steps that weren't done are dropped unless the plan above brings them back.
+
 Next phase: from the taxi dev repo to the team's main project
 (`C:/dev/mlops-zoomcamp-project`). Done so far: steps 1–5 in CLAUDE.md, plus the
 slot-filling loop and its evals (`experiments/evals/`).
