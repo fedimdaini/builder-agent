@@ -1,5 +1,33 @@
 # Builder roadmap
 
+## New direction (2026-10-12)
+
+**The Builder must be complete on its own.** It should not wait for another agent to exist before it
+can generate, check and deliver every file it owns (gaps: `docs/PIPELINE_GAPS.md`).
+
+- **Every value that depends on another agent** goes into an `integration` section of
+  `contracts.yaml`. Each one has a working default and a comment naming the agent that will confirm
+  it (for example the router format: Deployer; the board URL: board owner; the agents.yaml format:
+  board owner; the lineage map format and path: Reviewer and Trainer).
+- **`docs/INTEGRATION.md`** will list the questions to ask the team and, for each one, the
+  `integration` field its answer changes.
+
+Next steps, in order:
+
+1. **Deterministic Python-version check**: image vs Pipfile, outside the LLM, reported separately
+   from the LLM-only results (item 9 (e) below).
+2. **Create command**: scan, decide, slots, sandbox and fix loop, then write the passing files to a
+   `builder/<date>` branch through `RepoWriter` and commit them.
+3. **The `integration` section** of `contracts.yaml`, **`agents.yaml`**, and **`docs/INTEGRATION.md`**.
+4. **Candidate container and router behind a switch** (an `integration` field, off by default until
+   the Deployer confirms the ownership).
+5. **Model registry**: register the trained model and serve `models:/<name>/<version>`.
+6. **Pandera schema**: a first `schema.py` draft for the Inspector, checked against the repo's own
+   eval data.
+7. **DPO** starting from the SFT-v5 adapter, with `MAX_SEQ_LEN` 8192 so gen-009 is kept.
+
+---
+
 Next phase: from the taxi dev repo to the team's main project
 (`C:/dev/mlops-zoomcamp-project`). Done so far: steps 1–5 in CLAUDE.md, plus the
 slot-filling loop and its evals (`experiments/evals/`).
