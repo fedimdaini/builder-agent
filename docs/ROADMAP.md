@@ -16,7 +16,9 @@ can generate, check and deliver every file it owns (gaps: `docs/PIPELINE_GAPS.md
 - adds its questions to `docs/INTEGRATION.md`;
 - uses a documented format.
 
-### A. The Builder works
+### A. The Builder works: done (2026-10-12)
+
+Done, each step with its regression checks: 1 Python rule `c723bf6`; 2 docs cleanup `4044825`; 3 create command `a0ccb54`; 4 integration `69a4794`; 4b integration rehearsal `59162ef` (3 bugs fixed). The step text below is the plan as written.
 
 1. **Deterministic Python-version check.** When the image's Python version and the repo's declared
    version disagree, the Builder sets the declared version itself, before asking the LLM, and logs
@@ -33,7 +35,7 @@ can generate, check and deliver every file it owns (gaps: `docs/PIPELINE_GAPS.md
 
 ### B. LLM work
 
-5. **Evaluation protocol, written before running.** Then leave-one-out over the 14 faults
+5. **Evaluation protocol, written before running.** *Protocol approved 2026-10-12 (`docs/EVAL_PROTOCOL.md`, `3778d13`, with its Decisions section); the runner, the leave-one-out memory and the analysis are still to build; nothing run yet.* Then leave-one-out over the 14 faults
    (fault-001 and gen-001..013), with 5 samples each, for `diagnose_v1`, v3 and v5.
 6. **Retry slot filling from training errors**: the runtime error goes back to the LLM as feedback
    (for example the `sys.argv[2]` mistake in `docs/RESULTS.md` section 8).

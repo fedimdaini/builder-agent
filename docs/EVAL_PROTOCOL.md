@@ -197,6 +197,20 @@ A new RESULTS.md section with:
 The sections 4–9 single runs stay as they are. They used temperature 0 and a different memory, so they
 aren't pooled with these runs.
 
+## Decisions (2026-10-12, approved before any run)
+
+1. **Test faults in the memory.** The split-test faults (gen-001, 010, 011, 013) may go into the memory
+   for the other cases, never while they are being tested. This replaces the earlier rule that kept
+   them out of the memory. The rule for training data is unchanged.
+2. **No-sibling subgroup.** Every metric is also reported for the 5 cases with no same-fix fault in
+   their memory (gen-002, 003, 006, 009, 010).
+3. **Hand labels by Jack, blind.** Jack labels the 50 sampled reasons himself. He gets a file with, per
+   reason, the fault, its error line and the reason, and nothing else: not the filter's verdict, not
+   the config.
+4. **An extra pass at temperature 0.** 14 cases × 3 configurations, one run each (42 runs, about 2 h),
+   with the same leave-one-out memory and `--no-python-rule`. It is reported next to the main results
+   and not pooled with them.
+
 ## Changes after approval
 
 (none yet)
