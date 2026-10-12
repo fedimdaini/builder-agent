@@ -120,6 +120,13 @@ def main():
         per_group[str(group)] = {"rmse": m["rmse"], "mae": m["mae"], "n": int(len(idx))}
     report = {{ '{' }}{{ report_fields.model_version | py }}: version, {{ report_fields.metrics | py }}: metrics(y_true, y_pred), {{ report_fields.per_group | py }}: per_group}
 {% endif %}
+{% if metric_filter %}
+    # only the metrics the Trainer reads (contracts.yaml integration.trainer); per group, also the row count
+    keep = {{ metric_filter | py }}
+    report[{{ report_fields.metrics | py }}] = {k: v for k, v in report[{{ report_fields.metrics | py }}].items() if k in keep}
+    report[{{ report_fields.per_group | py }}] = {g: {k: v for k, v in m.items() if k in keep or k == "n"}
+                                                  for g, m in report[{{ report_fields.per_group | py }}].items()}
+{% endif %}
 
     out = ROOT / EVAL_REPORT
     out.parent.mkdir(parents=True, exist_ok=True)

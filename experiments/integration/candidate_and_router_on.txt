@@ -1,0 +1,2 @@
+CREATE taxi: FAILED: rendering failed: RenderError: contracts.yaml integration.deployer.candidate_and_router is true, but the candidate container and router are not implemented yet (ROADMAP D)
+  report: C:\Users\mdain\OneDrive\Bureau\adsp-project\builder-agent\logs\create\20261012T215545Z-taxi.json

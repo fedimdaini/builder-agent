@@ -1,0 +1,42 @@
+INTEGRATION: 34 of 34 field(s) not confirmed yet (7 still at the Builder's default)
+  monitor (to confirm):
+    predictions_log = monitoring/predictions.log.jsonl  [changed, default logs/predictions.jsonl]
+    predictions_log_fields = {"time": "ts", "model_version": "model", "features": "inputs", "prediction": "output", "request_id": "trace_id"}  [changed, default {"time": "time", "model_version": "model_version", "features": "features", "prediction": "prediction", "request_id": "request_id"}]
+  trainer (to confirm):
+    eval_report = metrics_out/evaluation.json  [changed, default reports/eval.json]
+    eval_report_fields = {"model_version": "model", "task": "kind", "metrics": "scores", "per_group": "by_group"}  [changed, default {"model_version": "model_version", "task": "task", "metrics": "metrics", "per_group": "per_group"}]
+    eval_metrics = ["rmse", "mae"]  [changed, default ["rmse", "mae", "r2"]]
+    eval_classification_metrics = ["accuracy", "f1_macro"]  [changed, default ["accuracy", "f1_macro", "roc_auc"]]
+    latest_model_uri = state/latest_model.txt  [changed, default models/latest_model_uri.txt]
+    mlflow_experiment = rehearsal-experiment  [changed, default mlops-zoomcamp-experiment]
+    train_command = make train  [default]
+    evaluate_command = make evaluate  [default]
+  inspector (to confirm):
+    raw_data = data/external  [changed, default data/raw]
+    processed_data = data/processed  [default]
+    schema_path = quality/schema.py  [changed, default schema.py]
+  deployer (to confirm):
+    serving_port = 8081  [changed, default 8000]
+    endpoints = {"predict": {"method": "POST", "path": "/v1/predict"}, "health": {"method": "GET", "path": "/v1/healthz"}}  [changed, default {"predict": {"method": "POST", "path": "/predict"}, "health": {"method": "GET", "path": "/health"}}]
+    request_format = json  [default]
+    prediction_field = y_pred  [changed, default prediction]
+    model_version_field = model_tag  [changed, default model_version]
+    error_status = 4xx_or_5xx  [default]
+    model_uri_env = SERVING_MODEL_URI  [changed, default MODEL_URI]
+    serve_command = make serve  [default]
+    current_service = model-live  [changed, default serving-current]
+    candidate_service = model-next  [changed, default serving-candidate]
+    deploy_file = deploy/compose.deploy.yaml  [changed, default compose.deploy.yml]
+    router_config = deploy/router.yaml  [changed, default router.yaml]
+    candidate_and_router = false  [default]
+  board (to confirm):
+    url = http://board-svc:5678  [changed, default http://board:8000]
+    image = hashicorp/http-echo:1.0.0  [changed, default ]
+    agents_file = team/agents.yaml  [changed, default agents.yaml]
+    subscriptions = {"builder": ["pipeline:*", "type:question"], "reviewer": ["code:*", "feature:*", "pipeline:*"], "inspector": ["dataset:*", "type:question"], "trainer": ["dataset:*", "model:*", "type:alert"], "deployer": ["deployment:*"], "monitor": ["feature:*", "model:*", "expected_change:*", "type:alert"]}  [changed, default {"builder": ["pipeline:*"], "reviewer": ["code:*", "feature:*"], "inspector": ["dataset:*", "feature:*", "type:question"], "trainer": ["dataset:*", "model:*"], "deployer": ["model:*", "deployment:*"], "monitor": ["feature:*", "model:*", "expected_change:*"]}]
+  reviewer (to confirm):
+    builder_commit_author = Rehearsal Bot <rehearsal@example.com>  [changed, default Builder agent <builder@localhost>]
+    ci_workflow = .github/workflows/builder-ci.yml  [changed, default .github/workflows/ci.yml]
+  team (to confirm):
+    mlflow_uri = http://tracking:5050  [changed, default http://mlflow:5000]
+    mlflow_server_image = ghcr.io/mlflow/mlflow:v2.17.1  [changed, default ghcr.io/mlflow/mlflow:v2.17.2]

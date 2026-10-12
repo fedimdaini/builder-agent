@@ -1,0 +1,272 @@
+# Integration rehearsal copy of contracts.yaml (made by make_rehearsal_contracts.py): every
+# integration field that has another valid value is changed. Never used for real runs.
+contract_version: 1
+project:
+  main_repo: mlops-zoomcamp-project
+  dev_repos:
+  - taxi-trip-regression
+  python_version: auto
+serving:
+  mode: auto
+make_targets:
+  install: install dependencies
+  data: build features from raw data into paths.processed_data
+  train: train a model and log it to MLflow
+  evaluate: evaluate a model and write paths.eval_report
+  serve: start the model service on serving.port
+  test: run the smoke test
+  all: install, data, train, evaluate, test in order
+sample_mode:
+  variable: SAMPLE
+  fraction: 0.01
+paths:
+  models: models
+  adapters_dir: pipeline
+compose:
+  base_file: compose.base.yml
+  data: mounted
+smoke_test:
+  health_status: 200
+  predict_status: 2xx
+  predict_body_has_not: error
+ownership:
+  Makefile: builder
+  Dockerfile: builder
+  .dockerignore: builder
+  compose.base.yml: builder
+  compose.deploy.yml: deployer
+  router.yaml: deployer
+  .github/workflows/ci.yml: builder
+  schema.py: inspector
+  agents.yaml: board
+  lineage_map:
+  - reviewer
+  - trainer
+  pipeline/: builder
+  contracts.yaml: team
+integration:
+  monitor:
+    predictions_log:
+      value: monitoring/predictions.log.jsonl
+      default: logs/predictions.jsonl
+      confirmed: false
+    predictions_log_fields:
+      value:
+        time: ts
+        model_version: model
+        features: inputs
+        prediction: output
+        request_id: trace_id
+      default:
+        time: time
+        model_version: model_version
+        features: features
+        prediction: prediction
+        request_id: request_id
+      confirmed: false
+  trainer:
+    eval_report:
+      value: metrics_out/evaluation.json
+      default: reports/eval.json
+      confirmed: false
+    eval_report_fields:
+      value:
+        model_version: model
+        task: kind
+        metrics: scores
+        per_group: by_group
+      default:
+        model_version: model_version
+        task: task
+        metrics: metrics
+        per_group: per_group
+      confirmed: false
+    eval_metrics:
+      value:
+      - rmse
+      - mae
+      default:
+      - rmse
+      - mae
+      - r2
+      confirmed: false
+    eval_classification_metrics:
+      value:
+      - accuracy
+      - f1_macro
+      default:
+      - accuracy
+      - f1_macro
+      - roc_auc
+      confirmed: false
+    latest_model_uri:
+      value: state/latest_model.txt
+      default: models/latest_model_uri.txt
+      confirmed: false
+    mlflow_experiment:
+      value: rehearsal-experiment
+      default: mlops-zoomcamp-experiment
+      confirmed: false
+    train_command:
+      value: make train
+      default: make train
+      confirmed: false
+    evaluate_command:
+      value: make evaluate
+      default: make evaluate
+      confirmed: false
+  inspector:
+    raw_data:
+      value: data/external
+      default: data/raw
+      confirmed: false
+    processed_data:
+      value: data/processed
+      default: data/processed
+      confirmed: false
+    schema_path:
+      value: quality/schema.py
+      default: schema.py
+      confirmed: false
+  deployer:
+    serving_port:
+      value: 8081
+      default: 8000
+      confirmed: false
+    endpoints:
+      value:
+        predict:
+          method: POST
+          path: /v1/predict
+        health:
+          method: GET
+          path: /v1/healthz
+      default:
+        predict:
+          method: POST
+          path: /predict
+        health:
+          method: GET
+          path: /health
+      confirmed: false
+    request_format:
+      value: json
+      default: json
+      confirmed: false
+    prediction_field:
+      value: y_pred
+      default: prediction
+      confirmed: false
+    model_version_field:
+      value: model_tag
+      default: model_version
+      confirmed: false
+    error_status:
+      value: 4xx_or_5xx
+      default: 4xx_or_5xx
+      confirmed: false
+    model_uri_env:
+      value: SERVING_MODEL_URI
+      default: MODEL_URI
+      confirmed: false
+    serve_command:
+      value: make serve
+      default: make serve
+      confirmed: false
+    current_service:
+      value: model-live
+      default: serving-current
+      confirmed: false
+    candidate_service:
+      value: model-next
+      default: serving-candidate
+      confirmed: false
+    deploy_file:
+      value: deploy/compose.deploy.yaml
+      default: compose.deploy.yml
+      confirmed: false
+    router_config:
+      value: deploy/router.yaml
+      default: router.yaml
+      confirmed: false
+    candidate_and_router:
+      value: false
+      default: false
+      confirmed: false
+  board:
+    url:
+      value: http://board-svc:5678
+      default: http://board:8000
+      confirmed: false
+    image:
+      value: hashicorp/http-echo:1.0.0
+      default: ''
+      confirmed: false
+    agents_file:
+      value: team/agents.yaml
+      default: agents.yaml
+      confirmed: false
+    subscriptions:
+      value:
+        builder:
+        - pipeline:*
+        - type:question
+        reviewer:
+        - code:*
+        - feature:*
+        - pipeline:*
+        inspector:
+        - dataset:*
+        - type:question
+        trainer:
+        - dataset:*
+        - model:*
+        - type:alert
+        deployer:
+        - deployment:*
+        monitor:
+        - feature:*
+        - model:*
+        - expected_change:*
+        - type:alert
+      default:
+        builder:
+        - pipeline:*
+        reviewer:
+        - code:*
+        - feature:*
+        inspector:
+        - dataset:*
+        - feature:*
+        - type:question
+        trainer:
+        - dataset:*
+        - model:*
+        deployer:
+        - model:*
+        - deployment:*
+        monitor:
+        - feature:*
+        - model:*
+        - expected_change:*
+      confirmed: false
+  reviewer:
+    builder_commit_author:
+      value: Rehearsal Bot <rehearsal@example.com>
+      default: Builder agent <builder@localhost>
+      confirmed: false
+    ci_workflow:
+      value: .github/workflows/builder-ci.yml
+      default: .github/workflows/ci.yml
+      confirmed: false
+  team:
+    mlflow_uri:
+      value: http://tracking:5050
+      default: http://mlflow:5000
+      confirmed: false
+    mlflow_server_image:
+      value: ghcr.io/mlflow/mlflow:v2.17.1
+      default: ghcr.io/mlflow/mlflow:v2.17.2
+      confirmed: false
+team_repo:
+  layout: monorepo

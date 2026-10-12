@@ -39,8 +39,8 @@ That would be a new field, not a rename.
 
 Limits today:
 - **Metrics:** only `rmse`, `mae`, `r2` and `accuracy`, `f1_macro`, `roc_auc` are supported. Asking for
-  another one stops rendering with a clear error. The report always contains all the supported metrics
-  of its task: a shorter list is accepted but doesn't remove any.
+  another one stops rendering with a clear error. A shorter list keeps only those metrics in the report,
+  overall and per group. Per group, the row count `n` always stays.
 - **Commands:** each must be `make <target>` with a target of `make_targets`. Renaming a target is a
   contract change.
 

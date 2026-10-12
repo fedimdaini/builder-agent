@@ -109,6 +109,13 @@ def experiment_name(ctx: RepoContext, c: Contracts) -> str:
     return re.sub(r"[^a-z0-9._-]+", "-", ctx.name.lower()).strip("-") or "builder"
 
 
+def _metric_filter(fmt: dict, task: str) -> list[str] | None:
+    key, supported = (("classification_metrics", SUPPORTED_CLASSIFICATION_METRICS) if task == "classification"
+                      else ("metrics", SUPPORTED_METRICS))
+    wanted = list(fmt.get(key, {}))
+    return None if set(wanted) == supported else wanted
+
+
 def template_context(ctx: RepoContext, c: Contracts, s: SlotAnswers) -> dict:
     adapters_dir = c.paths["adapters_dir"].strip("/")
     headers = {d.path: d.columns for d in ctx.data_columns}
@@ -162,6 +169,8 @@ def template_context(ctx: RepoContext, c: Contracts, s: SlotAnswers) -> dict:
         "flavor": s.model_flavor,
         "model_input": s.model_input,
         "task": task,
+        # the metrics the Trainer reads (integration.trainer): rendered as a filter only when it's not all of them
+        "metric_filter": _metric_filter(fmt, task),
         # train
         "fn_module": module,
         "fn_name": fn_name,
@@ -241,12 +250,12 @@ class Expected(BaseModel):
 
 
 def smoke_context(c: Contracts, expected: Expected | None) -> dict:
-    smoke = (c.model_extra or {}).get("smoke_test", {})
+    smoke = c.smoke_test          # a typed field: predict_body_has is the contract's prediction field (load_contracts)
     return {
-        "health_status": smoke.get("health_status", 200),
-        "predict_status": smoke.get("predict_status", "2xx"),
-        "body_has": smoke.get("predict_body_has", "prediction"),
-        "body_has_not": smoke.get("predict_body_has_not", "error"),
+        "health_status": smoke["health_status"],
+        "predict_status": smoke["predict_status"],
+        "body_has": smoke["predict_body_has"],
+        "body_has_not": smoke["predict_body_has_not"],
         "expected": expected.prediction if expected else None,
         "expected_rel_tol": expected.rel_tolerance if expected else 0.0,
     }

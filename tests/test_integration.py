@@ -195,3 +195,33 @@ def test_no_integration_default_is_hard_coded(contracts):  # noqa: F811
         text = path.read_text(encoding="utf-8")
         found += [(path.relative_to(ROOT).as_posix(), d) for d in defaults if d in text]
     assert not found, found
+
+
+# --- bugs the integration rehearsal found (experiments/integration/report.md) -----------------------
+
+def test_runtime_output_folders_are_volumes(mini, tmp_path):  # noqa: F811
+    """Bug 1: only models/ and the predictions log folder were mounted, so a latest model URI or an eval
+    report in another folder never reached the next stage's container, or the host."""
+    c = edited(tmp_path, lambda d: [setv("trainer", "latest_model_uri", "state/latest.txt")(d),
+                                    setv("trainer", "eval_report", "metrics_out/eval.json")(d)])
+    out = tmp_path / "out"
+    render_all(mini, c, out)
+    vols = yaml.safe_load((out / "compose.base.yml").read_text(encoding="utf-8"))["services"]["serving-current"]["volumes"]
+    assert {"./state:/app/state", "./metrics_out:/app/metrics_out", "./logs:/app/logs"} <= set(vols)
+
+
+def test_a_shorter_metric_list_filters_the_report(mini, contracts, tmp_path):  # noqa: F811
+    """Bug 2: the report kept every supported metric whatever the Trainer listed."""
+    c = edited(tmp_path, setv("trainer", "eval_metrics", ["rmse"]))
+    render_all(mini, c, tmp_path / "a")
+    assert 'keep = ["rmse"]' in (tmp_path / "a/pipeline/evaluate.py").read_text(encoding="utf-8")
+    render_all(mini, contracts, tmp_path / "b")                        # the full default list: no filter rendered
+    assert "keep = " not in (tmp_path / "b/pipeline/evaluate.py").read_text(encoding="utf-8")
+
+
+def test_the_smoke_test_checks_the_contract_prediction_field(mini, tmp_path):  # noqa: F811
+    """Bug 3: the smoke test read smoke_test from the untyped extras, so it always looked for "prediction"."""
+    c = edited(tmp_path, setv("deployer", "prediction_field", "y_pred"))
+    render_all(mini, c, tmp_path / "out")
+    smoke = (tmp_path / "out/pipeline/smoke_test.py").read_text(encoding="utf-8")
+    assert '"y_pred"' in smoke and '"prediction"' not in smoke

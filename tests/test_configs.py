@@ -96,7 +96,8 @@ def test_taxi_compose(taxi_render):
     compose = yaml.safe_load(read(root, "compose.base.yml"))
     mlflow, serving = compose["services"]["mlflow"], compose["services"]["serving-current"]
     assert mlflow["image"] == "ghcr.io/mlflow/mlflow:v2.17.2" and mlflow["ports"] == ["5000:5000"]
-    assert serving["volumes"] == ["./data:/app/data:ro", "./models:/app/models", "./logs:/app/logs"]
+    # every runtime output folder is a volume: the model URI (models/), the eval report (reports/), the predictions log
+    assert serving["volumes"] == ["./data:/app/data:ro", "./models:/app/models", "./reports:/app/reports", "./logs:/app/logs"]
     assert serving["environment"] == {"MLFLOW_TRACKING_URI": "http://mlflow:5000", "MODEL_URI": "${MODEL_URI:-}"}
     assert serving["ports"] == ["8000:8000"] and serving["depends_on"] == ["mlflow"]
     assert "http://localhost:8000/health" in serving["healthcheck"]["test"][-1]

@@ -30,6 +30,7 @@ from .slots import FLAVOR_DIST, SlotAnswers, validate_slots
 
 WORKDIR = "/app"
 ADAPTER_SCRIPTS = {"data": "data.py", "train": "train.py", "evaluate": "evaluate.py"}
+RUNTIME_OUTPUTS = ("latest_model_uri", "eval_report", "predictions_log")   # contract paths written while the pipeline runs
 ADAPTER_PACKAGES = ["mlflow", "pandas", "numpy", "flask", "gunicorn"]   # what the adapters import
 TEST_STUB = ['@echo "make test: no smoke test: the adapters were not rendered" >&2', "@exit 1"]
 
@@ -92,7 +93,7 @@ def _top_dirs(ctx: RepoContext, c: Contracts) -> tuple[list[str], list[str], lis
 
     data = {top(d.path) for d in ctx.data_dirs} | {top(c.paths.get("raw_data")), top(c.paths.get("processed_data"))}
     models = {top(d.path) for d in ctx.model_dirs} | {top(c.paths.get("models"))}
-    outputs = {top(posixpath.dirname(c.paths[k])) for k in ("eval_report", "predictions_log")
+    outputs = {top(posixpath.dirname(c.paths[k])) for k in RUNTIME_OUTPUTS
                if posixpath.dirname(c.paths.get(k, ""))}
     clean = lambda dirs: sorted(d for d in dirs if d and d not in code_dirs)  # noqa: E731
     return clean(data), clean(models), clean(outputs - data - models)
@@ -190,7 +191,10 @@ def config_context(ctx: RepoContext, c: Contracts, plan: BuildPlan, slots: SlotA
     board = urlparse(c.i("board", "url"))
     data_dirs, model_dirs, output_dirs = _top_dirs(ctx, c)
     models_dir = PurePosixPath(c.paths["models"]).parts[0]
-    logs_dir = posixpath.dirname(c.paths["predictions_log"])
+    # folders of the runtime outputs (model URI, eval report, predictions log): each make target runs in its own
+    # container, so they must be on a volume to reach the next stage and the host (the Trainer and Monitor read them)
+    runtime_dirs = [d for k in RUNTIME_OUTPUTS if (d := posixpath.dirname(c.paths[k]))
+                    and PurePosixPath(d).parts[0] != models_dir]
     health = c.serving.endpoints["health"].path
 
     return {
@@ -227,7 +231,7 @@ def config_context(ctx: RepoContext, c: Contracts, plan: BuildPlan, slots: SlotA
         "models_dir": models_dir,
         "output_dirs": output_dirs,
         "mounts": [f"./{d}:{WORKDIR}/{d}:ro" for d in data_dirs]
-                  + [f"./{d}:{WORKDIR}/{d}" for d in dict.fromkeys([models_dir, logs_dir])],
+                  + [f"./{d}:{WORKDIR}/{d}" for d in dict.fromkeys([models_dir, *runtime_dirs])],
         "healthcheck": ["CMD", "python", "-c",
                         f"import urllib.request; urllib.request.urlopen('http://localhost:{port}{health}', timeout=3)"],
         "sample_var": c.sample_mode.variable,

@@ -1,0 +1,470 @@
+{
+ "taxi": {
+  "branch": "builder/2026-10-12",
+  "files": [
+   ".dockerignore",
+   "Dockerfile",
+   "Makefile",
+   "compose.base.yml",
+   "pipeline/.builder-manifest.json",
+   "pipeline/data.py",
+   "pipeline/evaluate.py",
+   "pipeline/sample_request.json",
+   "pipeline/serve.py",
+   "pipeline/smoke_test.py",
+   "pipeline/train.py",
+   "team/agents.yaml"
+  ],
+  "checks": [
+   {
+    "field": "monitor.predictions_log",
+    "value": "monitoring/predictions.log.jsonl",
+    "where": "serve.py PREDICTIONS_LOG; compose volume ./monitoring; agents.yaml monitor watch (runtime)",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "monitor.predictions_log_fields",
+    "value": {
+     "time": "ts",
+     "model_version": "model",
+     "features": "inputs",
+     "prediction": "output",
+     "request_id": "trace_id"
+    },
+    "where": "serve.py log line keys (and the response's request id key)",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "trainer.eval_report",
+    "value": "metrics_out/evaluation.json",
+    "where": "evaluate.py EVAL_REPORT; compose volume ./metrics_out; agents.yaml trainer watch (runtime)",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "trainer.eval_report_fields",
+    "value": {
+     "model_version": "model",
+     "task": "kind",
+     "metrics": "scores",
+     "per_group": "by_group"
+    },
+    "where": "evaluate.py report keys (task key: classification only)",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "trainer.eval_metrics",
+    "value": [
+     "rmse",
+     "mae"
+    ],
+    "where": "evaluate.py keep filter; the evaluate stage printed only these",
+    "ok": true,
+    "note": "evaluate printed: {\"rmse\": 353.1334105416921, \"mae\": 227.44006336084914}"
+   },
+   {
+    "field": "trainer.eval_classification_metrics",
+    "value": [
+     "accuracy",
+     "f1_macro"
+    ],
+    "where": "evaluate.py, classification repos only",
+    "ok": true,
+    "note": "not rendered for a regression repo (the filter is per task); covered by tests"
+   },
+   {
+    "field": "trainer.latest_model_uri",
+    "value": "state/latest_model.txt",
+    "where": "train/evaluate/serve MODEL_URI_FILE; compose volume ./state; evaluate and serve passed reading it",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "trainer.mlflow_experiment",
+    "value": "rehearsal-experiment",
+    "where": "train.py EXPERIMENT; agents.yaml trainer.mlflow",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "inspector.raw_data",
+    "value": "data/external",
+    "where": "agents.yaml inspector watch (only if the folder exists in the repo)",
+    "ok": true,
+    "note": "listed"
+   },
+   {
+    "field": "inspector.schema_path",
+    "value": "quality/schema.py",
+    "where": "agents.yaml inspector.schema.path",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "deployer.serving_port",
+    "value": 8081,
+    "where": "Dockerfile EXPOSE, gunicorn bind, compose ports and healthcheck, agents.yaml",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "deployer.endpoints",
+    "value": {
+     "predict": {
+      "method": "POST",
+      "path": "/v1/predict"
+     },
+     "health": {
+      "method": "GET",
+      "path": "/v1/healthz"
+     }
+    },
+    "where": "serve.py routes, smoke_test.py, compose healthcheck, agents.yaml",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "deployer.prediction_field",
+    "value": "y_pred",
+    "where": "serve.py response key; smoke_test.py checks it; predict stage passed",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "deployer.model_version_field",
+    "value": "model_tag",
+    "where": "serve.py response key",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "deployer.model_uri_env",
+    "value": "SERVING_MODEL_URI",
+    "where": "compose environment; the adapters read it",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "deployer.current_service",
+    "value": "model-live",
+    "where": "compose service; agents.yaml deployer.service and monitor.health_url",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "deployer.candidate_service",
+    "value": "model-next",
+    "where": "nowhere yet: used once the candidate container exists (ROADMAP D)",
+    "ok": true,
+    "note": "not used while candidate_and_router is off"
+   },
+   {
+    "field": "deployer.deploy_file",
+    "value": "deploy/compose.deploy.yaml",
+    "where": "compose header comment; agents.yaml deployer.files_you_create",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "deployer.router_config",
+    "value": "deploy/router.yaml",
+    "where": "agents.yaml deployer.files_you_create",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "board.url",
+    "value": "http://board-svc:5678",
+    "where": "agents.yaml board_url; compose board service name and port",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "board.image",
+    "value": "hashicorp/http-echo:1.0.0",
+    "where": "compose board service image",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "board.agents_file",
+    "value": "team/agents.yaml",
+    "where": "the agents file's path in the commit",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "board.subscriptions",
+    "value": "6 agents changed",
+    "where": "agents.yaml subscriptions",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "reviewer.builder_commit_author",
+    "value": "Rehearsal Bot <rehearsal@example.com>",
+    "where": "the commit's author",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "reviewer.ci_workflow",
+    "value": ".github/workflows/builder-ci.yml",
+    "where": "agents.yaml reviewer.ci_workflow (create doesn't write the workflow yet)",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "team.mlflow_uri",
+    "value": "http://tracking:5050",
+    "where": "compose service tracking on 5050 and MLFLOW_TRACKING_URI; train/evaluate/serve default; agents.yaml",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "team.mlflow_server_image",
+    "value": "ghcr.io/mlflow/mlflow:v2.17.1",
+    "where": "compose mlflow image; Dockerfile client pin mlflow==2.17.1",
+    "ok": true,
+    "note": ""
+   }
+  ]
+ },
+ "script-file-demo": {
+  "branch": "builder/2026-10-12",
+  "files": [
+   ".dockerignore",
+   "Dockerfile",
+   "Makefile",
+   "compose.base.yml",
+   "pipeline/.builder-manifest.json",
+   "pipeline/data.py",
+   "pipeline/evaluate.py",
+   "pipeline/sample_request.json",
+   "pipeline/serve.py",
+   "pipeline/smoke_test.py",
+   "pipeline/train.py",
+   "team/agents.yaml"
+  ],
+  "checks": [
+   {
+    "field": "monitor.predictions_log",
+    "value": "monitoring/predictions.log.jsonl",
+    "where": "serve.py PREDICTIONS_LOG; compose volume ./monitoring; agents.yaml monitor watch (runtime)",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "monitor.predictions_log_fields",
+    "value": {
+     "time": "ts",
+     "model_version": "model",
+     "features": "inputs",
+     "prediction": "output",
+     "request_id": "trace_id"
+    },
+    "where": "serve.py log line keys (and the response's request id key)",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "trainer.eval_report",
+    "value": "metrics_out/evaluation.json",
+    "where": "evaluate.py EVAL_REPORT; compose volume ./metrics_out; agents.yaml trainer watch (runtime)",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "trainer.eval_report_fields",
+    "value": {
+     "model_version": "model",
+     "task": "kind",
+     "metrics": "scores",
+     "per_group": "by_group"
+    },
+    "where": "evaluate.py report keys (task key: classification only)",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "trainer.eval_metrics",
+    "value": [
+     "rmse",
+     "mae"
+    ],
+    "where": "evaluate.py keep filter; the evaluate stage printed only these",
+    "ok": true,
+    "note": "evaluate printed: {\"rmse\": 2.043445889305696, \"mae\": 1.4464672971076054}"
+   },
+   {
+    "field": "trainer.eval_classification_metrics",
+    "value": [
+     "accuracy",
+     "f1_macro"
+    ],
+    "where": "evaluate.py, classification repos only",
+    "ok": true,
+    "note": "not rendered for a regression repo (the filter is per task); covered by tests"
+   },
+   {
+    "field": "trainer.latest_model_uri",
+    "value": "state/latest_model.txt",
+    "where": "train/evaluate/serve MODEL_URI_FILE; compose volume ./state; evaluate and serve passed reading it",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "trainer.mlflow_experiment",
+    "value": "rehearsal-experiment",
+    "where": "train.py EXPERIMENT; agents.yaml trainer.mlflow",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "inspector.raw_data",
+    "value": "data/external",
+    "where": "agents.yaml inspector watch (only if the folder exists in the repo)",
+    "ok": true,
+    "note": "folder doesn't exist in this repo, so not listed"
+   },
+   {
+    "field": "inspector.schema_path",
+    "value": "quality/schema.py",
+    "where": "agents.yaml inspector.schema.path",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "deployer.serving_port",
+    "value": 8081,
+    "where": "Dockerfile EXPOSE, gunicorn bind, compose ports and healthcheck, agents.yaml",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "deployer.endpoints",
+    "value": {
+     "predict": {
+      "method": "POST",
+      "path": "/v1/predict"
+     },
+     "health": {
+      "method": "GET",
+      "path": "/v1/healthz"
+     }
+    },
+    "where": "serve.py routes, smoke_test.py, compose healthcheck, agents.yaml",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "deployer.prediction_field",
+    "value": "y_pred",
+    "where": "serve.py response key; smoke_test.py checks it; predict stage passed",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "deployer.model_version_field",
+    "value": "model_tag",
+    "where": "serve.py response key",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "deployer.model_uri_env",
+    "value": "SERVING_MODEL_URI",
+    "where": "compose environment; the adapters read it",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "deployer.current_service",
+    "value": "model-live",
+    "where": "compose service; agents.yaml deployer.service and monitor.health_url",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "deployer.candidate_service",
+    "value": "model-next",
+    "where": "nowhere yet: used once the candidate container exists (ROADMAP D)",
+    "ok": true,
+    "note": "not used while candidate_and_router is off"
+   },
+   {
+    "field": "deployer.deploy_file",
+    "value": "deploy/compose.deploy.yaml",
+    "where": "compose header comment; agents.yaml deployer.files_you_create",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "deployer.router_config",
+    "value": "deploy/router.yaml",
+    "where": "agents.yaml deployer.files_you_create",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "board.url",
+    "value": "http://board-svc:5678",
+    "where": "agents.yaml board_url; compose board service name and port",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "board.image",
+    "value": "hashicorp/http-echo:1.0.0",
+    "where": "compose board service image",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "board.agents_file",
+    "value": "team/agents.yaml",
+    "where": "the agents file's path in the commit",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "board.subscriptions",
+    "value": "6 agents changed",
+    "where": "agents.yaml subscriptions",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "reviewer.builder_commit_author",
+    "value": "Rehearsal Bot <rehearsal@example.com>",
+    "where": "the commit's author",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "reviewer.ci_workflow",
+    "value": ".github/workflows/builder-ci.yml",
+    "where": "agents.yaml reviewer.ci_workflow (create doesn't write the workflow yet)",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "team.mlflow_uri",
+    "value": "http://tracking:5050",
+    "where": "compose service tracking on 5050 and MLFLOW_TRACKING_URI; train/evaluate/serve default; agents.yaml",
+    "ok": true,
+    "note": ""
+   },
+   {
+    "field": "team.mlflow_server_image",
+    "value": "ghcr.io/mlflow/mlflow:v2.17.1",
+    "where": "compose mlflow image; Dockerfile client pin mlflow==2.17.1",
+    "ok": true,
+    "note": ""
+   }
+  ]
+ }
+}
