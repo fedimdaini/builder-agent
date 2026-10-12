@@ -215,9 +215,7 @@ def create(repo: str | Path, client: ChatClient, slots_file: str | Path | None =
                     + ", ".join(taken))
     if ignored := ignored_paths(root, paths):
         return done("refused", "the repo's .gitignore excludes files the Builder would commit: " + ", ".join(ignored))
-    author = ((c.model_extra or {}).get("integration") or {}).get("builder_commit_author")
-    if not author:
-        return done("refused", "contracts.yaml integration.builder_commit_author is not set")
+    author = c.i("reviewer", "builder_commit_author")
 
     # 3. sandbox + fix loop (its first run is the sandbox)
     fl = run_fix_loop(root, slots, DIAGNOSE_PROMPT, client, expected=expected, contracts_path=contracts_path,

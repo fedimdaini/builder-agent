@@ -8,7 +8,7 @@ import yaml
 
 from builder_agent.decide import plan_build
 from builder_agent.render import RenderError
-from builder_agent.render.ci import CI_PATH, classify_tests, plan_ci, render_ci, validate_workflow
+from builder_agent.render.ci import classify_tests, plan_ci, render_ci, validate_workflow
 from builder_agent.repo_writer import RepoWriter
 from builder_agent.scan import scan_repo
 from builder_agent.verify.source import RepoSource
@@ -88,7 +88,7 @@ def test_render_validates_and_writes_through_the_writer(proj, contracts, tmp_pat
     ctx = scan_repo(proj)
     r = render_ci(ctx, contracts, plan_build(ctx, contracts), proj, writer=RepoWriter(proj))
     assert r.yaml_ok and r.actionlint == []
-    doc = yaml.safe_load((proj / CI_PATH).read_text(encoding="utf-8"))
+    doc = yaml.safe_load((proj / ".github/workflows/ci.yml").read_text(encoding="utf-8"))
     test_steps = [s.get("name", s.get("uses")) for s in doc["jobs"]["test"]["steps"]]
     assert test_steps == ["actions/checkout@v4.2.2", "actions/setup-python@v5.6.0", "Install dependencies",
                           "Unit tests (pytest)", "Install pre-commit",
@@ -109,7 +109,7 @@ def test_render_validates_and_writes_through_the_writer(proj, contracts, tmp_pat
     assert api["run"] == "docker build -f api/Dockerfile -t ci/api:ci api"
     assert 'check build_api "api/Dockerfile" "api/"' in docker["Which images need rebuilding"]["run"]
     assert doc["jobs"]["test"]["runs-on"] == "ubuntu-24.04"
-    text = (proj / CI_PATH).read_text(encoding="utf-8")
+    text = (proj / ".github/workflows/ci.yml").read_text(encoding="utf-8")
     assert "#   - ci:service-tests:" in text and "#       api/test_live.py: imports requests" in text
 
     with pytest.raises(RenderError, match="refusing to overwrite .github/workflows/ci.yml"):   # second run
@@ -129,7 +129,7 @@ def test_invalid_workflow_is_never_written():
 def _check_function(proj, contracts):  # noqa: F811
     ctx = scan_repo(proj)
     render_ci(ctx, contracts, plan_build(ctx, contracts), proj, writer=RepoWriter(proj))
-    doc = yaml.safe_load((proj / CI_PATH).read_text(encoding="utf-8"))
+    doc = yaml.safe_load((proj / ".github/workflows/ci.yml").read_text(encoding="utf-8"))
     script = next(s["run"] for s in doc["jobs"]["docker"]["steps"] if s.get("id") == "changes")
     return script[script.index("check() {"):script.index("}\n", script.index("check() {")) + 2], script
 

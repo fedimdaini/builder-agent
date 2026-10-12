@@ -201,7 +201,7 @@ def test_never_overwrites_existing_files(mini, contracts, tmp_path):
 
 def test_unsupported_contract_metric(mini, tmp_path):
     data = yaml.safe_load(CONTRACTS.read_text(encoding="utf-8"))
-    data["formats"]["eval_report"]["metrics"]["mape"] = "float"
+    data["integration"]["trainer"]["eval_metrics"]["value"].append("mape")
     p = tmp_path / "contracts.yaml"
     p.write_text(yaml.safe_dump(data), encoding="utf-8")
     with pytest.raises(RenderError, match="mape"):
@@ -319,17 +319,14 @@ def test_taxi_model_input_candidates_follow_the_api(taxi):
 
 @pytest.mark.parametrize("value,expected", [
     ("mlops-zoomcamp-experiment", "mlops-zoomcamp-experiment"),     # set in contracts.yaml: always wins
-    ("auto", "my-repo_2"), (None, "my-repo_2"), ("", "my-repo_2"),   # not set: one experiment per repo
+    ("auto", "my-repo_2"), ("", "my-repo_2"),                        # not set: one experiment per repo
 ])
 def test_experiment_name(mini, tmp_path, value, expected):
     from test_decide import edit_contracts
     from builder_agent.render import experiment_name
 
     def change(d):
-        if value is None:
-            d["paths"].pop("mlflow_experiment")
-        else:
-            d["paths"]["mlflow_experiment"] = value
+        d["integration"]["trainer"]["mlflow_experiment"]["value"] = value
     c = edit_contracts(tmp_path, change)
     assert experiment_name(mini.model_copy(update={"name": "My Repo_2"}), c) == expected
 

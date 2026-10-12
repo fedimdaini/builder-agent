@@ -108,8 +108,8 @@ def main():
     per_group = {}
     for group, idx in df.groupby(GROUP_COLUMN).indices.items():
         per_group[str(group)] = {"accuracy": float(np.mean(y_pred[idx] == y_true[idx])), "n": int(len(idx))}
-    report = {"model_version": version, "task": "classification",
-              "metrics": metrics(y_true, y_pred, score, positive_class), "per_group": per_group}
+    report = {{ '{' }}{{ report_fields.model_version | py }}: version, {{ report_fields.task | py }}: "classification",
+              {{ report_fields.metrics | py }}: metrics(y_true, y_pred, score, positive_class), {{ report_fields.per_group | py }}: per_group}
 {% else %}
     y_true = df[TARGET].to_numpy(dtype=float)
     y_pred = predict(model, df)
@@ -118,7 +118,7 @@ def main():
     for group, idx in df.groupby(GROUP_COLUMN).indices.items():
         m = metrics(y_true[idx], y_pred[idx])
         per_group[str(group)] = {"rmse": m["rmse"], "mae": m["mae"], "n": int(len(idx))}
-    report = {"model_version": version, "metrics": metrics(y_true, y_pred), "per_group": per_group}
+    report = {{ '{' }}{{ report_fields.model_version | py }}: version, {{ report_fields.metrics | py }}: metrics(y_true, y_pred), {{ report_fields.per_group | py }}: per_group}
 {% endif %}
 
     out = ROOT / EVAL_REPORT
@@ -126,9 +126,9 @@ def main():
     out.write_text(json.dumps(report, indent=2), encoding="utf-8")
     if version != uri:  # a run id: attach the metrics to the training run
         with mlflow.start_run(run_id=version):
-            mlflow.log_metrics({f"eval_{k}": v for k, v in report["metrics"].items()})
+            mlflow.log_metrics({f"eval_{k}": v for k, v in report[{{ report_fields.metrics | py }}].items()})
             mlflow.log_dict(report, "builder/eval.json")
-    print(json.dumps(report["metrics"]))
+    print(json.dumps(report[{{ report_fields.metrics | py }}]))
 
 
 if __name__ == "__main__":

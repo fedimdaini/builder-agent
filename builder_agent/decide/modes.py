@@ -28,16 +28,16 @@ class ArtifactMode(BaseModel):
 
 def _artifact_patterns(c: Contracts) -> dict[str, list[str]]:
     """Artifact -> file patterns (repo-relative). Paths the contract names come from contracts.yaml."""
-    compose = (c.model_extra or {}).get("compose", {})
+    compose = (c.model_extra or {})["compose"]
     adapters = c.paths["adapters_dir"].strip("/")
     return {
         "Dockerfile": ["Dockerfile", "*/Dockerfile", "Dockerfile.*", "*.Dockerfile", "*/*.Dockerfile"],
-        "docker-compose": [compose.get("base_file", "compose.base.yml"), "docker-compose*.yml",
+        "docker-compose": [compose["base_file"], "docker-compose*.yml",
                            "docker-compose*.yaml", "compose.yml", "compose.yaml", "*/docker-compose*.y*ml"],
         "Makefile": ["Makefile"],
         "CI workflow": [".github/workflows/*.yml", ".github/workflows/*.yaml"],
-        "agents.yaml": ["agents.yaml"],
-        "schema draft": ["schema.py"],
+        "agents.yaml": [c.i("board", "agents_file")],
+        "schema draft": [c.i("inspector", "schema_path")],
         "contract adapter": [f"{adapters}/serve.py"],
     }
 

@@ -192,8 +192,10 @@ def template_context(ctx: RepoContext, c: Contracts, s: SlotAnswers) -> dict:
         "predict_method": endpoints["predict"].method.upper(),
         "health_path": endpoints["health"].path,
         "health_method": endpoints["health"].method.upper(),
-        "prediction_field": response.get("prediction_field", "prediction"),
-        "version_field": response.get("model_version_field", "model_version"),
+        "prediction_field": response["prediction_field"],
+        "version_field": response["model_version_field"],
+        "log_fields": c.i("monitor", "predictions_log_fields"),       # predictions log keys (Monitor)
+        "report_fields": c.i("trainer", "eval_report_fields"),        # eval report keys (Trainer)
         # contract values
         "sample_var": c.sample_mode.variable,
         "fraction": c.sample_mode.fraction,

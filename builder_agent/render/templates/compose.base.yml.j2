@@ -34,6 +34,13 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+{% if board_service %}
+
+  {{ board_service }}:
+    image: {{ board_image }}
+    ports:
+      - "{{ board_port }}:{{ board_port }}"
+{% endif %}
 
 volumes:
   mlflow-data:

@@ -44,7 +44,7 @@ def taxi_render(contracts, tmp_path_factory):
 @taxi_only
 def test_taxi_configs_lint_clean(taxi_render):
     _, _, result, _ = taxi_render
-    assert result.files == ["Dockerfile", ".dockerignore", "Makefile", "compose.base.yml"]
+    assert result.files == ["Dockerfile", ".dockerignore", "Makefile", "compose.base.yml", "agents.yaml"]
     assert result.ok, result.lint
 
 
@@ -107,7 +107,7 @@ def test_taxi_compose(taxi_render):
 def test_manifest_covers_adapters_and_configs(taxi_render):
     *_, root = taxi_render
     files = json.loads(read(root, "pipeline/.builder-manifest.json"))["files"]
-    assert set(files) == {"Dockerfile", ".dockerignore", "Makefile", "compose.base.yml", "pipeline/train.py",
+    assert set(files) == {"Dockerfile", ".dockerignore", "Makefile", "compose.base.yml", "agents.yaml", "pipeline/train.py",
                           "pipeline/evaluate.py", "pipeline/serve.py", "pipeline/data.py",
                           "pipeline/sample_request.json", "pipeline/smoke_test.py"}
 

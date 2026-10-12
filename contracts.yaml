@@ -15,37 +15,15 @@ project:
   python_version: auto       # Builder picks it from the repo; set e.g. "3.11" to force one
 
 # ---------------------------------------------------------------- serving
-# The model runs as a small web service that answers prediction requests.
-# This API contract does not change for the main project. Its own API differs (batch
-# POST /predict {"data": [...]} -> {"predictions": [...], "result": ...}, no /health, POST /reload
-# to load the model; see docs/reference-run-main.md). The Builder bridges the difference with an
-# adapter that serves this contract and calls the project's /predict.
+# The model runs as a small web service that answers prediction requests. Its API (port, endpoints,
+# fields, error rule) is agreed with the Deployer and the Monitor: see integration.deployer below.
 serving:
   mode: auto                 # auto: use the repo's own API if it has one, otherwise the Builder generates one
-  port: 8000                 # every agent calls the model on this port, whatever port the repo uses inside
-  endpoints:
-    predict: {method: POST, path: /predict}
-    health:  {method: GET,  path: /health}
-  request:
-    format: json             # one record per request, features sent BY NAME, never by position
-  response:
-    prediction_field: prediction
-    model_version_field: model_version
-  errors:
-    status: 4xx_or_5xx       # an error must never come back as HTTP 200
-  model_uri_env: MODEL_URI   # the service loads its model from MLflow using this environment variable
-
-# ---------------------------------------------------------------- router
-# Splits live traffic between the current model and a candidate model.
-router:
-  owner: deployer
-  config_file: router.yaml
-  services:
-    current: serving-current
-    candidate: serving-candidate
 
 # ---------------------------------------------------------------- commands
-# Fixed command names. What runs behind each one is the Builder's job.
+# Fixed command names. What runs behind each one is the Builder's job. Renaming one is a contract
+# change (the Builder's code knows these roles), not an integration field. The descriptions name
+# paths.* and serving.port: their values are in the integration section (load_contracts fills them).
 make_targets:
   install:  install dependencies
   data:     build features from raw data into paths.processed_data
@@ -58,47 +36,21 @@ sample_mode:
   variable: SAMPLE           # `make all SAMPLE=1` runs on a small slice of the data (fast tests)
   fraction: 0.01
 
-# ---------------------------------------------------------------- files and folders
+# ---------------------------------------------------------------- files and folders (the Builder's own)
 paths:
-  raw_data: data/raw
-  processed_data: data/processed
   models: models
-  latest_model_uri: models/latest_model_uri.txt   # written by `make train` (MLflow URI of the new model); read by evaluate and serve when MODEL_URI is unset
-  eval_report: reports/eval.json
-  predictions_log: logs/predictions.jsonl
-  mlflow_uri: http://mlflow:5000
-  mlflow_experiment: mlops-zoomcamp-experiment   # the main project's experiment (was taxi-duration)
   adapters_dir: pipeline     # Builder's adapter scripts in the target repo (train.py, evaluate.py, serve.py, data.py, sample_request.json)
-
-# Formats other agents read
-formats:
-  eval_report:               # written by `make evaluate`, read by Trainer
-    model_version: string
-    metrics: {rmse: float, mae: float, r2: float}
-    per_group: {group_name: {rmse: float, mae: float, n: int}}
-    # Classification models (added 2026-10-10): the report also has task: "classification", and
-    # "metrics" holds these instead; roc_auc only for binary models with predict_proba.
-    # per_group is then {group_name: {accuracy: float, n: int}}. A report without "task" is regression.
-    classification_metrics: {accuracy: float, f1_macro: float, roc_auc: float}
-  predictions_log:           # one JSON line per prediction, read by Monitor
-    time: ISO-8601 string
-    model_version: string
-    features: object         # the input record, by feature name
-    prediction: float
-    request_id: string       # lets late labels be joined back later
 
 # ---------------------------------------------------------------- containers
 compose:
   base_file: compose.base.yml       # Builder: model services, MLflow, message board
-  deploy_file: compose.deploy.yml   # Deployer: router, replicas, traffic split
   data: mounted                     # data is mounted into containers, never copied into images
 
 # ---------------------------------------------------------------- "it works"
-# The Builder's build is finished only when all of these pass.
+# The Builder's build is finished only when all of these pass (the prediction field: integration.deployer).
 smoke_test:
   health_status: 200
   predict_status: 2xx
-  predict_body_has: prediction
   predict_body_has_not: error
 
 # ---------------------------------------------------------------- ownership
@@ -118,10 +70,80 @@ ownership:
   contracts.yaml: team
 
 # ---------------------------------------------------------------- integration
-# Values that depend on another agent or on the team. Each one has a working default, so the
-# Builder runs on its own, and a comment naming who will confirm it (questions: docs/INTEGRATION.md).
+# Every value that depends on another agent or on the team, grouped by who confirms it.
+# Each field is {value, default, confirmed}:
+#   value      what the Builder uses now (change it when the teammate answers);
+#   default    the Builder's working default, so it runs on its own before anyone answers;
+#   confirmed  false until that teammate has confirmed the value (even if it equals the default).
+# The questions to ask, per field: docs/INTEGRATION.md. Fields still unconfirmed:
+#   python -m builder_agent.integration
+# Nothing listed here may be hard-coded in the Builder's code (tests/test_integration.py).
 integration:
-  builder_commit_author: "Builder agent <builder@localhost>"   # author of the create command's commit on builder/<date>; to confirm: Reviewer (gates that branch)
+  monitor:
+    predictions_log:          {value: logs/predictions.jsonl, default: logs/predictions.jsonl, confirmed: false}   # one JSON line per prediction, written by the model service
+    predictions_log_fields:   # the line's keys (Builder's name -> key in the file): time ISO-8601, model_version, features by name, prediction, request_id to join late labels
+      value:   {time: time, model_version: model_version, features: features, prediction: prediction, request_id: request_id}
+      default: {time: time, model_version: model_version, features: features, prediction: prediction, request_id: request_id}
+      confirmed: false
+  trainer:
+    eval_report:              {value: reports/eval.json, default: reports/eval.json, confirmed: false}   # written by `make evaluate`
+    eval_report_fields:       # top-level keys of the eval report (Builder's name -> key in the file); per_group: {group: {metric: float, n: int}}
+      value:   {model_version: model_version, task: task, metrics: metrics, per_group: per_group}
+      default: {model_version: model_version, task: task, metrics: metrics, per_group: per_group}
+      confirmed: false
+    eval_metrics:             {value: [rmse, mae, r2], default: [rmse, mae, r2], confirmed: false}   # regression metrics in the report (supported: rmse, mae, r2)
+    eval_classification_metrics: {value: [accuracy, f1_macro, roc_auc], default: [accuracy, f1_macro, roc_auc], confirmed: false}   # roc_auc only for binary models with predict_proba
+    latest_model_uri:         {value: models/latest_model_uri.txt, default: models/latest_model_uri.txt, confirmed: false}   # written by `make train`: the MLflow URI of the new model
+    mlflow_experiment:        {value: mlops-zoomcamp-experiment, default: mlops-zoomcamp-experiment, confirmed: false}   # "auto": one experiment per repo, named after it
+    train_command:            {value: make train, default: make train, confirmed: false}
+    evaluate_command:         {value: make evaluate, default: make evaluate, confirmed: false}
+  inspector:
+    raw_data:                 {value: data/raw, default: data/raw, confirmed: false}
+    processed_data:           {value: data/processed, default: data/processed, confirmed: false}
+    schema_path:              {value: schema.py, default: schema.py, confirmed: false}   # the Pandera schema draft (not generated yet: ROADMAP B7)
+  deployer:
+    serving_port:             {value: 8000, default: 8000, confirmed: false}   # every agent calls the model on this port
+    endpoints:
+      value:   {predict: {method: POST, path: /predict}, health: {method: GET, path: /health}}
+      default: {predict: {method: POST, path: /predict}, health: {method: GET, path: /health}}
+      confirmed: false
+    request_format:           {value: json, default: json, confirmed: false}   # one record per request, features by name, never by position
+    prediction_field:         {value: prediction, default: prediction, confirmed: false}
+    model_version_field:      {value: model_version, default: model_version, confirmed: false}
+    error_status:             {value: 4xx_or_5xx, default: 4xx_or_5xx, confirmed: false}   # an error never comes back as HTTP 200
+    model_uri_env:            {value: MODEL_URI, default: MODEL_URI, confirmed: false}   # the service loads its model from MLflow using this variable
+    serve_command:            {value: make serve, default: make serve, confirmed: false}
+    current_service:          {value: serving-current, default: serving-current, confirmed: false}   # compose service of the live model
+    candidate_service:        {value: serving-candidate, default: serving-candidate, confirmed: false}
+    deploy_file:              {value: compose.deploy.yml, default: compose.deploy.yml, confirmed: false}   # the Deployer's compose file (router, replicas, traffic split)
+    router_config:            {value: router.yaml, default: router.yaml, confirmed: false}
+    candidate_and_router:     {value: false, default: false, confirmed: false}   # true: the Builder adds the candidate container and router (not implemented yet: ROADMAP D)
+  board:
+    url:                      {value: "http://board:8000", default: "http://board:8000", confirmed: false}   # the message board every agent posts to
+    image:                    {value: "", default: "", confirmed: false}   # empty: no board service in compose until the board owner provides an image
+    agents_file:              {value: agents.yaml, default: agents.yaml, confirmed: false}
+    subscriptions:            # topics each agent receives (architecture page)
+      value:
+        builder: ["pipeline:*"]
+        reviewer: ["code:*", "feature:*"]
+        inspector: ["dataset:*", "feature:*", "type:question"]
+        trainer: ["dataset:*", "model:*"]
+        deployer: ["model:*", "deployment:*"]
+        monitor: ["feature:*", "model:*", "expected_change:*"]
+      default:
+        builder: ["pipeline:*"]
+        reviewer: ["code:*", "feature:*"]
+        inspector: ["dataset:*", "feature:*", "type:question"]
+        trainer: ["dataset:*", "model:*"]
+        deployer: ["model:*", "deployment:*"]
+        monitor: ["feature:*", "model:*", "expected_change:*"]
+      confirmed: false
+  reviewer:
+    builder_commit_author:    {value: "Builder agent <builder@localhost>", default: "Builder agent <builder@localhost>", confirmed: false}   # author of the create command's commit on builder/<date>
+    ci_workflow:              {value: .github/workflows/ci.yml, default: .github/workflows/ci.yml, confirmed: false}   # what blocks a pull request is the Reviewer's decision
+  team:
+    mlflow_uri:               {value: "http://mlflow:5000", default: "http://mlflow:5000", confirmed: false}   # tracking server, as the containers see it
+    mlflow_server_image:      {value: "ghcr.io/mlflow/mlflow:v2.17.2", default: "ghcr.io/mlflow/mlflow:v2.17.2", confirmed: false}   # the client is pinned to its tag (fault-001)
 
 # ---------------------------------------------------------------- team repository
 team_repo:

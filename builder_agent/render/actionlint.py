@@ -47,7 +47,7 @@ def ensure_actionlint() -> Path:
     return exe
 
 
-def run_actionlint(text: str, name: str = ".github/workflows/ci.yml") -> tuple[list[str], str]:
+def run_actionlint(text: str, name: str) -> tuple[list[str], str]:
     """Lint workflow text (read from stdin, so nothing has to be written first).
     Returns (problems, version). Empty problems: the workflow passed."""
     exe = ensure_actionlint()

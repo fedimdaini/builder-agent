@@ -24,7 +24,6 @@ from ..verify.source import RepoSource
 from . import MARKER, RenderError, _env
 from .actionlint import run_actionlint
 
-CI_PATH = ".github/workflows/ci.yml"
 RUNNER = "ubuntu-24.04"                                  # pinned, not ubuntu-latest (fault-002)
 ACTIONS = {"checkout": "actions/checkout@v4.2.2", "setup_python": "actions/setup-python@v5.6.0"}
 # a test that imports one of these (directly or through a local module) needs live services
@@ -213,15 +212,16 @@ def render_ci(ctx: RepoContext, contracts: Contracts, plan: BuildPlan, out_root:
               writer: RepoWriter | None = None, created: dict[str, str] | None = None) -> CIResult:
     ci = plan_ci(ctx, contracts, plan, created)
     text = render_ci_text(ctx, contracts, ci)
-    yaml_ok, problems, version = validate_workflow(text)
+    path = ci_path(contracts)
+    yaml_ok, problems, version = validate_workflow(text, path)
     if not yaml_ok or problems:
         raise RenderError("the rendered workflow is not valid, nothing written: " + "; ".join(problems))
     writer = writer or RepoWriter(out_root)
     try:
-        writer.write_new({CI_PATH: text})
+        writer.write_new({path: text})
     except Exception as e:  # noqa: BLE001 - WriteRefused and friends
         raise RenderError(str(e)) from e
-    return CIResult(files=[CI_PATH], plan=ci, yaml_ok=yaml_ok, actionlint=problems, actionlint_version=version)
+    return CIResult(files=[path], plan=ci, yaml_ok=yaml_ok, actionlint=problems, actionlint_version=version)
 
 
 # GitHub expressions, kept out of Jinja
@@ -235,14 +235,19 @@ def render_ci_text(ctx: RepoContext, contracts: Contracts, ci: CIPlan) -> str:
                                                    actions=ACTIONS, sample_var=contracts.sample_mode.variable)
 
 
-def validate_workflow(text: str) -> tuple[bool, list[str], str]:
+def ci_path(contracts: Contracts) -> str:
+    """Where the workflow goes: contracts.yaml integration.reviewer.ci_workflow."""
+    return contracts.i("reviewer", "ci_workflow")
+
+
+def validate_workflow(text: str, path: str = "ci.yml") -> tuple[bool, list[str], str]:
     """(YAML parses, actionlint problems, actionlint version). Run before anything is written."""
     try:
         doc = yaml.safe_load(text)
         yaml_ok = isinstance(doc, dict) and bool(doc.get("jobs"))
     except yaml.YAMLError:
         yaml_ok = False
-    problems, version = run_actionlint(text, CI_PATH)
+    problems, version = run_actionlint(text, path)
     if not yaml_ok and not problems:
         problems = ["the workflow has no jobs"]
     return yaml_ok, problems, version

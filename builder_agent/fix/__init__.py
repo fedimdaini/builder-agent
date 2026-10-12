@@ -30,7 +30,7 @@ from ..llm import ChatClient
 from ..llm.ollama import inline_refs
 from ..llm.prompts import PromptFile, load_prompt
 from ..render import validate_slots
-from ..render.configs import MLFLOW_IMAGE, Overrides, _env, config_context
+from ..render.configs import Overrides, _env, config_context
 from ..sandbox import DEFAULT_CONTRACTS, DEFAULT_LOG, STAGES, SandboxResult, run_sandbox, subprocess_runner
 from ..scan import scan_repo
 from ..scan.deps import declared_names, normalize
@@ -168,7 +168,7 @@ def prompt_variables(ctx, r: SandboxResult, tctx: dict, attempt: int, history: l
             f"system packages (apt-get install): {' '.join(tctx['apt_packages'])}",
             *[f"install: {c}" for c in tctx["install_commands"]],
             *[f"model service environment: {k}={json.dumps(v)}" for k, v in tctx["compose_env"].items()],
-            f"MLflow server image: {MLFLOW_IMAGE}",
+            f"MLflow server image: {tctx['mlflow_image']}",
             f"serve: {' '.join(tctx['serve_cmd'])}",
         ]),
     }

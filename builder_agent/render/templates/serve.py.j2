@@ -63,8 +63,8 @@ def parse_record(payload):
 
 
 def log_prediction(features, prediction, request_id):
-    line = {"time": datetime.now(timezone.utc).isoformat(), "model_version": MODEL_VERSION,
-            "features": features, "prediction": prediction, "request_id": request_id}
+    line = {{ '{' }}{{ log_fields.time | py }}: datetime.now(timezone.utc).isoformat(), {{ log_fields.model_version | py }}: MODEL_VERSION,
+            {{ log_fields.features | py }}: features, {{ log_fields.prediction | py }}: prediction, {{ log_fields.request_id | py }}: request_id}
     try:
         path = ROOT / PREDICTIONS_LOG
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -107,4 +107,4 @@ def predict_endpoint():
 
     request_id = str(uuid.uuid4())
     log_prediction({f: payload[f] for f in FEATURES}, value, request_id)
-    return jsonify({PREDICTION_FIELD: value, VERSION_FIELD: MODEL_VERSION, "request_id": request_id}), 200
+    return jsonify({PREDICTION_FIELD: value, VERSION_FIELD: MODEL_VERSION, {{ log_fields.request_id | py }}: request_id}), 200

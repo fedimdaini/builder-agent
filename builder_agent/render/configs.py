@@ -25,9 +25,9 @@ from ..scan.known import SYSTEM_PACKAGES
 from ..scan.models import RepoContext
 from ..repo_writer import RepoWriter
 from . import MARKER, RenderError, RenderResult, _env, manifest_path, write_new_files
+from .agents import check_agents, render_agents
 from .slots import FLAVOR_DIST, SlotAnswers, validate_slots
 
-MLFLOW_IMAGE = "ghcr.io/mlflow/mlflow:v2.17.2"   # tag checked to exist; Builder-internal default
 WORKDIR = "/app"
 ADAPTER_SCRIPTS = {"data": "data.py", "train": "train.py", "evaluate": "evaluate.py"}
 ADAPTER_PACKAGES = ["mlflow", "pandas", "numpy", "flask", "gunicorn"]   # what the adapters import
@@ -138,6 +138,10 @@ def config_context(ctx: RepoContext, c: Contracts, plan: BuildPlan, slots: SlotA
         raise RenderError(f"Python version not decided: {plan.python.reason}")
     if plan.install.status != "decided":
         raise RenderError(f"install not decided: {plan.install.reason}")
+    if c.i("deployer", "candidate_and_router"):
+        raise RenderError("contracts.yaml integration.deployer.candidate_and_router is true, but the candidate "
+                          "container and router are not implemented yet (ROADMAP D)")
+    mlflow_image = c.i("team", "mlflow_server_image")
 
     adapters = c.paths["adapters_dir"].strip("/") if slots else None
     port = c.serving.port
@@ -159,7 +163,7 @@ def config_context(ctx: RepoContext, c: Contracts, plan: BuildPlan, slots: SlotA
                 extras.append(pkg)
     # the MLflow client always matches the server image (fault-001)
     if slots or any(normalize(e) == "mlflow" for e in extras):
-        spec = mlflow_client_spec(MLFLOW_IMAGE) if mlflow_client is None else mlflow_client
+        spec = mlflow_client_spec(mlflow_image) if mlflow_client is None else mlflow_client
         extras = [spec] + [e for e in extras if normalize(e) != "mlflow"]
     o = overrides or Overrides()
     for dep in o.dependencies:
@@ -179,10 +183,11 @@ def config_context(ctx: RepoContext, c: Contracts, plan: BuildPlan, slots: SlotA
 
     mlflow = urlparse(c.paths["mlflow_uri"])
     if not mlflow.hostname or mlflow.hostname in {"localhost", "127.0.0.1"}:
-        raise RenderError(f"paths.mlflow_uri {c.paths['mlflow_uri']!r} must name the compose service, "
-                          "e.g. http://mlflow:5000")
-    compose = (c.model_extra or {}).get("compose", {})
-    router = (c.model_extra or {}).get("router", {})
+        raise RenderError(f"integration.team.mlflow_uri {c.paths['mlflow_uri']!r} must name the compose service, "
+                          "e.g. http://<service>:<port>")
+    compose = (c.model_extra or {})["compose"]
+    board_image = c.i("board", "image")
+    board = urlparse(c.i("board", "url"))
     data_dirs, model_dirs, output_dirs = _top_dirs(ctx, c)
     models_dir = PurePosixPath(c.paths["models"]).parts[0]
     logs_dir = posixpath.dirname(c.paths["predictions_log"])
@@ -208,11 +213,15 @@ def config_context(ctx: RepoContext, c: Contracts, plan: BuildPlan, slots: SlotA
         "mlflow_uri": c.paths["mlflow_uri"],
         "mlflow_service": mlflow.hostname,
         "mlflow_port": mlflow.port or 5000,
-        "mlflow_image": MLFLOW_IMAGE,
-        "model_service": router.get("services", {}).get("current", "serving-current"),
+        "mlflow_image": mlflow_image,
+        "model_service": c.i("deployer", "current_service"),
         "model_uri_env": c.serving.model_uri_env,
-        "compose_file": compose.get("base_file", "compose.base.yml"),
-        "deploy_file": compose.get("deploy_file", "compose.deploy.yml"),
+        "compose_file": compose["base_file"],
+        "deploy_file": compose["deploy_file"],
+        # the message board: a service only once the board owner gives an image (integration.board.image)
+        "board_service": board.hostname if board_image else None,
+        "board_image": board_image,
+        "board_port": board.port or 80,
         "data_dirs": data_dirs,
         "model_dirs": model_dirs,
         "models_dir": models_dir,
@@ -247,9 +256,15 @@ def render_configs(ctx: RepoContext, contracts: Contracts, plan: BuildPlan,
         "Makefile": env.get_template("Makefile.j2").render(**tctx),
         tctx["compose_file"]: env.get_template("compose.base.yml.j2").render(**tctx),
     }
+    agents_file = contracts.i("board", "agents_file")
+    if answers is not None:                      # agents.yaml names the train and eval files: needs the slots
+        rendered[agents_file] = render_agents(ctx, contracts, plan, answers, list(rendered))
     out_root = Path(out_root)
     write_new_files(writer or RepoWriter(out_root), manifest_path(contracts), rendered)
-    return RenderResult(files=list(rendered), lint=lint_configs(out_root, tctx))
+    lint = lint_configs(out_root, tctx)
+    if agents_file in rendered:
+        lint += check_agents(rendered[agents_file], ctx.root, out_root, contracts)
+    return RenderResult(files=list(rendered), lint=lint)
 
 
 # --- static checks -----------------------------------------------------------
