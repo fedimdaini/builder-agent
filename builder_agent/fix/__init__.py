@@ -95,6 +95,9 @@ class FixLoopResult(BaseModel):
     memory_set: str | None = None     # "base" or "learned" (builder_agent/memory/learned.py), with a retriever
     memory_sha256: str | None = None  # snapshot hash of that memory
     python_rule: bool = False         # the deterministic Python-version check was on (off: LLM-only)
+    final_attempt_id: str | None = None   # the last sandbox run kept (passed, or the failure the loop stopped on)
+    final_failed_stage: str | None = None
+    final_error_tail: list[str] = Field(default_factory=list)
 
     def text(self) -> str:
         out = [f"FIX LOOP {self.repo} ({self.prompt_version} x {self.model}): "
@@ -330,7 +333,9 @@ def run_fix_loop(repo: str | Path, slots: dict, prompt_version: str, client: Cha
     return FixLoopResult(repo=ctx.name, prompt_version=prompt.version, prompt_sha256=prompt.sha256,
                          model=client.model, model_digest=digest, initial=initial, initial_attempt_id=initial_id,
                          attempts=attempts, final_ok=r.ok, stopped_because=stopped, applied=applied,
-                         injection=injection, retriever=retriever_name, python_rule=python_rule)
+                         injection=injection, retriever=retriever_name, python_rule=python_rule,
+                         final_attempt_id=r.attempt_id, final_failed_stage=r.failed_stage,
+                         final_error_tail=_failed(r).output_tail if _failed(r) else [])
 
 
 def _log(path, repo: str, prompt: PromptFile, client, digest: str, a: FixAttempt) -> None:

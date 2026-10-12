@@ -120,6 +120,11 @@ every sandbox run.
 - It has never run on GitHub Actions.
 - The needs_llm items (`ci:service-tests`, `ci:pre-commit`, `ci:tests`) have no slots or prompt.
 
+**The create command doesn't write it yet** (2026-10-12). Create writes only the files the sandbox
+checked, so a file in the commit has passed every stage. The workflow is never rendered in the sandbox,
+and its own steps (pytest, pre-commit, docker build on a GitHub runner) have never run. Committing it
+would put an untested file on the builder branch. It will be added once the sandbox renders it.
+
 *Estimate: 1 day.* About 0.5 day to render it in the sandbox run, so it is written with the other
 files and linted every time, and 0.5 day for one real run on a fork of the taxi repo, recorded with
 its run URL. Filling the needs_llm items with an LLM would be a separate step.
@@ -203,14 +208,10 @@ First, the team has to agree on the format and where it lives (`contracts.yaml` 
 
 ## Outside the list, but needed for create mode to deliver these files
 
-- **No create command.** The render functions write through `RepoWriter` (new files only, on
-  `builder/<date>`), but only the sandbox (into a temp copy), the evals and the tests call them. No
-  command takes a repo through scan, decide, LLM slots, sandbox and fix loop, and then writes the
-  passing files into the repo's branch. The architecture page's "commits once every sandbox stage
-  passes" is not implemented.
-  *Estimate: 1.5 days:* a `python -m builder_agent.create <repo>` that reuses those pieces, writes
-  only after an all-stages-ok run, and commits on `builder/<date>`, with `tests/test_repo_rule.py`
-  extended to cover it.
+- **Create command: done (2026-10-12, ROADMAP step A3).** `python -m builder_agent.create <repo>`
+  runs scan, decide, LLM slots, sandbox and fix loop. Only after a run where every stage passed does
+  it commit the files on `builder/<date>` through `RepoWriter`, then switch back to the original
+  branch. It writes everything the sandbox checked, except the CI workflow (item 4).
 - **"Tells each agent where to watch":** the first-setup case's findings to the Reviewer, Inspector
   and Trainer need the board (3e) and `agents.yaml` (7).
 
@@ -218,7 +219,7 @@ First, the team has to agree on the format and where it lives (`contracts.yaml` 
 
 | Group | Items | Estimate |
 |---|---|---|
-| Builder alone | CI in the sandbox and one real run (4), model registry (5), Pandera draft (6), create command | about 5.5 days |
+| Builder alone | CI in the sandbox and one real run (4), model registry (5), Pandera draft (6) | about 4 days (the create command, 1.5, is done) |
 | Needs a format agreed with the team first | agents.yaml (7), lineage map (8, file level) | about 3 days |
 | Needs the Deployer or the board owner | candidate (3c), router (3d), board (3e) | about 2 days, after their decision or service |
 

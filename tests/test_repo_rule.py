@@ -177,6 +177,7 @@ ALLOWED_WRITERS = {
     "finetune/__init__.py": "fine-tuning data in builder-agent's experiments/finetune/",
     "faults/__init__.py": "generated fault cases in builder-agent's tests/faults/generated/",
     "memory/learned.py": "fixes written back from real runs in builder-agent's memory/learned/",
+    "create/__init__.py": "create-run reports in builder-agent's logs/create/ (target writes go through RepoWriter)",
 }
 
 

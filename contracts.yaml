@@ -117,6 +117,12 @@ ownership:
   pipeline/: builder                   # adapter scripts (paths.adapters_dir)
   contracts.yaml: team
 
+# ---------------------------------------------------------------- integration
+# Values that depend on another agent or on the team. Each one has a working default, so the
+# Builder runs on its own, and a comment naming who will confirm it (questions: docs/INTEGRATION.md).
+integration:
+  builder_commit_author: "Builder agent <builder@localhost>"   # author of the create command's commit on builder/<date>; to confirm: Reviewer (gates that branch)
+
 # ---------------------------------------------------------------- team repository
 team_repo:
   layout: monorepo           # one repository: shared/ for common code, agents/<name>/ for each agent

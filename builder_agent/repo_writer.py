@@ -35,6 +35,25 @@ def current_branch(root: Path) -> str | None:
     return r.stdout.strip() if r.returncode == 0 else None
 
 
+def tracked_changes(root: Path) -> list[str]:
+    """Uncommitted changes to tracked files (git status lines); untracked files are not listed."""
+    return _git(root, "status", "--porcelain", "--untracked-files=no").stdout.splitlines()
+
+
+def worktree_state(root: Path) -> list[str]:
+    """Every change git sees, untracked and ignored files included: to check a run left it unchanged."""
+    return sorted(_git(root, "status", "--porcelain", "--untracked-files=all", "--ignored").stdout.splitlines())
+
+
+def ignored_paths(root: Path, paths: list[str]) -> list[str]:
+    """Paths the repo's .gitignore excludes (they couldn't be committed)."""
+    if not paths:
+        return []
+    r = subprocess.run(["git", "-C", str(root), "check-ignore", "--no-index", "--stdin"], input="\n".join(paths),
+                       capture_output=True, text=True)
+    return r.stdout.split()
+
+
 def ensure_builder_branch(root: Path, today: date | None = None) -> str:
     """Create builder/<date> (or builder/<date>-N) from the current HEAD and switch to it.
 
@@ -63,6 +82,7 @@ class RepoWriter:
         self.root = Path(root)
         self.branch = ensure_builder_branch(self.root, today) if is_git_repo(self.root) else None
         self.created: set[str] = set()     # files this run created (it may update those)
+        self.created_dirs: set[Path] = set()   # folders this run created (restore removes them if empty)
 
     def _check(self, rel: str) -> Path:
         path = (self.root / rel).resolve()
@@ -75,6 +95,44 @@ class RepoWriter:
                                "(the Builder only adds new files; problems go into a findings report)")
         return path
 
+    def commit(self, message: str, author: str) -> str:
+        """Commit exactly the files this run created, on the Builder's branch. Returns the commit sha.
+        author: "Name <email>" (contracts.yaml integration.builder_commit_author)."""
+        if self.branch is None or current_branch(self.root) != self.branch:
+            raise WriteRefused(f"commit refused: not on the Builder's branch {self.branch!r}")
+        name, _, email = author.partition("<")
+        if not self.created or not name.strip() or not email.endswith(">"):
+            raise WriteRefused(f"commit refused: no files, or author {author!r} is not 'Name <email>'")
+        paths = sorted(self.created)
+        for args in (["add", "--", *paths],
+                     ["-c", f"user.name={name.strip()}", "-c", f"user.email={email[:-1]}", "commit", "--quiet",
+                      "--no-verify", "-m", message, "--", *paths]):
+            r = _git(self.root, *args)
+            if r.returncode != 0:
+                raise WriteRefused(f"git {args[0] if args[0] != '-c' else 'commit'} failed: {r.stderr.strip()}")
+        return _git(self.root, "rev-parse", "HEAD").stdout.strip()
+
+    def restore(self, original_branch: str) -> None:
+        """Back to the branch the repo was on, whatever happened: files this run wrote but didn't commit
+        are removed (they are its own new files), the switch back takes committed ones out of the working
+        tree, and a Builder branch with no commit of its own is deleted. Never touches other files."""
+        if self.branch is None:
+            return
+        tracked = set(_git(self.root, "ls-files", "--", *sorted(self.created)).stdout.split()) if self.created else set()
+        for rel in sorted(self.created - tracked):
+            (self.root / rel).unlink(missing_ok=True)
+        _git(self.root, "reset", "--quiet")                          # unstage anything a failed commit staged
+        if current_branch(self.root) != original_branch:
+            r = _git(self.root, "switch", original_branch)
+            if r.returncode != 0:
+                raise WriteRefused(f"could not switch back to {original_branch}: {r.stderr.strip()}")
+        mine = _git(self.root, "rev-parse", self.branch).stdout.strip()
+        if mine and mine == _git(self.root, "rev-parse", "HEAD").stdout.strip():
+            _git(self.root, "branch", "-D", self.branch)              # nothing was committed on it
+        for d in sorted(self.created_dirs, key=lambda p: -len(p.parts)):
+            if d.is_dir() and not any(d.iterdir()):
+                d.rmdir()                                             # empty folders this run created
+
     def write_new(self, files: dict[str, str]) -> list[str]:
         """Write all files or none. Paths are repo-relative with forward slashes."""
         if self.branch is not None:
@@ -83,7 +141,9 @@ class RepoWriter:
                 raise WriteRefused(f"the target repo is on {branch!r}, not the Builder's branch {self.branch!r}")
         paths = {rel: self._check(rel) for rel in files}       # check everything before writing anything
         for rel, text in files.items():
+            missing = [d for d in (paths[rel].parent, *paths[rel].parent.parents) if not d.exists()]
             paths[rel].parent.mkdir(parents=True, exist_ok=True)
+            self.created_dirs.update(missing)
             paths[rel].write_text(text, encoding="utf-8", newline="\n")
             self.created.add(rel)
         return list(files)
