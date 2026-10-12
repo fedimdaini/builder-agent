@@ -5,7 +5,8 @@
     [--retriever naive|advanced]              # RAG over the fix memory (prompts with {{ retrieved_text }})
     [--memory base|learned]                   # base: the memory of every RESULTS.md run (default)
     [--memory-snapshot SHA256]                # evaluation: refuse unless the memory has this hash; no write-back
-    [--no-write-back]                         # don't add this run's checked fixes to memory/learned/"""
+    [--no-write-back]                         # don't add this run's checked fixes to memory/learned/
+    [--no-python-rule]                        # LLM-only: no deterministic Python-version fix (every RESULTS.md run)"""
 
 import argparse
 import json
@@ -39,6 +40,9 @@ def main() -> None:
     p.add_argument("--memory-snapshot", metavar="SHA256",
                    help="evaluation mode: refuse to run unless the memory has this snapshot hash; never writes back")
     p.add_argument("--no-write-back", action="store_true", help="don't write this run's checked fixes to memory")
+    p.add_argument("--no-python-rule", action="store_true",
+                   help="LLM-only evaluation: don't set the declared Python version by rule before asking the LLM "
+                        "(the setting of every run in docs/RESULTS.md sections 2-9)")
     args = p.parse_args()
 
     slots, _ = load_answer(args.slots)
@@ -62,7 +66,7 @@ def main() -> None:
         retrieve = retriever(FixMemory.build(OllamaEmbedder(args.embed_model), docs=docs), args.retriever)
     result = run_fix_loop(args.repo, slots, args.prompt, OllamaClient(args.model), expected=expected,
                           mlflow_client=mlflow_client, injection=injection, retriever=retrieve,
-                          retriever_name=args.retriever)
+                          retriever_name=args.retriever, python_rule=not args.no_python_rule)
     if args.retriever:
         result.memory_set, result.memory_sha256 = args.memory, memory_sha
     sys.stdout.reconfigure(encoding="utf-8")

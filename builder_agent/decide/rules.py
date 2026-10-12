@@ -62,6 +62,22 @@ def _allows(spec: SpecifierSet, major_minor: str) -> bool:
     return any(Version(f"{major_minor}.{p}") in spec for p in (0, 99))
 
 
+def python_mismatch(ctx: RepoContext, choice: PythonChoice, image_version: str) -> str | None:
+    """The deterministic Python-version check: the version to set when the image's Python disagrees with
+    the version the repo declares, else None. Only a declared version counts: the Builder's assumed
+    default never triggers it, and a version chosen from constraints only (requires-python >=3.8, ...)
+    triggers it only when the image's version breaks one of them."""
+    if choice.status != "decided" or choice.assumed or not choice.version or image_version == choice.version:
+        return None
+    forced = choice.reason.startswith("forced")
+    exact = [h for h in ctx.python_version_hints if h.kind not in CONSTRAINT_KINDS and _major_minor(h.value)]
+    if not forced and not exact:
+        specs = [s for h in ctx.python_version_hints if h.kind in CONSTRAINT_KINDS and (s := _specifier(h.value))]
+        if all(_allows(s, image_version) for s in specs):
+            return None
+    return choice.version
+
+
 def _lower_bound(spec: SpecifierSet) -> str | None:
     bounds = [s.version.removesuffix(".*") for s in spec if s.operator in (">=", "~=", "==")]
     mms = sorted({mm for b in bounds if (mm := _major_minor(b))}, key=Version)

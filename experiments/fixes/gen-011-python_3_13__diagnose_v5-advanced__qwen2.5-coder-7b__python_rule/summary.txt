@@ -1,0 +1,8 @@
+FIX LOOP taxi-trip-regression (diagnose_v5 x qwen2.5-coder:7b): PASSED, stopped because: passed
+  initial run: failed at build
+  python rule: on
+  fix 1 (rule): stage build -> set_python_version 3.9 -> passed
+         reason: rule: the image runs Python 3.13, the repo declares 3.9 (all exact hints agree (pipfile, pipfile-lock, pyc-cache); 3.9 (pipfile: Pipfile), 3.9 (pipfile-lock: Pipfile.lock), 3.9 (pyc-cache: src/features/__pycache__/__init__.cpython-39.pyc))
+score vs gen-011 (python_3_13): {"first_fix_passed": true, "fixes_to_pass": 1, "exact": true, "loose": true, "first_action": {"action": "set_python_version", "version": "3.9"}, "rule_fixes": 1, "case": "gen-011"}
+memory: base 4aa9a3ad11e5 (10 documents)
+write-back: none, evaluation run (frozen memory snapshot)

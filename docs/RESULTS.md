@@ -554,6 +554,30 @@ Logs: `experiments/fixes/gen-NNN-<variant>__diagnose_v5-advanced__qwen-builder-s
 
 ---
 
+## 10. The deterministic Python-version check (not an LLM result)
+
+**What changed.** Before asking the LLM, the fix loop compares the image's Python version with the
+version the repo declares (`decide/rules.py` `python_mismatch`). If they disagree, the loop sets the
+declared version itself, once, as a rule-based fix. The fix is logged with `source: "rule"` and no LLM
+call, counts as one of the 3 fixes, and appears as `rule_fixes` in `score.json`. Only a declared
+version triggers it:
+
+- the Builder's assumed default (3.11) never does;
+- a version known only from a constraint (`requires-python >=3.10`) triggers it only when the image
+  breaks the constraint.
+
+**It is on by default. `--no-python-rule` gives the LLM-only loop**, which is the setting of every run
+in sections 2-9. Those runs are reproducible only with that flag, and LLM evaluations keep using it.
+
+**gen-011 with the rule on** (`diagnose_v5`, advanced retriever, base model, `--memory base` snapshot,
+no write-back): fix 1 (rule) was `set_python_version 3.9`, and it passed. That is 0 LLM calls, against
+3 fixes for the base model on v5 and not fixed by any other run. gen-009 and gen-010 (image and Pipfile
+both 3.9) can't trigger it, so the rule can't cause the wrong Python change of sections 6, 7 and 9.
+
+Logs: `experiments/fixes/gen-011-python_3_13__diagnose_v5-advanced__qwen2.5-coder-7b__python_rule/`.
+
+---
+
 ## Not run yet
 
 - DPO training (roadmap item 9 step 4); the pairs are in section 5.

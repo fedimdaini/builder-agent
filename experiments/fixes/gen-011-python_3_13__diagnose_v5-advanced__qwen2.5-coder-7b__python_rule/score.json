@@ -1,0 +1,12 @@
+{
+  "first_fix_passed": true,
+  "fixes_to_pass": 1,
+  "exact": true,
+  "loose": true,
+  "first_action": {
+    "action": "set_python_version",
+    "version": "3.9"
+  },
+  "rule_fixes": 1,
+  "case": "gen-011"
+}

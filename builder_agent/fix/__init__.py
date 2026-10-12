@@ -6,6 +6,11 @@
 A fix is a setting (Overrides) that changes only what the Builder generates. Every attempt
 re-renders the Builder's files into a fresh sandbox copy (through RepoWriter), so the repo's own
 files are never touched. At most 3 fixes; every attempt is logged.
+
+The deterministic Python-version check (python_rule=True, the default) runs before the LLM: when the
+image's Python version disagrees with the version the repo declares, the loop sets the declared version
+itself, once, as a rule-based fix (FixAttempt.source "rule", no LLM call). It counts as one of the 3
+fixes. python_rule=False gives the LLM-only loop of every run in docs/RESULTS.md sections 2-9.
 """
 
 from __future__ import annotations
@@ -20,6 +25,7 @@ from pydantic import BaseModel, Field
 
 from .. import LOG_DIR
 from ..decide import load_contracts, plan_build
+from ..decide.rules import python_mismatch
 from ..llm import ChatClient
 from ..llm.ollama import inline_refs
 from ..llm.prompts import PromptFile, load_prompt
@@ -29,7 +35,8 @@ from ..sandbox import DEFAULT_CONTRACTS, DEFAULT_LOG, STAGES, SandboxResult, run
 from ..scan import scan_repo
 from ..scan.deps import declared_names, normalize
 from ..scan.known import FRAMEWORKS, IMPORT_TO_DIST
-from .models import Diagnosis, DiagnosisWithAnalysis, GiveUp, answer_model, apply_fix, describe, validate_fix
+from .models import (Diagnosis, DiagnosisWithAnalysis, GiveUp, SetPythonVersion, answer_model, apply_fix, describe,
+                     validate_fix)
 
 MAX_FIXES = 3
 MAX_CALLS = 3                         # LLM calls per diagnosis (rejected answers are retried with reasons)
@@ -68,6 +75,7 @@ class FixAttempt(BaseModel):
     outcome: str                      # "passed", "failed at <stage>", "not applied: ...", "reverted: regression ..."
     sandbox_attempt_id: str | None = None
     retrieved: list[dict] | None = None   # RAG: the memory cases put into the prompt (id, variant, score, ranks)
+    source: str = "llm"               # "llm", or "rule": the deterministic Python-version check (no LLM call)
 
 
 class FixLoopResult(BaseModel):
@@ -86,13 +94,16 @@ class FixLoopResult(BaseModel):
     retriever: str | None = None      # RAG retriever name (builder_agent.memory), if any
     memory_set: str | None = None     # "base" or "learned" (builder_agent/memory/learned.py), with a retriever
     memory_sha256: str | None = None  # snapshot hash of that memory
+    python_rule: bool = False         # the deterministic Python-version check was on (off: LLM-only)
 
     def text(self) -> str:
         out = [f"FIX LOOP {self.repo} ({self.prompt_version} x {self.model}): "
                + ("PASSED" if self.final_ok else "NOT FIXED") + f", stopped because: {self.stopped_because}",
-               f"  initial run: {self.initial}"]
+               f"  initial run: {self.initial}",
+               f"  python rule: {'on' if self.python_rule else 'off (LLM-only)'}"]
         for a in self.attempts:
-            out.append(f"  fix {a.n}: stage {a.stage} -> {a.action_text or 'no valid action'} -> {a.outcome}")
+            by = " (rule)" if a.source == "rule" else ""
+            out.append(f"  fix {a.n}{by}: stage {a.stage} -> {a.action_text or 'no valid action'} -> {a.outcome}")
             if a.retrieved is not None:
                 out.append("         retrieved: " + ", ".join(f"{r['id']} {r['variant']}" for r in a.retrieved))
             if a.analysis:
@@ -229,9 +240,10 @@ def run_fix_loop(repo: str | Path, slots: dict, prompt_version: str, client: Cha
                  contracts_path: str | Path = DEFAULT_CONTRACTS, prompts_dir: str | Path | None = None,
                  runner=subprocess_runner, sandbox_log: str | Path | None = DEFAULT_LOG,
                  fix_log: str | Path | None = DEFAULT_FIX_LOG, injection: Overrides | None = None,
-                 retriever=None, retriever_name: str | None = None) -> FixLoopResult:
+                 retriever=None, retriever_name: str | None = None, python_rule: bool = True) -> FixLoopResult:
     """injection: a generated fault (builder_agent/faults) the loop starts from; fixes are applied on top.
-    retriever: (stage, error_tail) -> memory hits (builder_agent.memory), rendered into {{ retrieved_text }}."""
+    retriever: (stage, error_tail) -> memory hits (builder_agent.memory), rendered into {{ retrieved_text }}.
+    python_rule: run the deterministic Python-version check before asking the LLM (False: LLM-only)."""
     prompt = load_prompt(prompt_version, prompts_dir) if prompts_dir else load_prompt(prompt_version)
     ctx = scan_repo(repo)
     c = load_contracts(contracts_path)
@@ -249,11 +261,41 @@ def run_fix_loop(repo: str | Path, slots: dict, prompt_version: str, client: Cha
     attempts: list[FixAttempt] = []
     stopped = "passed" if r.ok else "max fixes reached"
     digest = client.digest
+    rule_used = False
+
+    def try_fix(attempt: FixAttempt, fix) -> None:
+        """Apply a fix in a new sandbox run; keep it unless it broke an earlier stage."""
+        nonlocal applied, r
+        trial = sandbox(apply_fix(applied, fix))
+        attempt.sandbox_attempt_id = trial.attempt_id
+        if regressed(r, trial):
+            # the fix broke an earlier stage than the one it was meant to fix: undo it and keep
+            # the previous state (and its error) for the next diagnosis; the attempt counts as failed
+            attempt.outcome = f"reverted: regression (failed at {trial.failed_stage}, before {r.failed_stage})"
+            reverted.append(fix.model_dump())
+        else:
+            applied, r = apply_fix(applied, fix), trial
+            attempt.outcome = _outcome(r)
+
     for n in range(1, max_fixes + 1):
         if r.ok:
             stopped = "passed"
             break
         tctx = config_context(ctx, c, plan, answers, mlflow_client, applied)
+        declared = python_mismatch(ctx, plan.python, tctx["python_version"]) if python_rule and not rule_used else None
+        if declared:
+            # the deterministic Python-version check: set the declared version, once, without the LLM
+            rule_used = True
+            stage = _failed(r)
+            fix = SetPythonVersion(action="set_python_version", version=declared)
+            attempt = FixAttempt(n=n, stage=stage.name, error_tail=stage.output_tail, calls=[], outcome="",
+                                 action=fix.model_dump(), action_text=describe(fix), source="rule",
+                                 reason=f"rule: the image runs Python {tctx['python_version']}, the repo declares "
+                                        f"{declared} ({plan.python.reason}; {', '.join(plan.python.evidence)})")
+            try_fix(attempt, fix)
+            attempts.append(attempt)
+            _log(fix_log, ctx.name, prompt, client, digest, attempt)
+            continue
         variables = prompt_variables(ctx, r, tctx, n, attempts)
         stage = _failed(r)
         retrieved = None
@@ -278,17 +320,7 @@ def run_fix_loop(repo: str | Path, slots: dict, prompt_version: str, client: Cha
                 attempt.outcome = "not applied: the LLM gave up"
                 stopped = "give_up"
             else:
-                trial = sandbox(apply_fix(applied, diag.fix))
-                attempt.sandbox_attempt_id = trial.attempt_id
-                if regressed(r, trial):
-                    # the fix broke an earlier stage than the one it was meant to fix: undo it and keep
-                    # the previous state (and its error) for the next diagnosis; the attempt counts as failed
-                    attempt.outcome = (f"reverted: regression (failed at {trial.failed_stage}, "
-                                       f"before {r.failed_stage})")
-                    reverted.append(diag.fix.model_dump())
-                else:
-                    applied, r = apply_fix(applied, diag.fix), trial
-                    attempt.outcome = _outcome(r)
+                try_fix(attempt, diag.fix)
         attempts.append(attempt)
         _log(fix_log, ctx.name, prompt, client, digest, attempt)
         if diag is None or isinstance(diag.fix, GiveUp):
@@ -298,7 +330,7 @@ def run_fix_loop(repo: str | Path, slots: dict, prompt_version: str, client: Cha
     return FixLoopResult(repo=ctx.name, prompt_version=prompt.version, prompt_sha256=prompt.sha256,
                          model=client.model, model_digest=digest, initial=initial, initial_attempt_id=initial_id,
                          attempts=attempts, final_ok=r.ok, stopped_because=stopped, applied=applied,
-                         injection=injection, retriever=retriever_name)
+                         injection=injection, retriever=retriever_name, python_rule=python_rule)
 
 
 def _log(path, repo: str, prompt: PromptFile, client, digest: str, a: FixAttempt) -> None:
@@ -318,14 +350,16 @@ def score_attempts(attempts: list[dict], expected_fix: dict) -> dict:
     """Score one run from its fix attempts (FixAttempt dumps or fix_attempts.jsonl entries).
     Main: did the first fix pass the sandbox, and how many fixes until it passed (None: not fixed).
     Secondary: was the first accepted action the expected one (exact: same action and arguments;
-    loose: same action on the same package, any version)."""
+    loose: same action on the same package, any version).
+    rule_fixes: how many fixes the deterministic Python rule made (0 in an LLM-only run); a first fix
+    made by the rule is scored like any other, so compare runs with the same rule setting."""
     passed = next((a["n"] for a in attempts if a["outcome"] == "passed"), None)
     first = next((a["action"] for a in attempts if a.get("action")), None)
     same = first is not None and first.get("action") == expected_fix.get("action") and \
         normalize(str(first.get("name", ""))) == normalize(str(expected_fix.get("name", "")))
     return {"first_fix_passed": passed == 1, "fixes_to_pass": passed,
             "exact": same and all(first.get(k) == v for k, v in expected_fix.items()), "loose": same,
-            "first_action": first}
+            "first_action": first, "rule_fixes": sum(a.get("source") == "rule" for a in attempts)}
 
 
 def score_fix(result: FixLoopResult, expected_fix: dict) -> dict:

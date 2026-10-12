@@ -97,7 +97,7 @@ def test_fault_001_fixed_by_the_expected_pin(mini, tmp_path):  # noqa: F811
     assert "logged-models failed with error code 404" in "\n".join(a.error_tail)
     assert "mlflow==2.17.2" not in runner.dockerfiles[0] and "mlflow==2.17.2" in runner.dockerfiles[1]
     assert score_fix(r, FAULT_001["expected_fix"]) == {"first_fix_passed": True, "fixes_to_pass": 1, "exact": True,
-                                                        "loose": True, "first_action": PIN["fix"]}
+                                                        "loose": True, "first_action": PIN["fix"], "rule_fixes": 0}
     assert snapshot(Path(mini.root)) == before                          # the repo itself is never touched
 
     [entry] = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()]
@@ -338,3 +338,63 @@ def test_v5_is_v3_plus_the_python_line():
     assert v5.sections["system"] == v3.sections["system"] and v5.sections["retry"] == v3.sections["retry"]
     assert v5.sections["user"] == v3.sections["user"].replace("{{ scan_summary }}\n",
                                                               "{{ scan_summary }}\n{{ python_text }}\n")
+
+
+# --- the deterministic Python-version check -----------------------------------------------------
+
+class PythonRunner:
+    """Fake docker: the build fails unless the Builder's Dockerfile is on Python 3.11 (mini declares 3.11)."""
+
+    def __init__(self):
+        self.images: list[str] = []
+
+    def __call__(self, cmd, cwd, timeout):
+        if "build" in cmd:
+            first = (Path(cwd) / "Dockerfile").read_text(encoding="utf-8").split("FROM ")[1].split()[0]
+            self.images.append(first)
+            if first != "python:3.11-slim":
+                return 1, "ERROR: Failed building wheel for numpy"
+        return 0, "prediction: 98.5\nsmoke test passed" if "predict" in cmd else "ok"
+
+
+def test_python_rule_sets_the_declared_version_without_the_llm(mini):  # noqa: F811
+    model = FakeModel()                                                   # any LLM call would fail: no answers
+    runner = PythonRunner()
+    r = run_fix_loop(mini.root, MINI_GOLD, "diagnose_v5", model, runner=runner, sandbox_log=None, fix_log=None,
+                     injection=Overrides(python_version="3.13"))
+    assert r.final_ok and r.python_rule and model.sent == []
+    [a] = r.attempts
+    assert (a.source, a.action_text, a.outcome, a.calls) == ("rule", "set_python_version 3.11", "passed", [])
+    assert "image runs Python 3.13, the repo declares 3.11" in a.reason
+    assert runner.images[-1] == "python:3.11-slim"
+    assert score_fix(r, {"action": "set_python_version", "version": "3.11"})["rule_fixes"] == 1
+    assert "fix 1 (rule): stage build -> set_python_version 3.11 -> passed" in r.text()
+
+
+def test_python_rule_off_asks_the_llm(mini):  # noqa: F811
+    model = FakeModel({"fix": {"action": "set_python_version", "version": "3.11"}, "reason": "the Pipfile asks 3.11"})
+    r = run_fix_loop(mini.root, MINI_GOLD, "diagnose_v1", model, runner=PythonRunner(), sandbox_log=None,
+                     fix_log=None, injection=Overrides(python_version="3.13"), python_rule=False)
+    assert r.final_ok and not r.python_rule and len(model.sent) == 1
+    assert r.attempts[0].source == "llm" and "python rule: off (LLM-only)" in r.text()
+
+
+def test_python_rule_does_nothing_when_the_versions_agree(mini):  # noqa: F811
+    r = loop(mini, FakeModel(PIN), fix_log=None)                          # fault-001: a 3.11 image, as declared
+    assert [a.source for a in r.attempts] == ["llm"] and r.final_ok
+
+
+def test_python_mismatch_only_for_declared_versions(tmp_path, contracts):  # noqa: F811
+    from builder_agent.decide.models import PythonChoice
+    from builder_agent.decide.rules import python_mismatch
+    from builder_agent.scan import scan_repo
+    from test_scan import write
+    exact = scan_repo(write(tmp_path / "e", {".python-version": "3.9\n"}))
+    assert python_mismatch(exact, plan_build(exact, contracts).python, "3.13") == "3.9"
+    assert python_mismatch(exact, plan_build(exact, contracts).python, "3.9") is None
+    assumed = PythonChoice(status="decided", version="3.11", assumed=True, reason="assumed: no hint")
+    assert python_mismatch(exact, assumed, "3.13") is None                # the Builder's default isn't declared
+    lower = scan_repo(write(tmp_path / "c", {"pyproject.toml": '[project]\nname = "x"\nrequires-python = ">=3.10"\n'}))
+    choice = plan_build(lower, contracts).python
+    assert python_mismatch(lower, choice, "3.12") is None                 # 3.12 meets >=3.10
+    assert python_mismatch(lower, choice, "3.8") == choice.version        # 3.8 doesn't

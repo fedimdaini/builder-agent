@@ -121,6 +121,7 @@ def write_back(result, case: dict | None = None, evaluation: bool = False, memor
                        "prompt_version": result.prompt_version, "retriever": result.retriever,
                        "memory_set": memory_set, "memory_sha256": memory_sha256,
                        "sandbox_attempt_id": a.sandbox_attempt_id, "fix_n": a.n,
+                       "fixed_by": getattr(a, "source", "llm"),
                        "injected_case": case["id"] if case else None},
         }
         path.write_text(json.dumps(rec, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
