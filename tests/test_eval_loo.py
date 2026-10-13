@@ -18,6 +18,8 @@ import stats  # noqa: E402
 
 from builder_agent.memory import MemoryCaseError, all_cases, doc_from_case, loo_docs  # noqa: E402
 
+from test_render import mini  # noqa: E402,F401 (fixture)
+
 
 # --- the leave-one-out memory -------------------------------------------------------------------------
 
@@ -56,6 +58,7 @@ def test_statistics():
 # --- the runner -------------------------------------------------------------------------------------
 
 CASE = {"id": "gen-002", "variant": "xgboost_uninstalled", "family": "missing_dependency", "stage": "train",
+        "error_signature": "boom",
         "injection": {"post_install_commands": ["pip uninstall -y xgboost"]}}
 
 
@@ -127,3 +130,61 @@ def test_analysis_and_blind_labels(tmp_path):
     sheet = (tmp_path / "labels" / "to_label.csv").read_text(encoding="utf-8")
     assert "v3-advanced" not in sheet and "refers to" not in sheet                    # blind: no config, no verdict
     assert analyze.label_agreement(tmp_path / "labels") is None                       # nothing labelled yet
+
+
+# --- speed: runs grouped by case, the first sandbox run shared -------------------------------------
+
+def test_plan_groups_runs_by_case():
+    todo = run.plan("main", list(run.CONFIGS), ["gen-001", "gen-002", "gen-003"], [101, 102])
+    cases_in_order = [c for _, c, _ in todo]
+    blocks = [c for i, c in enumerate(cases_in_order) if i == 0 or c != cases_in_order[i - 1]]
+    assert len(todo) == 18 and len(blocks) == 3                  # each case's 6 runs are consecutive
+    assert todo == run.plan("main", list(run.CONFIGS), ["gen-001", "gen-002", "gen-003"], [101, 102])
+
+
+def fake_sandbox_result(stage="train"):
+    from builder_agent.sandbox import SandboxResult, StageResult
+    return SandboxResult(repo="taxi", attempt_id="first-1", started_at="t", ok=False, failed_stage=stage, total_s=1,
+                         workdir="w", compose_project="p", stages=[StageResult(name=stage, status="failed",
+                                                                               output_tail=["boom"])], teardown="ok")
+
+
+def test_initial_run_is_stored_and_reused_only_while_the_fingerprint_holds(tmp_path, monkeypatch):
+    fp = {"builder_agent": "a", "contracts": "b", "gold": "c", "taxi_head": "d", "uncommitted": False}
+    monkeypatch.setattr(run, "fingerprint", lambda: dict(fp))
+    calls = []
+
+    def sandbox(*a, **k):
+        calls.append(1)
+        return fake_sandbox_result()
+    r, reused = run.initial_run(tmp_path, CASE, sandbox=sandbox)
+    assert not reused and calls == [1] and (tmp_path / "_initial" / "gen-002.json").exists()
+    r2, reused = run.initial_run(tmp_path, CASE, sandbox=sandbox)
+    assert reused and calls == [1] and r2.attempt_id == r.attempt_id
+    fp["builder_agent"] = "changed"                              # the Builder changed: run it again
+    _, reused = run.initial_run(tmp_path, CASE, sandbox=sandbox)
+    assert not reused and calls == [1, 1]
+    fp["uncommitted"] = True                                     # uncommitted code: never reused, never stored
+    (tmp_path / "_initial" / "gen-002.json").unlink()
+    _, reused = run.initial_run(tmp_path, CASE, sandbox=sandbox)
+    assert not reused and not (tmp_path / "_initial" / "gen-002.json").exists()
+    with pytest.raises(run.Stop, match="didn't reproduce"):
+        run.initial_run(tmp_path, CASE, sandbox=lambda *a, **k: fake_sandbox_result("build"))
+
+
+def test_run_fix_loop_uses_a_given_first_run(mini):  # noqa: F811
+    from test_fix import PIN, Fault001Runner
+    from test_llm import FakeModel
+    from test_render import MINI_GOLD
+    from builder_agent.fix import run_fix_loop
+    runner = Fault001Runner()
+    first = run_fix_loop(mini.root, MINI_GOLD, "diagnose_v1", FakeModel(PIN), mlflow_client="mlflow", runner=runner,
+                         sandbox_log=None, fix_log=None)
+    builds = len(runner.dockerfiles)
+    runner2 = Fault001Runner()
+    given = fake_sandbox_result()
+    given.stages[0].output_tail = first.attempts[0].error_tail
+    again = run_fix_loop(mini.root, MINI_GOLD, "diagnose_v1", FakeModel(PIN), mlflow_client="mlflow", runner=runner2,
+                         sandbox_log=None, fix_log=None, initial=given)
+    assert again.initial_attempt_id == "first-1" and again.final_ok
+    assert len(runner2.dockerfiles) == builds - 1                # the first sandbox run was not repeated

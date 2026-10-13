@@ -10,6 +10,16 @@ case's leave-one-out memory (builder_agent.memory.loo_docs), no write-back. Each
 <out>/<pass>/<config>/<case>/seed-<n>/ (fix_attempts.jsonl, sandbox_attempts.jsonl, result.json). result.json
 is written last (via a temp file), so a run without it is incomplete: it is deleted and done again.
 
+Speed (the protocol is unchanged):
+- runs are grouped by case: all configs and seeds of one case run one after another, so the Docker builds of
+  that case's fault and fixes are still in the build cache (cases in a fixed shuffled order, and the runs
+  within a case too);
+- the first sandbox run of a case (the injected fault, before any fix) is the same in every config, seed and
+  pass, so it runs once and is shared (docs/EVAL_PROTOCOL.md section 5 item 4). It is stored in
+  <out>/_initial/<case>.json with a fingerprint of its inputs (the Builder's code, contracts.yaml, the gold
+  files, the taxi repo's HEAD), reused only while that fingerprint holds and never from uncommitted code,
+  and only if it failed at the case's recorded stage. Each run's sandbox_attempts.jsonl starts with a copy.
+
 A run is only kept if it measured the model: Docker and Ollama answered before and after it, no LLM call
 failed, no Docker error is in its output, and the first sandbox run failed at the case's recorded stage
 (the fault reproduced). Otherwise the runner deletes the run and stops with the reason (exit 2).
@@ -32,6 +42,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from builder_agent.fix import run_fix_loop  # noqa: E402
+from builder_agent.sandbox import SandboxResult, run_sandbox  # noqa: E402
 from builder_agent.llm import OllamaClient  # noqa: E402
 from builder_agent.llm.ollama import DEFAULT_HOST, DEFAULT_OPTIONS  # noqa: E402
 from builder_agent.memory import all_cases, loo_docs  # noqa: E402
@@ -91,10 +102,57 @@ def is_done(d: Path) -> bool:
 
 
 def plan(pass_: str, configs: list[str], case_ids: list[str], seeds: list[int]) -> list[tuple[str, str, int]]:
-    """Every (config, case, seed), in a shuffled but fixed order."""
-    todo = [(cfg, c, s) for cfg in configs for c in case_ids for s in seeds]
-    random.Random(f"{ORDER_SEED}-{pass_}").shuffle(todo)
+    """Every (config, case, seed), grouped by case: cases in a fixed shuffled order, and within a case its
+    configs and seeds in a fixed shuffled order (the build cache stays warm for the case)."""
+    rng = random.Random(f"{ORDER_SEED}-{pass_}")
+    order = list(case_ids)
+    rng.shuffle(order)
+    todo = []
+    for c in order:
+        runs = [(cfg, c, s) for cfg in configs for s in seeds]
+        rng.shuffle(runs)
+        todo += runs
     return todo
+
+
+def fingerprint() -> dict:
+    """What the first sandbox run depends on: if any of it changes, the stored first runs are not reused."""
+    def git(repo, *args):
+        return subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True).stdout.strip()
+    dirty = git(ROOT, "status", "--porcelain", "--", "builder_agent", "contracts.yaml", "tests/gold")
+    return {"builder_agent": git(ROOT, "rev-parse", "HEAD:builder_agent"),
+            "contracts": git(ROOT, "rev-parse", "HEAD:contracts.yaml"),
+            "gold": git(ROOT, "rev-parse", "HEAD:tests/gold"),
+            "taxi_head": git(REPO, "rev-parse", "HEAD"),
+            "uncommitted": bool(dirty)}
+
+
+def initial_run(out: Path, case: dict, sandbox=None) -> tuple[SandboxResult, bool]:
+    """The case's first sandbox run: stored and reused while the fingerprint holds. Returns (result, reused)."""
+    path = out / "_initial" / f"{case['id']}.json"
+    fp = fingerprint()
+    if path.exists() and not fp["uncommitted"]:
+        stored = json.loads(path.read_text(encoding="utf-8"))
+        if stored["fingerprint"] == fp:
+            return SandboxResult.model_validate(stored["result"]), True
+    injection, mlflow_client = fault(case)
+    slots, _ = load_answer(SLOTS)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    r = (sandbox or run_sandbox)(REPO, slots, expected=json.loads(EXPECTED.read_text(encoding="utf-8")),
+                                 log_path=path.with_suffix(".sandbox.jsonl"), mlflow_client=mlflow_client,
+                                 overrides=injection)
+    failed = next((s for s in r.stages if s.status == "failed"), None)
+    if r.failed_stage != case["stage"] or failed is None:
+        raise Stop(f"{case['id']}: the fault didn't reproduce: first sandbox run failed at {r.failed_stage}, "
+                   f"the case says {case['stage']}")
+    signature_seen = case["error_signature"].strip() in "\n".join(failed.output_tail)
+    if not fp["uncommitted"]:                     # never store a run made from uncommitted code
+        tmp = path.with_suffix(".json.tmp")
+        tmp.write_text(json.dumps({"fingerprint": fp, "case": case["id"], "signature_seen": signature_seen,
+                                   "result": r.model_dump()}, indent=1, ensure_ascii=False) + "\n",
+                       encoding="utf-8", newline="\n")
+        tmp.replace(path)
+    return r, False
 
 
 def invalid(result, case: dict) -> str | None:
@@ -110,12 +168,14 @@ def invalid(result, case: dict) -> str | None:
 
 
 def run_one(d: Path, pass_: str, config: str, case: dict, seed: int, retrievers: dict, model: str,
-            run_fix_loop=run_fix_loop, runner=None) -> dict:
+            run_fix_loop=run_fix_loop, runner=None, initial: SandboxResult | None = None) -> dict:
     prompt, retriever_name = CONFIGS[config]
     temperature, _ = PASSES[pass_]
     if d.exists():
         shutil.rmtree(d)                            # an incomplete run: start it again
     d.mkdir(parents=True)
+    if initial is not None:                         # the shared first run heads this run's own sandbox log
+        (d / "sandbox_attempts.jsonl").write_text(initial.model_dump_json() + "\n", encoding="utf-8", newline="\n")
     docs = loo_docs(case["id"])
     retrieve = None
     if retriever_name:
@@ -132,7 +192,7 @@ def run_one(d: Path, pass_: str, config: str, case: dict, seed: int, retrievers:
     kw = {"runner": runner} if runner else {}
     result = run_fix_loop(REPO, slots, prompt, client, expected=json.loads(EXPECTED.read_text(encoding="utf-8")),
                           mlflow_client=mlflow_client, injection=injection, retriever=retrieve,
-                          retriever_name=retriever_name, python_rule=False,
+                          retriever_name=retriever_name, python_rule=False, initial=initial,
                           sandbox_log=d / "sandbox_attempts.jsonl", fix_log=d / "fix_attempts.jsonl", **kw)
     if why := invalid(result, case):
         shutil.rmtree(d)
@@ -146,7 +206,8 @@ def run_one(d: Path, pass_: str, config: str, case: dict, seed: int, retrievers:
         "retriever": retriever_name, "memory": "loo" if retriever_name else None,
         "memory_ids": sorted(doc.id for doc in docs) if retriever_name else [],
         "memory_sha256": snapshot_sha256(docs) if retriever_name else None, "python_rule": False,
-        "initial": result.initial, "final_ok": result.final_ok, "stopped_because": result.stopped_because,
+        "initial": result.initial, "initial_attempt_id": result.initial_attempt_id,
+        "initial_shared": initial is not None, "final_ok": result.final_ok, "stopped_because": result.stopped_because,
         "first_fix_passed": passed == 1, "fixes_to_pass": passed,
         "attempts": [a.model_dump(exclude={"calls"}) | {"n_calls": len(a.calls),
                                                         "rejected": [c.reasons for c in a.calls if not c.valid]}
@@ -182,13 +243,21 @@ def main() -> None:
     if args.list:
         return
     retrievers: dict = {}
+    firsts: dict = {}
     for i, (config, case_id, seed) in enumerate(left, 1):
         if problem := health():
             print(f"STOP before {config} {case_id} seed {seed}: {problem}", flush=True)
             sys.exit(2)
         d = run_dir(out, args.pass_, config, case_id, seed)
         try:
-            rec = run_one(d, args.pass_, config, cases[case_id], seed, retrievers, args.model)
+            if case_id not in firsts:
+                t0 = time.monotonic()
+                first, reused = initial_run(out, cases[case_id])
+                firsts[case_id] = first
+                print(f"{case_id}: first sandbox run {'reused' if reused else 'done'} (failed at "
+                      f"{first.failed_stage}, {time.monotonic() - t0:.0f} s)", flush=True)
+            rec = run_one(d, args.pass_, config, cases[case_id], seed, retrievers, args.model,
+                          initial=firsts[case_id])
         except Stop as e:
             print(f"STOP: {e}", flush=True)
             sys.exit(2)

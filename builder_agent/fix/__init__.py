@@ -243,10 +243,13 @@ def run_fix_loop(repo: str | Path, slots: dict, prompt_version: str, client: Cha
                  contracts_path: str | Path = DEFAULT_CONTRACTS, prompts_dir: str | Path | None = None,
                  runner=subprocess_runner, sandbox_log: str | Path | None = DEFAULT_LOG,
                  fix_log: str | Path | None = DEFAULT_FIX_LOG, injection: Overrides | None = None,
-                 retriever=None, retriever_name: str | None = None, python_rule: bool = True) -> FixLoopResult:
+                 retriever=None, retriever_name: str | None = None, python_rule: bool = True,
+                 initial: SandboxResult | None = None) -> FixLoopResult:
     """injection: a generated fault (builder_agent/faults) the loop starts from; fixes are applied on top.
     retriever: (stage, error_tail) -> memory hits (builder_agent.memory), rendered into {{ retrieved_text }}.
-    python_rule: run the deterministic Python-version check before asking the LLM (False: LLM-only)."""
+    python_rule: run the deterministic Python-version check before asking the LLM (False: LLM-only).
+    initial: the first sandbox run, already done with the same inputs (the evaluation runner reuses a case's
+    identical first run across configs and seeds, docs/EVAL_PROTOCOL.md section 5); None: run it here."""
     prompt = load_prompt(prompt_version, prompts_dir) if prompts_dir else load_prompt(prompt_version)
     ctx = scan_repo(repo)
     c = load_contracts(contracts_path)
@@ -259,7 +262,7 @@ def run_fix_loop(repo: str | Path, slots: dict, prompt_version: str, client: Cha
         return run_sandbox(repo, slots, expected=expected, contracts_path=contracts_path, log_path=sandbox_log,
                            runner=runner, mlflow_client=mlflow_client, overrides=o)
 
-    r = sandbox(applied)
+    r = initial if initial is not None else sandbox(applied)
     initial, initial_id = _outcome(r), r.attempt_id
     attempts: list[FixAttempt] = []
     stopped = "passed" if r.ok else "max fixes reached"
