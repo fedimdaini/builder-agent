@@ -60,6 +60,7 @@ class SlotFillResult(BaseModel):
     answer: dict | None            # the last valid answer, else the last parsed one
     attempts: list[Attempt]
     error: str | None = None       # a call failed for good (after the transport retry): the loop stopped
+    conversation: list[dict] = Field(default_factory=list)   # the last request's messages + the model's answer
 
     @property
     def valid_on_first_try(self) -> bool:
@@ -84,11 +85,33 @@ def _parse(raw: str) -> tuple[dict | None, list[str]]:
     return value, []
 
 
+def slot_messages(ctx: RepoContext, plan: BuildPlan, prompt: PromptFile) -> list[dict]:
+    variables = slot_variables(ctx, plan)
+    return [{"role": "system", "content": prompt.render("system", variables)},
+            {"role": "user", "content": prompt.render("user", variables)}]
+
+
 def fill_slots(ctx: RepoContext, plan: BuildPlan, prompt: PromptFile, client: ChatClient,
                max_attempts: int = MAX_ATTEMPTS, log_path: str | Path | None = DEFAULT_CALL_LOG) -> SlotFillResult:
+    return slot_loop(ctx, plan, prompt, client, slot_messages(ctx, plan, prompt), max_attempts, log_path)
+
+
+def runtime_retry(ctx: RepoContext, plan: BuildPlan, prompt: PromptFile, retry_prompt: PromptFile, client: ChatClient,
+                  conversation: list[dict], variables: dict, max_attempts: int = MAX_ATTEMPTS,
+                  log_path: str | Path | None = DEFAULT_CALL_LOG) -> SlotFillResult:
+    """The sandbox failed because of a slot answer: the same conversation, plus retry_prompt's user message
+    (the error output and the previous answer). The new answer goes through the static validator, with the
+    slot prompt's own retry section if it is rejected."""
+    messages = conversation + [{"role": "user", "content": retry_prompt.render("user", variables)}]
+    return slot_loop(ctx, plan, prompt, client, messages, max_attempts, log_path, task="slot_runtime_retry",
+                     extra_prompt=retry_prompt)
+
+
+def slot_loop(ctx: RepoContext, plan: BuildPlan, prompt: PromptFile, client: ChatClient, messages: list[dict],
+              max_attempts: int = MAX_ATTEMPTS, log_path: str | Path | None = DEFAULT_CALL_LOG,
+              task: str = "slot_filling", extra_prompt: PromptFile | None = None) -> SlotFillResult:
+    """Call, validate, and retry with the reasons (the prompt's retry section), from these messages on."""
     variables = slot_variables(ctx, plan)
-    messages = [{"role": "system", "content": prompt.render("system", variables)},
-                {"role": "user", "content": prompt.render("user", variables)}]
     schema = inline_refs(slots_model(prompt).model_json_schema())   # v1/v2: SlotAnswers, unchanged
     digest = client.digest
     attempts: list[Attempt] = []
@@ -102,7 +125,7 @@ def fill_slots(ctx: RepoContext, plan: BuildPlan, prompt: PromptFile, client: Ch
         except Exception as e:  # noqa: BLE001 - log every failed call, then stop the loop
             error = f"{type(e).__name__}: {e}"
             _log(log_path, prompt, client, digest, ctx, n, messages, None, [], error=error,
-                 latency_s=round(time.perf_counter() - t0, 2))
+                 latency_s=round(time.perf_counter() - t0, 2), task=task, extra_prompt=extra_prompt)
             break
         parsed, reasons = _parse(resp.content)
         if parsed is not None:
@@ -111,7 +134,7 @@ def fill_slots(ctx: RepoContext, plan: BuildPlan, prompt: PromptFile, client: Ch
         attempts.append(Attempt(attempt=n, latency_s=resp.latency_s, prompt_tokens=resp.prompt_tokens,
                                 output_tokens=resp.output_tokens, valid=not reasons, reasons=reasons,
                                 answer=parsed, raw=resp.content))
-        _log(log_path, prompt, client, digest, ctx, n, messages, resp, reasons)
+        _log(log_path, prompt, client, digest, ctx, n, messages, resp, reasons, task=task, extra_prompt=extra_prompt)
         if not reasons:
             break
         if n < max_attempts:
@@ -121,20 +144,24 @@ def fill_slots(ctx: RepoContext, plan: BuildPlan, prompt: PromptFile, client: Ch
 
     return SlotFillResult(prompt_version=prompt.version, prompt_sha256=prompt.sha256, model=client.model,
                           model_digest=digest, valid=error is None and bool(attempts) and attempts[-1].valid,
-                          answer=answer, attempts=attempts, error=error)
+                          answer=answer, attempts=attempts, error=error,
+                          conversation=messages + ([{"role": "assistant", "content": attempts[-1].raw}]
+                                                   if attempts else []))
 
 
 def _log(log_path, prompt: PromptFile, client: ChatClient, digest: str, ctx: RepoContext, attempt: int,
          messages: list[dict], resp: ChatResponse | None, reasons: list[str], error: str | None = None,
-         latency_s: float | None = None) -> None:
+         latency_s: float | None = None, task: str = "slot_filling", extra_prompt: PromptFile | None = None) -> None:
     if not log_path:
         return
     entry = {
         "time": datetime.now(timezone.utc).isoformat(),
-        "task": "slot_filling",
+        "task": task,
         "repo": ctx.name,
         "prompt_version": prompt.version,
         "prompt_sha256": prompt.sha256,
+        **({"retry_prompt_version": extra_prompt.version, "retry_prompt_sha256": extra_prompt.sha256}
+           if extra_prompt else {}),
         "model": client.model,
         "model_digest": digest,
         "options": client.options,

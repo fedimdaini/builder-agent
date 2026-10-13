@@ -56,7 +56,8 @@ class PromptFile(BaseModel):
             raise PromptError(f"{self.version}.md [{section}] line {e.lineno}: {e.message}") from e
 
 
-def load_prompt(version: str, prompts_dir: str | Path = PROMPTS_DIR) -> PromptFile:
+def load_prompt(version: str, prompts_dir: str | Path = PROMPTS_DIR, required: tuple[str, ...] = SECTIONS) -> PromptFile:
+    """required: the sections the file must have (a follow-up prompt such as slot_runtime_retry_v1 has only user)."""
     path = Path(prompts_dir) / f"{version}.md"
     if not path.exists():
         raise PromptError(f"prompt file not found: {path}")
@@ -70,10 +71,10 @@ def load_prompt(version: str, prompts_dir: str | Path = PROMPTS_DIR) -> PromptFi
             raise PromptError(f"{path.name}: section '{name}' appears twice")
         end = heads[i + 1].start() if i + 1 < len(heads) else len(text)
         sections[name] = text[h.end():end].strip("\n")
-    missing = [s for s in SECTIONS if s not in sections]
+    missing = [s for s in required if s not in sections]
     if missing:
         raise PromptError(f"{path.name}: missing section(s) {', '.join(missing)} "
-                          f"(expected headings: {', '.join('## ' + s for s in SECTIONS)})")
+                          f"(expected headings: {', '.join('## ' + s for s in required)})")
     return PromptFile(version=version, path=str(path), sha256=hashlib.sha256(raw).hexdigest(),
                       sections=sections)
 

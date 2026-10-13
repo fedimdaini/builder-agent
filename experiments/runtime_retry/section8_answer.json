@@ -1,0 +1,25 @@
+{
+  "target_column": "price",
+  "target_transform": "none",
+  "model_flavor": "sklearn",
+  "model_input": "dataframe",
+  "task": "regression",
+  "train_script": {
+    "script": "scripts/train.py",
+    "args": [
+      "$train_path",
+      "$target_column"
+    ],
+    "train_file": "data/processed/train.csv",
+    "model_output": "mlflow",
+    "mlflow_artifact_path": "ridge",
+    "model_file": null
+  },
+  "evaluate": {
+    "eval_file": "data/processed/test.csv",
+    "group_column": "a"
+  },
+  "data": {
+    "data_step": "existing"
+  }
+}

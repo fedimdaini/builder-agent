@@ -2,7 +2,9 @@
 
     python -m builder_agent.create <repo> [--dry-run] [--model M] [--slots FILE] [--expected FILE] [--no-write-back]
 
-scan -> decide -> slot filling (the approved prompt for the repo's training mode) -> sandbox and fix loop
+scan -> decide -> slot filling (the approved prompt for the repo's training mode) -> sandbox; if it fails
+because of a slot answer (fix/origin.py), the error goes back to the slot LLM (prompts/slot_runtime_retry_v1.md),
+at most MAX_RUNTIME_RETRIES times -> fix loop
 (diagnose_v3 + advanced retriever over the base memory, Python rule on) -> if every stage passed: render the
 same files with the fixes applied, write them through RepoWriter on a new builder/<date> branch, commit
 them there, and switch back to the original branch (in a finally block, whatever happens).
@@ -28,17 +30,21 @@ from .. import LOG_DIR
 from ..decide import load_contracts, plan_build
 from ..decide.modes import select_modes
 from ..fix import DEFAULT_FIX_LOG, FixLoopResult, run_fix_loop
-from ..llm import DEFAULT_CALL_LOG, ChatClient, SlotFillResult, fill_slots, load_prompt
+from ..fix.origin import GROUP_SLOTS, changed_slots, classify, outside_group, slot_files
+from ..llm import DEFAULT_CALL_LOG, ChatClient, SlotFillResult, fill_slots, load_prompt, runtime_retry, slot_messages
 from ..render import Expected, render_adapters, validate_slots
 from ..render.configs import render_configs
 from ..repo_writer import (RepoWriter, WriteRefused, current_branch, ignored_paths, is_git_repo, tracked_changes,
                            worktree_state)
-from ..sandbox import DEFAULT_CONTRACTS, DEFAULT_LOG, subprocess_runner
+from ..sandbox import DEFAULT_CONTRACTS, DEFAULT_LOG, run_sandbox, subprocess_runner
 from ..scan import scan_repo
 
 # the approved prompts (docs/RESULTS.md): slots per training mode, and the default diagnosis setup
 SLOT_PROMPTS = {"function": "slots_v3", "script": "train_script_v1"}
 DIAGNOSE_PROMPT = "diagnose_v3"
+RUNTIME_RETRY_PROMPT = "slot_runtime_retry_v1"
+MAX_RUNTIME_RETRIES = 2                  # slot answers corrected from a sandbox error, before the fix loop
+ERROR_LINES = 30                         # last lines of the failed stage shown in a runtime retry
 RETRIEVER = "advanced"
 MEMORY_SET = "base"
 REPORT_DIR = LOG_DIR / "create"
@@ -57,6 +63,7 @@ class CreateResult(BaseModel):
     slots_source: str | None = None      # "llm" or "file:<path>"
     slots: dict | None = None
     slot_attempts: list[dict] = Field(default_factory=list)
+    runtime_retries: list[dict] = Field(default_factory=list)   # slot answers corrected from a sandbox error
     fix_loop: dict | None = None         # FixLoopResult dump
     worktree_unchanged: bool | None = None
     report_path: str | None = None
@@ -65,6 +72,7 @@ class CreateResult(BaseModel):
         out = [f"CREATE {self.repo}: {self.status.upper()}" + (f": {self.reason}" if self.reason else "")]
         for a in self.slot_attempts:
             out.append(f"  slots try {a['attempt']}: " + ("valid" if a["valid"] else "rejected: " + "; ".join(a["reasons"])))
+        out += ["  " + runtime_retry_text(r) for r in self.runtime_retries]
         if self.fix_loop:
             fl = FixLoopResult.model_validate(self.fix_loop)
             out += ["  " + line for line in fl.text().splitlines()]
@@ -116,8 +124,18 @@ def render_files(ctx, c, plan, slots: dict, overrides, expected: dict | None) ->
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def runtime_retry_text(r: dict) -> str:
+    o = r["origin"]
+    head = (f"runtime slot retry {r['retry']}: {r['stage']} failed, blamed {o['group']} ({o['frame']}: "
+            f"{o['exception']})")
+    if not r["valid"]:
+        return head + " -> no valid answer"
+    flag = f"; CHANGED OUTSIDE THE BLAMED GROUP: {', '.join(r['outside_group'])}" if r["outside_group"] else ""
+    return head + f" -> changed {', '.join(r['changed']) or 'nothing'}{flag} -> sandbox {r['sandbox_after']}"
+
+
 def commit_message(ctx, plan, files: list[str], slots: dict, slots_source: str, slot_fill: SlotFillResult | None,
-                   fl: FixLoopResult, prediction: float | None) -> str:
+                   fl: FixLoopResult, prediction: float | None, runtime_retries: list[dict] = ()) -> str:
     p, t, m = plan.python, plan.task, plan.train_mode
     task = (f"{t.task} (rule: {t.reason})" if t and t.status == "decided"
             else f"{slots.get('task', '?')} (chosen by the LLM; the scan signals didn't settle it)")
@@ -136,6 +154,8 @@ def commit_message(ctx, plan, files: list[str], slots: dict, slots_source: str, 
         f"- training mode: {m.mode if m else 'function'} ({m.reason if m else 'no rule'})",
         "",
         f"Slot answers ({source}):", json.dumps(slots, indent=2, sort_keys=True),
+        "",
+        "Runtime slot retries:", *([f"- {runtime_retry_text(r)}" for r in runtime_retries] or ["- none"]),
         "",
         "Fixes applied:", *(fixes or ["- none: the first sandbox run passed"]),
         "",
@@ -184,15 +204,15 @@ def create(repo: str | Path, client: ChatClient, slots_file: str | Path | None =
 
     # 2. slots: the LLM with the approved prompt for the training mode, or a file
     slot_fill = None
+    mode = plan.train_mode.mode if plan.train_mode else "function"
+    if not slots_file and plan.train_mode and plan.train_mode.status != "decided":
+        return done("failed", f"training mode not decided: {plan.train_mode.reason}")
+    prompt = load_prompt(SLOT_PROMPTS[mode], prompts_dir) if prompts_dir else load_prompt(SLOT_PROMPTS[mode])
     if slots_file:
         from ..render.slots import load_answer
         slots, _ = load_answer(slots_file)
         res.slots_source = f"file:{slots_file}"
     else:
-        mode = plan.train_mode.mode if plan.train_mode else "function"
-        if plan.train_mode and plan.train_mode.status != "decided":
-            return done("failed", f"training mode not decided: {plan.train_mode.reason}")
-        prompt = load_prompt(SLOT_PROMPTS[mode], prompts_dir) if prompts_dir else load_prompt(SLOT_PROMPTS[mode])
         slot_fill = fill_slots(ctx, plan, prompt, client, log_path=call_log)
         res.slot_attempts = [{"attempt": a.attempt, "valid": a.valid, "reasons": a.reasons} for a in slot_fill.attempts]
         res.slots_source = "llm"
@@ -217,10 +237,46 @@ def create(repo: str | Path, client: ChatClient, slots_file: str | Path | None =
         return done("refused", "the repo's .gitignore excludes files the Builder would commit: " + ", ".join(ignored))
     author = c.i("reviewer", "builder_commit_author")
 
-    # 3. sandbox + fix loop (its first run is the sandbox)
+    # 3. the sandbox, and the slot answers corrected from its error when the slots caused it
+    def sandbox(s: dict):
+        return run_sandbox(root, s, expected=expected, contracts_path=contracts_path, log_path=sandbox_log,
+                           runner=runner)
+    first = sandbox(slots)
+    retry_prompt = (load_prompt(RUNTIME_RETRY_PROMPT, prompts_dir, required=("user",)) if prompts_dir
+                    else load_prompt(RUNTIME_RETRY_PROMPT, required=("user",)))
+    conversation = (slot_fill.conversation if slot_fill else
+                    slot_messages(ctx, plan, prompt) + [{"role": "assistant", "content": json.dumps(slots)}])
+    adapters_dir = c.paths["adapters_dir"].strip("/")
+    for k in range(1, MAX_RUNTIME_RETRIES + 1):
+        failed = next((s for s in first.stages if s.status == "failed"), None)
+        if first.ok or failed is None:
+            break
+        origin = classify(failed.name, failed.output_tail, slot_files(validate_slots(ctx, slots).slots, adapters_dir))
+        if origin.kind != "slot":
+            break                                 # the environment: the fix loop's job
+        variables = {"stage": failed.name, "origin": origin.frame + (f" (`{origin.code}`)" if origin.code else ""),
+                     "slot_group": ", ".join(GROUP_SLOTS[origin.group]),
+                     "error_tail": "\n".join(failed.output_tail[-ERROR_LINES:]),
+                     "previous_answer": json.dumps(slots, indent=2)}
+        r = runtime_retry(ctx, plan, prompt, retry_prompt, client, conversation, variables, log_path=call_log)
+        entry = {"retry": k, "stage": failed.name, "origin": origin.model_dump(), "calls": len(r.attempts),
+                 "valid": r.valid, "rejected": [a.reasons for a in r.attempts if not a.valid],
+                 "changed": [], "outside_group": [], "sandbox_before": first.attempt_id}
+        if not r.valid:
+            res.runtime_retries.append(entry)
+            break
+        changed = changed_slots(slots, r.answer)
+        entry |= {"changed": changed, "outside_group": outside_group(changed, origin.group)}
+        slots, conversation = r.answer, r.conversation
+        first = sandbox(slots)
+        entry["sandbox_after"] = "passed" if first.ok else f"failed at {first.failed_stage}"
+        res.runtime_retries.append(entry)
+    res.slots = slots
+
+    # 4. the fix loop, starting from the last sandbox run
     fl = run_fix_loop(root, slots, DIAGNOSE_PROMPT, client, expected=expected, contracts_path=contracts_path,
                       runner=runner, sandbox_log=sandbox_log, fix_log=fix_log, retriever=retriever,
-                      retriever_name=retriever_name, python_rule=True,
+                      retriever_name=retriever_name, python_rule=True, initial=first,
                       **({"prompts_dir": prompts_dir} if prompts_dir else {}))
     if write_back:
         write_back(fl)
@@ -228,7 +284,7 @@ def create(repo: str | Path, client: ChatClient, slots_file: str | Path | None =
     if not fl.final_ok:
         return done("failed", f"the sandbox still fails at {fl.final_failed_stage} after {len(fl.attempts)} fix(es)")
 
-    # 4. the files, rendered with the fixes applied (RepoWriter checks again that none exists)
+    # 5. the files, rendered with the fixes applied (RepoWriter checks again that none exists)
     try:
         files = render_files(ctx, c, plan, slots, fl.applied, expected)
     except Exception as e:  # noqa: BLE001
@@ -237,11 +293,11 @@ def create(repo: str | Path, client: ChatClient, slots_file: str | Path | None =
     if sorted(files) != sorted(paths):
         return done("failed", "the final files differ from the planned paths: " + ", ".join(sorted(set(files) ^ set(paths))))
     res.commit_message = commit_message(ctx, plan, res.files, slots, res.slots_source, slot_fill, fl,
-                                        _prediction(sandbox_log, fl.final_attempt_id))
+                                        _prediction(sandbox_log, fl.final_attempt_id), res.runtime_retries)
     if dry_run:
         return done("dry-run")
 
-    # 5. write and commit on builder/<date>; back to the original branch whatever happens
+    # 6. write and commit on builder/<date>; back to the original branch whatever happens
     before = worktree_state(root)
     writer, error = None, None
     try:

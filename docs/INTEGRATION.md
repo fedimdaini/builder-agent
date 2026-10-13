@@ -13,6 +13,9 @@ exit 1 while any remain.
 in the `integration` section, adds its questions here, and uses a documented format. A test fails if one
 of these defaults is hard-coded in the Builder's code (`tests/test_integration.py`).
 
+**Features checked against the rule with nothing to add:** runtime slot retries (ROADMAP B6). Its error
+rule, its 2-retry limit and its prompt are the Builder's own; no other agent reads or decides them.
+
 ## Monitor
 
 | Question | Field | Default |

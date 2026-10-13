@@ -579,6 +579,35 @@ Logs: `experiments/fixes/gen-011-python_3_13__diagnose_v5-advanced__qwen2.5-code
 
 ---
 
+## 11. Runtime slot retries: first check (ROADMAP B6)
+
+**What changed.** In the create command, after the slots pass the static validator, the sandbox runs once.
+If it fails because of a slot answer, the error goes back to the slot LLM as a follow-up turn in the same
+conversation, at most 2 times, before the environment fix loop. The prompt is
+`prompts/slot_runtime_retry_v1.md`, approved as drafted and generic (no hint for any one case).
+"Slot-caused" is a rule in `builder_agent/fix/origin.py`:
+- the stage is data, train, evaluate or serve-side;
+- a parsed traceback's innermost frame is in a file the slots decide;
+- its exception is one a slot explains: a column, a function argument, a script argument, a data file,
+  the train function, or the model's location;
+- environment errors (missing modules or libraries, MLflow server errors, the build and mlflow stages)
+  and anything unknown go to the fix loop.
+
+Each retry logs which slots changed, and flags any change outside the blamed group.
+
+**First check, on the script repo of section 8**: `script-mlflow-demo`, rebuilt fresh, `--no-write-back`.
+**This is a first check, not an independent test.** The repo, its known mistake and the rule were all
+written by me (Claude), and the mistake is the case the feature was designed around.
+
+| Run | Slots | Runtime retry | Result |
+|---|---|---|---|
+| A | section 8's recorded answer (`args ["$train_path", "$target_column"]`), via `--slots` | 1: blamed `script_args` (`scripts/train.py line 10`, `ValueError: could not convert string to float: 'price'`); changed only `train_script.args` to `["$train_path", "1.0"]`; nothing outside the group | all stages ok, committed |
+| B | the LLM from scratch (`train_script_v1`, valid on try 3) | the model made section 8's `sys.argv[2]` mistake again; 1 retry, the same correction | all stages ok, committed |
+
+Logs: `experiments/runtime_retry/` (create reports and outputs).
+
+---
+
 ## Not run yet
 
 - DPO training (roadmap item 9 step 4); the pairs are in section 5.
