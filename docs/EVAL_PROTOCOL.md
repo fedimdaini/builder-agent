@@ -244,6 +244,28 @@ aren't pooled with these runs.
    with the same leave-one-out memory and `--no-python-rule`. It is reported next to the main results
    and not pooled with them.
 
-## Changes after approval
+## Changes after approval (before any run)
 
-(none yet)
+Added 2026-10-13, before the first evaluation run. None of them changes the decision rule of section 3.
+
+1. **A secondary metric: action accuracy.** Per run: whether the first LLM action (the first answer the
+   validator accepted and the loop applied) matches the case's expected fix. It counts as correct if it is:
+   - *exact*: the same action and arguments;
+   - *same target*: the same action on the same package, system package or environment variable, with
+     another version or value;
+   - *a verified alternative*: an entry of `experiments/finetune/checks.json` for that case that passed the
+     sandbox (for example `set_python_version 3.10` for gen-004).
+
+   Anything else is wrong, including `give_up` and a run with no valid answer. For `set_python_version`
+   there is no "same target": another version is correct only as a verified alternative. It is computed
+   from the logged attempts (`analyze.py`) and reported per config and for the no-sibling cases, as a rate
+   with its bootstrap interval and the exact / same-target / alternative counts. It isn't used to call a
+   config better.
+2. **The filter acceptance rule.** If the faithfulness filter agrees with Jack's blind labels on fewer than
+   80% of the 50 reasons, true reasons and copied reasons are reported twice: with the filter's verdicts
+   (all fixes) and without them (the hand labels, for the 50 labelled reasons only). The text then says
+   that the filter-based rates are not reliable. At 80% or more, the filter's verdicts are used, and the
+   agreement is reported.
+3. **A "real failures" set.** Once the Builder has failures from real runs, outside the injected faults
+   (for example from the pinned public repos, ROADMAP B8), they form a separate set. Its results are
+   reported next to the synthetic ones and never pooled with them. It has no cases yet.

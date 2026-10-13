@@ -8,6 +8,8 @@ Per run: first fix passes, fixed within 3. Per applied LLM fix (an answer that w
 sandbox): true reason (the faithfulness filter of builder_agent.finetune, frozen: its git hash is recorded) and
 copied reason (a term only a retrieved other case has, the rule of RESULTS.md section 6). The error a fix answers
 is the case's recorded error line for the first fix, and that attempt's own error output for later ones.
+Secondary, per run (protocol "Changes after approval" 1): action accuracy of the first LLM action: exact, same
+target, or a sandbox-verified alternative from experiments/finetune/checks.json. Not used in the comparisons.
 """
 
 from __future__ import annotations
@@ -26,6 +28,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(__file__).parent))
 
 from builder_agent.finetune import _terms, faithful, foreign_terms  # noqa: E402
+from builder_agent.scan.deps import normalize  # noqa: E402
 from builder_agent.memory import all_cases, loo_docs  # noqa: E402
 import stats  # noqa: E402
 
@@ -34,8 +37,47 @@ NO_SIBLING = ["gen-002", "gen-003", "gen-006", "gen-009", "gen-010"]   # no same
 CONFIG_ORDER = ["v1", "v3-advanced", "v5-advanced"]
 RUN_METRICS = {"first_fix_passed": "First fix passes (main)", "fixed": "Fixed within 3"}
 FIX_METRICS = {"true": "True reasons", "copied": "Copied reasons"}
+SECONDARY = {"action": "Action accuracy (secondary)"}
+CHECKS = ROOT / "experiments" / "finetune" / "checks.json"
+NAMED = {"pin_package", "add_dependency", "add_system_package", "set_env_var"}   # actions with a target
+
+
+def verified_alternatives(path: Path = CHECKS) -> dict[str, list[dict]]:
+    """case id -> fixes that passed the sandbox on top of the fault (checks.json, ok true)."""
+    if not path.exists():
+        return {}
+    out: dict[str, list[dict]] = {}
+    for c in json.loads(path.read_text(encoding="utf-8")).values():
+        if c.get("ok"):
+            out.setdefault(c["case_id"], []).append(c["fix"])
+    return out
+
+
+def _same(a: dict, b: dict) -> bool:
+    return {k: (normalize(str(v)) if k == "name" else v) for k, v in a.items()} == \
+        {k: (normalize(str(v)) if k == "name" else v) for k, v in b.items()}
+
+
+def action_match(run: dict, case: dict, alternatives: dict[str, list[dict]]) -> str:
+    """The first LLM action that was applied, against the case's expected fix: "exact", "same_target",
+    "alternative", "wrong" (any other action, give_up included) or "none" (no valid answer)."""
+    first = next((a["action"] for a in run["attempts"] if a.get("source", "llm") == "llm" and a.get("action")), None)
+    if first is None:
+        return "none"
+    expected = case["expected_fix"]
+    if _same(first, expected):
+        return "exact"
+    if first.get("action") == expected.get("action") in NAMED and \
+            normalize(str(first.get("name", ""))) == normalize(str(expected.get("name", ""))):
+        return "same_target"
+    if any(_same(first, alt) for alt in alternatives.get(case["id"], [])):
+        return "alternative"
+    return "wrong"
 BASE_PYTHON = "3.9"                     # the taxi image's Python before any injection (Pipfile)
 ERROR_RE = re.compile(r"error|exception|fail|traceback|no matching|not found", re.I)
+
+
+ALTERNATIVES = verified_alternatives()
 
 
 def load_runs(out: Path, pass_: str) -> list[dict]:
@@ -80,6 +122,8 @@ def per_case(runs: list[dict], cases: dict[str, dict], metric: str, only: list[s
             vals = [int(r["first_fix_passed"])]
         elif metric == "fixed":
             vals = [int(r["final_ok"])]
+        elif metric == "action":
+            vals = [int(action_match(r, cases[r["case"]], ALTERNATIVES) in ("exact", "same_target", "alternative"))]
         else:
             vals = [int(f[metric]) for f in applied_fixes(r, cases)]
         out.setdefault(r["case"], []).extend(vals)
@@ -101,8 +145,11 @@ def analyze(runs: list[dict]) -> dict:
                                          "builder_agent/finetune/__init__.py"], capture_output=True, text=True
                                         ).stdout.strip()}
     for c in configs:
-        res["configs"][c] = {m: describe(per_case(by[c], cases, m)) for m in metrics}
-        res["no_sibling"][c] = {m: describe(per_case(by[c], cases, m, NO_SIBLING)) for m in metrics}
+        res["configs"][c] = {m: describe(per_case(by[c], cases, m)) for m in metrics + list(SECONDARY)}
+        res["no_sibling"][c] = {m: describe(per_case(by[c], cases, m, NO_SIBLING)) for m in metrics + list(SECONDARY)}
+        kinds = [action_match(r, cases[r["case"]], ALTERNATIVES) for r in by[c]]
+        res["configs"][c]["action_kinds"] = {k: kinds.count(k) for k in
+                                             ("exact", "same_target", "alternative", "wrong", "none")}
         fams = sorted({r["family"] for r in by[c]})
         res["families"][c] = {f: describe(per_case([r for r in by[c] if r["family"] == f], cases, "first_fix_passed"))
                               for f in fams}
@@ -141,9 +188,12 @@ def markdown(res: dict, pass_: str) -> str:
            f"Faithfulness filter frozen at commit {res['filter_git']}. Interval: case-cluster bootstrap; "
            "Wilson in brackets, for reference only.", "", "| Metric | " + " | ".join(res["configs"]) + " |",
            "|---" * (len(res["configs"]) + 1) + "|"]
-    names = RUN_METRICS | FIX_METRICS
+    names = RUN_METRICS | FIX_METRICS | SECONDARY
     for m, name in names.items():
         out.append(f"| {name} | " + " | ".join(_fmt(res["configs"][c][m]) for c in res["configs"]) + " |")
+    out += ["", "Action accuracy, first LLM action (exact / same target / verified alternative / wrong / none): "
+            + "; ".join(f"{c} " + "/".join(str(v) for v in d["action_kinds"].values()) for c, d in res["configs"].items())
+            + ". Secondary: not used to call a config better."]
     out += ["", "## Paired comparisons (later config minus earlier one, per case)", "",
             "| Metric | Pair | Difference, 95% interval | Sign test (better/worse, p, Holm p) | Verdict |",
             "|---|---|---|---|---|"]

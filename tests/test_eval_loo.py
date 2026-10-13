@@ -188,3 +188,28 @@ def test_run_fix_loop_uses_a_given_first_run(mini):  # noqa: F811
                          sandbox_log=None, fix_log=None, initial=given)
     assert again.initial_attempt_id == "first-1" and again.final_ok
     assert len(runner2.dockerfiles) == builds - 1                # the first sandbox run was not repeated
+
+
+def test_action_accuracy():
+    cases = {c["id"]: c for c in all_cases()}
+
+    def first(action):
+        return {"attempts": [{"n": 1, "source": "llm", "action": action}] if action else
+                [{"n": 1, "source": "llm", "action": None}]}
+    alts = {"gen-004": [{"action": "set_python_version", "version": "3.10"}]}
+    m = lambda case, action: analyze.action_match(first(action), cases[case], alts)  # noqa: E731
+    assert m("gen-001", {"action": "pin_package", "name": "mlflow", "version": "2.17.2"}) == "exact"
+    assert m("gen-001", {"action": "pin_package", "name": "MLflow", "version": "2.10.0"}) == "same_target"
+    assert m("gen-013", {"action": "set_env_var", "name": "MLFLOW_TRACKING_URI", "value": "http://x:1"}) == "same_target"
+    assert m("gen-004", {"action": "set_python_version", "version": "3.10"}) == "alternative"
+    assert m("gen-004", {"action": "set_python_version", "version": "3.11"}) == "wrong"     # no same target for Python
+    assert m("gen-001", {"action": "give_up", "reason": "x"}) == "wrong"
+    assert m("gen-001", None) == "none"
+    real = analyze.verified_alternatives()                       # checks.json: only fixes that passed
+    assert {"action": "set_python_version", "version": "3.10"} in real["gen-004"]
+    assert all(f != {"action": "set_env_var", "name": "GIT_PYTHON_REFRESH", "value": "quiet"} for f in real.get("gen-007", []))
+    runs = [result(cfg, "gen-001", s, True, True, "x") for cfg in ("v1", "v3-advanced") for s in (101, 102)]
+    res = analyze.analyze(runs)
+    assert res["configs"]["v1"]["action"]["rate"] == 0.0 and res["configs"]["v1"]["action_kinds"]["wrong"] == 2
+    assert "action" not in res["comparisons"]                    # secondary: never compared
+    assert "Action accuracy (secondary)" in analyze.markdown(res, "main")
