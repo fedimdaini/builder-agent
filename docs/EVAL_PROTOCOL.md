@@ -269,3 +269,9 @@ Added 2026-10-13, before the first evaluation run. None of them changes the deci
 3. **A "real failures" set.** Once the Builder has failures from real runs, outside the injected faults
    (for example from the pinned public repos, ROADMAP B8), they form a separate set. Its results are
    reported next to the synthetic ones and never pooled with them. It has no cases yet.
+4. **A crash fix in the advanced retriever** (2026-10-13). Chroma's approximate vector search can, rarely,
+   return fewer documents than asked for. The advanced retriever then raised `ValueError` (seen once in
+   about ten full test runs, never reproduced in isolation), which would stop a run. Now the missing
+   documents take the last vector ranks, in memory order. When Chroma returns every document, the ranking
+   is identical to before (a test checks it), so this changes only the runs that would otherwise crash.
+   There is no other retrieval change.

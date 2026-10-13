@@ -148,6 +148,9 @@ class FixMemory:
     def advanced(self, stage: str, error_tail: list[str] | str, k: int = TOP_K) -> list[Hit]:
         signature = error_signature(error_tail if isinstance(error_tail, list) else error_tail.splitlines())
         vector = [i for i, _ in self._vector_ranking(signature)]
+        # Chroma's approximate search can, rarely, return fewer documents than asked for: rank the missing ones
+        # last, in memory order, instead of crashing (when it returns them all, nothing changes)
+        vector += [i for i in self._order if i not in vector]
         bm = self.bm25.get_scores(tokens(signature))
         bm25 = [i for _, i in sorted(zip(bm, self._order), key=lambda t: -t[0])]
         hits = []

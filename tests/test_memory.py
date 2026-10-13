@@ -12,6 +12,7 @@ from builder_agent.fix import run_fix_loop
 from builder_agent.llm.prompts import PromptError
 from builder_agent.memory import (FixMemory, MemoryCaseError, doc_from_case, memory_cases, render_retrieved,
                                   retriever, tokens)
+from builder_agent.faults import error_signature
 
 from test_fix import PIN, Fault001Runner
 from test_llm import FakeModel
@@ -148,3 +149,24 @@ def test_diagnose_v4_shows_the_current_build_settings_with_applied_fixes(mini, m
     assert "install: pip install mlflow " in settings(first) and "mlflow==2.9.2" not in settings(first)
     assert "mlflow==2.9.2" in settings(second)                         # the applied fix shows on the next attempt
     assert 'model service environment: MLFLOW_TRACKING_URI="http://mlflow:5000"' in settings(second)
+
+
+# --- the crash fix: Chroma returning fewer documents than asked ----------------------------------------
+
+def test_missing_vector_results_are_ranked_last(memory, monkeypatch):
+    stage, tail = "train", ["ImportError: libffi.so.8: cannot open shared object file"]
+    before = memory.advanced(stage, tail, k=len(memory.docs))
+    full = memory._vector_ranking(error_signature(tail))
+    assert len(full) == len(memory.docs)
+    # Chroma returns every document: the ranking is the same as with the fallback unused
+    monkeypatch.setattr(memory, "_vector_ranking", lambda q: full)
+    same = memory.advanced(stage, tail, k=len(memory.docs))
+    assert [(h.doc.id, h.score, h.ranks) for h in same] == [(h.doc.id, h.score, h.ranks) for h in before]
+    # Chroma drops two documents: no crash, they take the last vector ranks, in memory order
+    dropped = [i for i, _ in full[:2]]
+    monkeypatch.setattr(memory, "_vector_ranking", lambda q: full[2:])
+    hits = {h.doc.id: h for h in memory.advanced(stage, tail, k=len(memory.docs))}
+    n = len(memory.docs)
+    last = sorted(dropped, key=memory._order.index)
+    assert [hits[i].ranks["vector"] for i in last] == [n - 1, n]
+    assert sorted(h.ranks["vector"] for h in hits.values()) == list(range(1, n + 1))
