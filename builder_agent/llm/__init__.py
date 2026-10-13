@@ -92,24 +92,28 @@ def slot_messages(ctx: RepoContext, plan: BuildPlan, prompt: PromptFile) -> list
 
 
 def fill_slots(ctx: RepoContext, plan: BuildPlan, prompt: PromptFile, client: ChatClient,
-               max_attempts: int = MAX_ATTEMPTS, log_path: str | Path | None = DEFAULT_CALL_LOG) -> SlotFillResult:
-    return slot_loop(ctx, plan, prompt, client, slot_messages(ctx, plan, prompt), max_attempts, log_path)
+               max_attempts: int = MAX_ATTEMPTS, log_path: str | Path | None = DEFAULT_CALL_LOG,
+               strict: bool = False) -> SlotFillResult:
+    """strict: the create command's extra checks (render.slots.create_checks) count as rejections too."""
+    return slot_loop(ctx, plan, prompt, client, slot_messages(ctx, plan, prompt), max_attempts, log_path,
+                     strict=strict)
 
 
 def runtime_retry(ctx: RepoContext, plan: BuildPlan, prompt: PromptFile, retry_prompt: PromptFile, client: ChatClient,
                   conversation: list[dict], variables: dict, max_attempts: int = MAX_ATTEMPTS,
-                  log_path: str | Path | None = DEFAULT_CALL_LOG) -> SlotFillResult:
+                  log_path: str | Path | None = DEFAULT_CALL_LOG, strict: bool = False) -> SlotFillResult:
     """The sandbox failed because of a slot answer: the same conversation, plus retry_prompt's user message
     (the error output and the previous answer). The new answer goes through the static validator, with the
     slot prompt's own retry section if it is rejected."""
     messages = conversation + [{"role": "user", "content": retry_prompt.render("user", variables)}]
     return slot_loop(ctx, plan, prompt, client, messages, max_attempts, log_path, task="slot_runtime_retry",
-                     extra_prompt=retry_prompt)
+                     extra_prompt=retry_prompt, strict=strict)
 
 
 def slot_loop(ctx: RepoContext, plan: BuildPlan, prompt: PromptFile, client: ChatClient, messages: list[dict],
               max_attempts: int = MAX_ATTEMPTS, log_path: str | Path | None = DEFAULT_CALL_LOG,
-              task: str = "slot_filling", extra_prompt: PromptFile | None = None) -> SlotFillResult:
+              task: str = "slot_filling", extra_prompt: PromptFile | None = None,
+              strict: bool = False) -> SlotFillResult:
     """Call, validate, and retry with the reasons (the prompt's retry section), from these messages on."""
     variables = slot_variables(ctx, plan)
     schema = inline_refs(slots_model(prompt).model_json_schema())   # v1/v2: SlotAnswers, unchanged
@@ -130,7 +134,7 @@ def slot_loop(ctx: RepoContext, plan: BuildPlan, prompt: PromptFile, client: Cha
         parsed, reasons = _parse(resp.content)
         if parsed is not None:
             answer = parsed
-            reasons = validate_slots(ctx, parsed).reasons
+            reasons = validate_slots(ctx, parsed, strict=strict).reasons
         attempts.append(Attempt(attempt=n, latency_s=resp.latency_s, prompt_tokens=resp.prompt_tokens,
                                 output_tokens=resp.output_tokens, valid=not reasons, reasons=reasons,
                                 answer=parsed, raw=resp.content))

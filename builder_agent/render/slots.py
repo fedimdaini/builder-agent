@@ -200,7 +200,35 @@ def _pydantic_reasons(e: ValidationError) -> list[str]:
     return [f"{'.'.join(str(p) for p in err['loc']) or 'answer'}: {err['msg']}" for err in e.errors()]
 
 
-def validate_slots(ctx: RepoContext, answer: dict | SlotAnswers) -> SlotValidation:
+def validate_slots(ctx: RepoContext, answer: dict | SlotAnswers, strict: bool = False) -> SlotValidation:
+    """strict: also the create-mode checks (create_checks), for answers the create command will commit.
+    The sandbox, the fix loop and the evaluations validate without them (the evaluated setup is frozen)."""
+    v = _validate(ctx, answer)
+    if strict and v.ok:
+        if extra := create_checks(ctx, v.slots):
+            return SlotValidation(ok=False, reasons=extra)
+    return v
+
+
+def _is_test_file(path: str) -> bool:
+    return "test" in PurePosixPath(path).name.lower()
+
+
+def create_checks(ctx: RepoContext, s) -> list[str]:
+    """Checks for the create command only (validate_slots strict=True), each with a reason the slot LLM can act on:
+    - evaluate.eval_file: when the repo has a test file (a data file whose name contains "test") with the
+      target column, evaluation must use one, not a validation or training file."""
+    files: dict[str, list[str]] = slot_candidates(ctx)["data_files"]
+    reasons = []
+    tests = [f for f, header in files.items() if _is_test_file(f) and s.target_column in header]
+    if tests and s.evaluate.eval_file not in tests:
+        reasons.append(f"evaluate.eval_file {s.evaluate.eval_file!r} is not a test file, but the repo has one with "
+                       f"the target column ({', '.join(tests)}): evaluate on the test file, not on validation or "
+                       "training data")
+    return reasons
+
+
+def _validate(ctx: RepoContext, answer: dict | SlotAnswers) -> SlotValidation:
     from .script_slots import ScriptSlotAnswers, validate_script_slots
     if isinstance(answer, ScriptSlotAnswers) or (isinstance(answer, dict) and "train_script" in answer):
         return validate_script_slots(ctx, answer)     # script-training mode

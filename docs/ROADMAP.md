@@ -38,7 +38,7 @@ Done, each step with its regression checks: 1 Python rule `c723bf6`; 2 docs clea
 5. **Evaluation protocol, written before running.** *Protocol approved 2026-10-12 (`docs/EVAL_PROTOCOL.md`, `3778d13`, with its Decisions section); built 2026-10-13: `--temperature/--seed` and `--memory loo --exclude` on the fix loop, `experiments/eval_loo/` (run.py resumable, stops on Docker/Ollama trouble; analyze.py; make_labels.py), smoke-tested on 2 cases x 1 sample (`experiments/eval_loo/_smoke/`); the full run has not started.* Then leave-one-out over the 14 faults
    (fault-001 and gen-001..013), with 5 samples each, for `diagnose_v1`, v3 and v5.
 5b. **After the baseline evaluation (step 5):**
-   - **Evaluate on the test file.** A rule or a validator check that `evaluate.eval_file` is the repo's
+   - *Done 2026-10-13 (create mode only: `validate_slots(strict=True)`, `render/slots.py` `create_checks`; a fresh taxi create now evaluates on test.csv).* **Evaluate on the test file.** A rule or a validator check that `evaluate.eval_file` is the repo's
      test file when one exists, not a validation split. In section 9's create run on taxi, the LLM chose
      `validation.csv`, and the validator accepted it.
    - **A grounding check, as a new configuration.** A fix's reason must quote a line of the current error

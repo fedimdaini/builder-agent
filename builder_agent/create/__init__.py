@@ -213,7 +213,7 @@ def create(repo: str | Path, client: ChatClient, slots_file: str | Path | None =
         slots, _ = load_answer(slots_file)
         res.slots_source = f"file:{slots_file}"
     else:
-        slot_fill = fill_slots(ctx, plan, prompt, client, log_path=call_log)
+        slot_fill = fill_slots(ctx, plan, prompt, client, log_path=call_log, strict=True)
         res.slot_attempts = [{"attempt": a.attempt, "valid": a.valid, "reasons": a.reasons} for a in slot_fill.attempts]
         res.slots_source = "llm"
         if not slot_fill.valid:
@@ -221,7 +221,7 @@ def create(repo: str | Path, client: ChatClient, slots_file: str | Path | None =
                         + (f": {slot_fill.error}" if slot_fill.error else f" after {len(slot_fill.attempts)} tries"))
         slots = slot_fill.answer
     res.slots = slots
-    v = validate_slots(ctx, slots)
+    v = validate_slots(ctx, slots, strict=True)        # with the create-mode checks (render.slots.create_checks)
     if not v.ok:
         return done("failed", "invalid slot answers: " + "; ".join(v.reasons))
 
@@ -258,7 +258,8 @@ def create(repo: str | Path, client: ChatClient, slots_file: str | Path | None =
                      "slot_group": ", ".join(GROUP_SLOTS[origin.group]),
                      "error_tail": "\n".join(failed.output_tail[-ERROR_LINES:]),
                      "previous_answer": json.dumps(slots, indent=2)}
-        r = runtime_retry(ctx, plan, prompt, retry_prompt, client, conversation, variables, log_path=call_log)
+        r = runtime_retry(ctx, plan, prompt, retry_prompt, client, conversation, variables, log_path=call_log,
+                          strict=True)
         entry = {"retry": k, "stage": failed.name, "origin": origin.model_dump(), "calls": len(r.attempts),
                  "valid": r.valid, "rejected": [a.reasons for a in r.attempts if not a.valid],
                  "changed": [], "outside_group": [], "sandbox_before": first.attempt_id}
