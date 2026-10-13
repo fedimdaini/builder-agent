@@ -44,6 +44,9 @@ SLOT_PROMPTS = {"function": "slots_v3", "script": "train_script_v1"}
 DIAGNOSE_PROMPT = "diagnose_v3"
 RUNTIME_RETRY_PROMPT = "slot_runtime_retry_v1"
 MAX_RUNTIME_RETRIES = 2                  # slot answers corrected from a sandbox error, before the fix loop
+# slot-filling calls in create: 2 more than the slot evals' 3 (llm.MAX_ATTEMPTS, unchanged), because create's
+# stricter checks (render.slots.create_checks) can reject an answer the plain validator accepts
+CREATE_SLOT_ATTEMPTS = 5
 ERROR_LINES = 30                         # last lines of the failed stage shown in a runtime retry
 RETRIEVER = "advanced"
 MEMORY_SET = "base"
@@ -213,7 +216,8 @@ def create(repo: str | Path, client: ChatClient, slots_file: str | Path | None =
         slots, _ = load_answer(slots_file)
         res.slots_source = f"file:{slots_file}"
     else:
-        slot_fill = fill_slots(ctx, plan, prompt, client, log_path=call_log, strict=True)
+        slot_fill = fill_slots(ctx, plan, prompt, client, max_attempts=CREATE_SLOT_ATTEMPTS, log_path=call_log,
+                               strict=True)
         res.slot_attempts = [{"attempt": a.attempt, "valid": a.valid, "reasons": a.reasons} for a in slot_fill.attempts]
         res.slots_source = "llm"
         if not slot_fill.valid:

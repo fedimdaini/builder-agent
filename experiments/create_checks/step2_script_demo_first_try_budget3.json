@@ -1,0 +1,39 @@
+{
+  "repo": "script-mlflow-demo",
+  "status": "failed",
+  "reason": "slot filling (train_script_v1) gave no valid answer after 3 tries",
+  "original_branch": "master",
+  "branch": null,
+  "commit": null,
+  "files": [],
+  "commit_message": null,
+  "slots_source": "llm",
+  "slots": null,
+  "slot_attempts": [
+    {
+      "attempt": 1,
+      "valid": false,
+      "reasons": [
+        "evaluate.group_column 'none' is not in the header of data/processed/test.csv"
+      ]
+    },
+    {
+      "attempt": 2,
+      "valid": false,
+      "reasons": [
+        "evaluate.group_column 'none' is not in the header of data/processed/test.csv"
+      ]
+    },
+    {
+      "attempt": 3,
+      "valid": false,
+      "reasons": [
+        "evaluate.group_column 'a' has 149 distinct values in the first 150 rows of data/processed/test.csv: a group column needs at most 20 (a few labels such as a category or a flag), not a continuous or ID-like column"
+      ]
+    }
+  ],
+  "runtime_retries": [],
+  "fix_loop": null,
+  "worktree_unchanged": null,
+  "report_path": "C:\\Users\\mdain\\OneDrive\\Bureau\\adsp-project\\builder-agent\\logs\\create\\20261013T163024Z-script-mlflow-demo.json"
+}

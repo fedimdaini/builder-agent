@@ -55,3 +55,22 @@ def test_create_gets_the_slot_llm_to_switch_to_the_test_file(mini, tmp_path):  #
     assert res.status == "dry-run", res.text()
     assert not res.slot_attempts[0]["valid"] and "is not a test file" in res.slot_attempts[0]["reasons"][0]
     assert res.slot_attempts[1]["valid"] and res.slots["evaluate"]["eval_file"] == "data/processed/test.csv"
+
+
+# --- step 2: a group column is a few labels --------------------------------------------------------
+
+def test_a_column_with_too_many_distinct_values_is_not_a_group(tmp_path):
+    from test_script_mode import BASE, MLFLOW_RUN, MLFLOW_SCRIPT, script_repo
+    ctx = scan_repo(script_repo(tmp_path / "s", MLFLOW_SCRIPT))       # 60 rows: a = i % 7, b = i * 0.37, g = i % 3
+    answer = lambda col: BASE | {"train_script": MLFLOW_RUN,          # noqa: E731
+                                 "evaluate": {"eval_file": "data/processed/test.csv", "group_column": col}}
+    assert validate_slots(ctx, answer("b")).ok                         # the plain validator: unchanged
+    v = validate_slots(ctx, answer("b"), strict=True)
+    assert not v.ok and "evaluate.group_column 'b' has 60 distinct values in the first 60 rows" in v.reasons[0]
+    assert "at most 20" in v.reasons[0]
+    assert validate_slots(ctx, answer("g"), strict=True).ok            # 3 groups
+    assert validate_slots(ctx, answer("a"), strict=True).ok            # 7 groups: still a few labels
+
+
+def test_a_tiny_sample_settles_nothing(mini):  # noqa: F811
+    assert validate_slots(mini, MINI_GOLD, strict=True).ok             # 1 row per file: under MIN_ROWS, accepted

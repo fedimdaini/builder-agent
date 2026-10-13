@@ -17,6 +17,7 @@ from ..decide.rules import choose_task
 from ..scan.code import module_target
 from ..scan.layout import DATA_EXTS
 from ..scan.models import FunctionSig, RepoContext
+from ..scan.task import MAX_CLASSES, MIN_ROWS, target_values
 
 # Builder-supported menus (what the templates know how to render)
 FLAVOR_DIST = {"xgboost": "xgboost", "sklearn": "scikit-learn", "lightgbm": "lightgbm", "catboost": "catboost"}
@@ -214,10 +215,18 @@ def _is_test_file(path: str) -> bool:
     return "test" in PurePosixPath(path).name.lower()
 
 
+# a group column is a set of labels: the scanner reads more than MAX_CLASSES (20) distinct values in a sample of
+# MAX_ROWS (2000) rows as a quantity, not labels (scan/task.py); per-group metrics over more groups than that are
+# a list of tiny groups (with SAMPLE=1, a 1% slice, most hold a row or two)
+MAX_GROUPS = MAX_CLASSES
+
+
 def create_checks(ctx: RepoContext, s) -> list[str]:
     """Checks for the create command only (validate_slots strict=True), each with a reason the slot LLM can act on:
     - evaluate.eval_file: when the repo has a test file (a data file whose name contains "test") with the
-      target column, evaluation must use one, not a validation or training file."""
+      target column, evaluation must use one, not a validation or training file;
+    - evaluate.group_column: at most MAX_GROUPS distinct values in the scanned sample of the eval file (a sample
+      under MIN_ROWS values settles nothing, so it is accepted)."""
     files: dict[str, list[str]] = slot_candidates(ctx)["data_files"]
     reasons = []
     tests = [f for f, header in files.items() if _is_test_file(f) and s.target_column in header]
@@ -225,6 +234,11 @@ def create_checks(ctx: RepoContext, s) -> list[str]:
         reasons.append(f"evaluate.eval_file {s.evaluate.eval_file!r} is not a test file, but the repo has one with "
                        f"the target column ({', '.join(tests)}): evaluate on the test file, not on validation or "
                        "training data")
+    g = target_values(Path(ctx.root), s.evaluate.eval_file, s.evaluate.group_column)
+    if g is not None and g.n >= MIN_ROWS and g.distinct > MAX_GROUPS:
+        reasons.append(f"evaluate.group_column {s.evaluate.group_column!r} has {g.distinct} distinct values in the first "
+                       f"{g.n} rows of {s.evaluate.eval_file}: a group column needs at most {MAX_GROUPS} (a few labels "
+                       "such as a category or a flag), not a continuous or ID-like column")
     return reasons
 
 
