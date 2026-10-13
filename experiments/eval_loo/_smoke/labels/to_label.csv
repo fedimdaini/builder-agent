@@ -1,0 +1,3 @@
+item,fault,error_line,reason,label
+r01,gen-013 (mlflow_uri_empty),mlflow.exceptions.MlflowException: Run 'c755d485cbcd4b2eb93d599c0fb91aec' not found,The tracking URI uses port 5001; the mlflow service listens on 5000.,
+r02,gen-002 (xgboost_uninstalled),ModuleNotFoundError: No module named 'xgboost',"The error indicates that the 'xgboost' package is missing, which is required by the code in 'src/models/train_model.py'.",

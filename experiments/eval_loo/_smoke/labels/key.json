@@ -1,0 +1,20 @@
+{
+ "r01": {
+  "config": "v3-advanced",
+  "case": "gen-013",
+  "seed": 101,
+  "fix_n": 1,
+  "fix": "set_env_var MLFLOW_TRACKING_URI=http://mlflow:5000",
+  "filter_true": false,
+  "filter_why": "names 5001, port from a retrieved case, not from this error"
+ },
+ "r02": {
+  "config": "v3-advanced",
+  "case": "gen-002",
+  "seed": 101,
+  "fix_n": 1,
+  "fix": "add_dependency xgboost",
+  "filter_true": true,
+  "filter_why": "refers to xgboost"
+ }
+}

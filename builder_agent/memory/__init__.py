@@ -64,8 +64,10 @@ class Hit(BaseModel):
     ranks: dict[str, int | None]        # rank in each list (1 = best), None if not ranked
 
 
-def doc_from_case(case: dict) -> MemoryDoc:
-    if case.get("split") == "test":
+def doc_from_case(case: dict, allow_test: bool = False) -> MemoryDoc:
+    """allow_test: only for the leave-one-out memory (loo_docs), where a test case is indexed for the
+    other cases, never for itself (docs/EVAL_PROTOCOL.md, Decisions 1)."""
+    if case.get("split") == "test" and not allow_test:
         raise MemoryCaseError(f"{case['id']} ({case.get('variant')}) is a held-out test case; "
                               "test cases are never indexed")
     if "expected_fix" not in case:
@@ -83,6 +85,28 @@ def memory_cases(faults_dir: str | Path = FAULTS_DIR) -> list[dict]:
     generated = [c for c in map(load, sorted((faults_dir / "generated").glob("*/case.json")))
                  if c.get("split") == "memory"]
     return hand + generated
+
+
+# the same fault recorded twice: leave-one-out leaves both out (docs/EVAL_PROTOCOL.md section 1)
+TWINS = {"gen-008": {"fault-001"}, "fault-001": {"gen-008"}}
+
+
+def all_cases(faults_dir: str | Path = FAULTS_DIR) -> list[dict]:
+    """fault-001 plus every generated case, whatever its split: the 14 cases of the leave-one-out evaluation."""
+    faults_dir = Path(faults_dir)
+    load = lambda p: json.loads(p.read_text(encoding="utf-8"))  # noqa: E731
+    hand = [c for c in map(load, sorted(faults_dir.glob("*/case.json"))) if c["id"] == "fault-001"]
+    return hand + sorted(map(load, (faults_dir / "generated").glob("*/case.json")), key=lambda c: c["id"])
+
+
+def loo_docs(case_id: str, faults_dir: str | Path = FAULTS_DIR) -> list[MemoryDoc]:
+    """Leave-one-out memory for one case: every other case, minus its twin. Built from the case files
+    only (never memory/learned/); test cases included, as Decisions 1 of the protocol allows."""
+    cases = all_cases(faults_dir)
+    if case_id not in {c["id"] for c in cases}:
+        raise MemoryCaseError(f"{case_id} is not one of the {len(cases)} cases")
+    excluded = {case_id} | TWINS.get(case_id, set())
+    return [doc_from_case(c, allow_test=True) for c in cases if c["id"] not in excluded]
 
 
 def tokens(text: str) -> list[str]:

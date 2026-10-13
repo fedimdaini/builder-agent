@@ -6,7 +6,9 @@
     [--memory base|learned]                   # base: the memory of every RESULTS.md run (default)
     [--memory-snapshot SHA256]                # evaluation: refuse unless the memory has this hash; no write-back
     [--no-write-back]                         # don't add this run's checked fixes to memory/learned/
-    [--no-python-rule]                        # LLM-only: no deterministic Python-version fix (every RESULTS.md run)"""
+    [--no-python-rule]                        # LLM-only: no deterministic Python-version fix (every RESULTS.md run)
+    [--temperature T] [--seed N]              # sampling (default: temperature 0, seed 42)
+    [--memory loo --exclude <case id>]        # leave-one-out memory (docs/EVAL_PROTOCOL.md); evaluation mode"""
 
 import argparse
 import json
@@ -34,9 +36,12 @@ def main() -> None:
     p.add_argument("--out", help="folder for this run's logs and summary")
     p.add_argument("--retriever", choices=["naive", "advanced"], help="RAG retriever over the fix memory")
     p.add_argument("--embed-model", default="nomic-embed-text", help="Ollama embedding model for --retriever")
-    p.add_argument("--memory", choices=["base", "learned"], default="base",
+    p.add_argument("--memory", choices=["base", "learned", "loo"], default="base",
                    help="base: fault-001 + generated memory faults (every RESULTS.md run); learned: + passed fixes "
-                        "written back from real runs")
+                        "written back from real runs; loo: all 14 cases but --exclude and its twin (evaluation mode)")
+    p.add_argument("--exclude", help="with --memory loo: the case being tested (left out with its twin)")
+    p.add_argument("--temperature", type=float, help="sampling temperature (default 0)")
+    p.add_argument("--seed", type=int, help="sampling seed (default 42)")
     p.add_argument("--memory-snapshot", metavar="SHA256",
                    help="evaluation mode: refuse to run unless the memory has this snapshot hash; never writes back")
     p.add_argument("--no-write-back", action="store_true", help="don't write this run's checked fixes to memory")
@@ -55,7 +60,13 @@ def main() -> None:
         mlflow_client = fault.pop("mlflow_client", mlflow_client)
         injection = Overrides(**fault)
     from ..memory.learned import check_snapshot, memory_docs, snapshot_sha256, write_back
-    docs = memory_docs(args.memory)
+    if (args.memory == "loo") != bool(args.exclude):
+        p.error("--memory loo and --exclude go together")
+    if args.memory == "loo":
+        from ..memory import loo_docs
+        docs = loo_docs(args.exclude)
+    else:
+        docs = memory_docs(args.memory)
     memory_sha = snapshot_sha256(docs)
     if args.memory_snapshot:
         check_snapshot(docs, args.memory_snapshot)    # raises SnapshotMismatch: the run doesn't start
@@ -64,7 +75,9 @@ def main() -> None:
         from ..llm.ollama import OllamaEmbedder
         from ..memory import FixMemory, retriever
         retrieve = retriever(FixMemory.build(OllamaEmbedder(args.embed_model), docs=docs), args.retriever)
-    result = run_fix_loop(args.repo, slots, args.prompt, OllamaClient(args.model), expected=expected,
+    from ..llm.ollama import DEFAULT_OPTIONS
+    options = DEFAULT_OPTIONS | {k: v for k, v in (("temperature", args.temperature), ("seed", args.seed)) if v is not None}
+    result = run_fix_loop(args.repo, slots, args.prompt, OllamaClient(args.model, options=options), expected=expected,
                           mlflow_client=mlflow_client, injection=injection, retriever=retrieve,
                           retriever_name=args.retriever, python_rule=not args.no_python_rule)
     if args.retriever:
@@ -79,7 +92,8 @@ def main() -> None:
     if args.no_write_back:
         text += "\nwrite-back: off (--no-write-back)"
     else:
-        written, why = write_back(result, case, evaluation=bool(args.memory_snapshot), memory_set=args.memory,
+        written, why = write_back(result, case, evaluation=bool(args.memory_snapshot) or args.memory == "loo",
+                                  memory_set=args.memory,
                                   memory_sha256=memory_sha)
         text += f"\nwrite-back: none, {why}" if why else f"\nwrite-back: {len(written)} document(s) to memory/learned/"
     print(text)

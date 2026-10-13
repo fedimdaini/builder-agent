@@ -35,7 +35,7 @@ Done, each step with its regression checks: 1 Python rule `c723bf6`; 2 docs clea
 
 ### B. LLM work
 
-5. **Evaluation protocol, written before running.** *Protocol approved 2026-10-12 (`docs/EVAL_PROTOCOL.md`, `3778d13`, with its Decisions section); the runner, the leave-one-out memory and the analysis are still to build; nothing run yet.* Then leave-one-out over the 14 faults
+5. **Evaluation protocol, written before running.** *Protocol approved 2026-10-12 (`docs/EVAL_PROTOCOL.md`, `3778d13`, with its Decisions section); built 2026-10-13: `--temperature/--seed` and `--memory loo --exclude` on the fix loop, `experiments/eval_loo/` (run.py resumable, stops on Docker/Ollama trouble; analyze.py; make_labels.py), smoke-tested on 2 cases x 1 sample (`experiments/eval_loo/_smoke/`); the full run has not started.* Then leave-one-out over the 14 faults
    (fault-001 and gen-001..013), with 5 samples each, for `diagnose_v1`, v3 and v5.
 6. **Retry slot filling from training errors**: the runtime error goes back to the LLM as feedback
    (for example the `sys.argv[2]` mistake in `docs/RESULTS.md` section 8).
