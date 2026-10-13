@@ -186,6 +186,39 @@ nearer the upper estimate than the lower one. Plan **three overnight sessions**,
 plus one shorter session for the fine-tuned models. The runner resumes, so a power cut costs only the
 run in progress.
 
+### Measured 2026-10-13 (no change to the protocol)
+
+**Why some builds are slow.** The Dockerfile installs everything in one `RUN` layer: the repo's pipenv
+install, any injected command and the Builder's extras. A fault or a fix that changes that line, or a
+layer before it (an `ENV`, apt packages, the Python image), re-runs the whole dependency install, about
+230 s with no pip cache. An identical Dockerfile seen before builds in 1–8 s. The build cache wasn't
+pruned (38.7 GB); the smoke test's slow builds were the first builds of gen-002's fault and fix lines.
+
+**Speed-ups in the runner, without changing the protocol.**
+- The runs are grouped by case.
+- The first sandbox run of each case is shared (section 5 item 4). It is stored with a fingerprint of
+  its inputs and reused across configs, seeds and both passes.
+
+**Measured on gen-003** (2 seeds × 3 configs, `experiments/eval_loo/_measure/`):
+
+| Step | Time |
+|---|---|
+| Shared first run | 192 s, once |
+| 2 runs whose fix line was new | 251 s and 263 s (a cold build of about 230 s each) |
+| 4 runs that reused those builds | 25–38 s |
+| LLM calls | about 6 s each |
+
+**New estimate.** The cost is driven by how many different fix Dockerfiles each case produces, each
+built once. At temperature 0.7, assume 4–8 per case.
+
+| Pass | Parts | Total |
+|---|---|---|
+| Main (210 runs) | first runs 14 × about 200 s ≈ 0.8 h; cold fix builds 56–112 × 230 s ≈ 3.6–7.2 h; per-run work (about 1.8 fixes × (25 s sandbox + 9 s LLM)) ≈ 3.5 h | **about 8–12 h** |
+| Temperature 0 (42 runs) | first runs reused; most fix builds already cached from the main pass | **about 1–2 h** |
+
+A larger saving would need a Builder change: separate layers for the repo's install and the Builder's
+extras, or a pip cache mount. That changes the generated Dockerfile, so it isn't done here.
+
 ## 8. How results will be reported
 
 A new RESULTS.md section with:

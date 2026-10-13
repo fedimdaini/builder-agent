@@ -1,0 +1,10 @@
+main: 0 of 6 runs done, 6 left
+gen-003: first sandbox run done (failed at train, 192 s)
+[1/6] v5-advanced gen-003 seed 101: first fix passed, fixed yes, 1 fix(es), 251 s
+[2/6] v3-advanced gen-003 seed 102: first fix passed, fixed yes, 1 fix(es), 263 s
+[3/6] v1 gen-003 seed 101: first fix passed, fixed yes, 1 fix(es), 26 s
+[4/6] v1 gen-003 seed 102: first fix passed, fixed yes, 1 fix(es), 25 s
+[5/6] v5-advanced gen-003 seed 102: first fix passed, fixed yes, 1 fix(es), 27 s
+[6/6] v3-advanced gen-003 seed 101: first fix passed, fixed yes, 1 fix(es), 38 s
+done
+exit 0
