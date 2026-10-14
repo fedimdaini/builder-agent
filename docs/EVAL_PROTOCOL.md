@@ -275,3 +275,42 @@ Added 2026-10-13, before the first evaluation run. None of them changes the deci
    documents take the last vector ranks, in memory order. When Chroma returns every document, the ranking
    is identical to before (a test checks it), so this changes only the runs that would otherwise crash.
    There is no other retrieval change.
+
+## Changes during the run (2026-10-14)
+
+**What happened.** The main pass stopped twice on gen-004 (Python 3.12), each time with "a Docker error is
+in the sandbox output; the run was deleted": first v1 seed 105, after 200 of 210 runs, then v3-advanced
+seed 103, after the restart. Docker Desktop was running both times. The runner deleted each stopped run's
+folder, which held the only copy of its sandbox output and fix log, so the exact line that matched a
+Docker pattern, and the fixes applied before it, are lost.
+
+**Evidence that remains.**
+- **v1 seed 105 was rerun with the same seed and finished without a stop.** It made three fixes (pin
+  pipenv 2023.10.0, pin `pkg_resources` 0.0.0, Python 3.10). All three failed at build with ordinary
+  pip errors (`failed to solve: process ... exit code: 1`), and no line of its output matches a Docker
+  pattern.
+- **Docker Desktop's logs** (host and VM) show no engine error and no out-of-memory messages at the two
+  stop times (about 01:08 and 18:38 UTC). The only event is a VM boot at 18:28 UTC, a Docker restart
+  before the second session.
+- **The 202 kept runs** never produced output that matches the patterns.
+
+**Verdict:** most likely a transient infrastructure hiccup, not an LLM fix (a missing Python image tag,
+for example, gives "not found", which matches no pattern). It can't be proven, since the output was
+deleted.
+
+**Changes to the runner** (`experiments/eval_loo/run.py`), for the remaining main runs and the t0 pass:
+1. **A stopped or interrupted run is never deleted.** It is moved to
+   `<out>/_stopped/<pass>/<config>/<case>/seed-<n>-<time>/` with a `reason.txt`, and the STOP message
+   names the matching line.
+2. **A Docker-pattern line with Docker healthy right after the run** (`docker info` and Ollama answer):
+   the run is moved to `_stopped` and done once more, with the same seed and the same shared first run.
+   - If the pattern comes back, the output is the run's own: it is kept as a failed attempt, and
+     `result.json` records the line in `docker_line_kept`.
+   - If it doesn't, the clean rerun is kept, and `result.json` lists the first try in `reruns`.
+   - If Docker isn't healthy, the runner stops as before.
+
+**Effect on the finished runs: none.** The new rule only differs from the old one when a Docker pattern
+matches, and every one of the 202 kept runs passed the old check without a match. Their files are
+unchanged. The 8 remaining main runs and all 42 t0 runs use the new rule. Tests: `tests/test_eval_loo.py`
+(a stopped run is moved, not deleted; a Docker error with Docker healthy is rerun once; the same error
+twice is kept as a failed attempt; Docker down stops).

@@ -20,6 +20,13 @@ Speed (the protocol is unchanged):
   files, the taxi repo's HEAD), reused only while that fingerprint holds and never from uncommitted code,
   and only if it failed at the case's recorded stage. Each run's sandbox_attempts.jsonl starts with a copy.
 
+A stopped or interrupted run is never deleted: it is moved to <out>/_stopped/<pass>/<config>/<case>/seed-<n>-<time>/
+with a reason.txt (EVAL_PROTOCOL.md, "Changes during the run (2026-10-14)").
+
+A Docker error in a run's output while Docker is healthy right after it: the run is moved to _stopped and done once
+more with the same seed. If the error comes back, the output is the run's own and it is kept as a failed attempt
+(result.json records the line); if Docker isn't healthy, the runner stops.
+
 A run is only kept if it measured the model: Docker and Ollama answered before and after it, no LLM call
 failed, no Docker error is in its output, and the first sandbox run failed at the case's recorded stage
 (the fault reproduced). Otherwise the runner deletes the run and stops with the reason (exit 2).
@@ -155,24 +162,47 @@ def initial_run(out: Path, case: dict, sandbox=None) -> tuple[SandboxResult, boo
     return r, False
 
 
+def docker_line(result) -> str | None:
+    """The first output line that looks like a Docker engine error, or None."""
+    tails = list(result.final_error_tail) + [line for a in result.attempts for line in a.error_tail]
+    return next((line for line in tails if any(p.lower() in line.lower() for p in INFRA_PATTERNS)), None)
+
+
 def invalid(result, case: dict) -> str | None:
-    """Why a finished run didn't measure the model, or None."""
+    """Why a finished run didn't measure the model, or None (a Docker error line is handled by run_one)."""
     if any(c.error for a in result.attempts for c in a.calls):
         return "an LLM call failed (Ollama)"
-    tails = list(result.final_error_tail) + [line for a in result.attempts for line in a.error_tail]
-    if any(p.lower() in line.lower() for line in tails for p in INFRA_PATTERNS):
-        return "a Docker error is in the sandbox output"
+    if line := docker_line(result):
+        return f"a Docker error is in the sandbox output: {line.strip()[:200]}"
     if result.initial != f"failed at {case['stage']}":
         return f"the fault didn't reproduce: first sandbox run {result.initial!r}, the case says failed at {case['stage']}"
     return None
 
 
+def move_to_stopped(d: Path, reason: str) -> Path:
+    """Keep a stopped run as evidence: <out>/_stopped/<pass>/<config>/<case>/<seed>-<time>/, with reason.txt."""
+    out, rel = d.parents[3], d.relative_to(d.parents[3])
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    dest = out / "_stopped" / rel.parent / f"{rel.name}-{stamp}"
+    n = 1
+    while dest.exists():                            # two moves in the same second: never nest one in the other
+        n += 1
+        dest = out / "_stopped" / rel.parent / f"{rel.name}-{stamp}-{n}"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(d), str(dest))
+    (dest / "reason.txt").write_text(reason + "\n", encoding="utf-8", newline="\n")
+    return dest
+
+
 def run_one(d: Path, pass_: str, config: str, case: dict, seed: int, retrievers: dict, model: str,
-            run_fix_loop=run_fix_loop, runner=None, initial: SandboxResult | None = None) -> dict:
+            run_fix_loop=run_fix_loop, runner=None, initial: SandboxResult | None = None, health=health,
+            reruns: list | None = None) -> dict:
+    """reruns: the earlier tries of this run that hit a Docker error with Docker healthy (moved to _stopped)."""
     prompt, retriever_name = CONFIGS[config]
     temperature, _ = PASSES[pass_]
+    reruns = list(reruns or [])
     if d.exists():
-        shutil.rmtree(d)                            # an incomplete run: start it again
+        move_to_stopped(d, "incomplete: no result.json (the runner was interrupted); started again")
     d.mkdir(parents=True)
     if initial is not None:                         # the shared first run heads this run's own sandbox log
         (d / "sandbox_attempts.jsonl").write_text(initial.model_dump_json() + "\n", encoding="utf-8", newline="\n")
@@ -194,9 +224,20 @@ def run_one(d: Path, pass_: str, config: str, case: dict, seed: int, retrievers:
                           mlflow_client=mlflow_client, injection=injection, retriever=retrieve,
                           retriever_name=retriever_name, python_rule=False, initial=initial,
                           sandbox_log=d / "sandbox_attempts.jsonl", fix_log=d / "fix_attempts.jsonl", **kw)
+    kept_docker_line = None
     if why := invalid(result, case):
-        shutil.rmtree(d)
-        raise Stop(f"{config} {case['id']} seed {seed}: {why}; the run was deleted")
+        line = docker_line(result)
+        if line and not any(c.error for a in result.attempts for c in a.calls) and health() is None:
+            if not reruns:                          # Docker is fine: do the run once more, same seed
+                kept = move_to_stopped(d, f"{why}; Docker healthy right after: run again once")
+                return run_one(d, pass_, config, case, seed, retrievers, model, run_fix_loop, runner, initial,
+                               health, reruns=[{"moved_to": str(kept), "line": line.strip()[:200]}])
+            kept_docker_line = line.strip()[:200]   # the same again: the run's own output, kept as a failed attempt
+            if result.initial != f"failed at {case['stage']}":
+                kept_docker_line = None             # not the Docker case after all: stop below
+        if kept_docker_line is None:
+            kept = move_to_stopped(d, why)
+            raise Stop(f"{config} {case['id']} seed {seed}: {why}; the run was moved to {kept}")
     passed = next((a.n for a in result.attempts if a.outcome == "passed"), None)
     record = {
         "pass": pass_, "config": config, "case": case["id"], "variant": case.get("variant", case.get("name")),
@@ -213,6 +254,7 @@ def run_one(d: Path, pass_: str, config: str, case: dict, seed: int, retrievers:
                                                         "rejected": [c.reasons for c in a.calls if not c.valid]}
                      for a in result.attempts],
         "started": started, "seconds": round(time.monotonic() - t0, 1),
+        "reruns": reruns, "docker_line_kept": kept_docker_line,
     }
     tmp = d / "result.json.tmp"
     tmp.write_text(json.dumps(record, indent=1, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
@@ -262,9 +304,13 @@ def main() -> None:
             print(f"STOP: {e}", flush=True)
             sys.exit(2)
         if problem := health():                     # down during the run: don't trust it
-            shutil.rmtree(d, ignore_errors=True)
-            print(f"STOP after {config} {case_id} seed {seed}: {problem}; the run was deleted", flush=True)
+            kept = move_to_stopped(d, f"Docker or Ollama down right after the run: {problem}")
+            print(f"STOP after {config} {case_id} seed {seed}: {problem}; the run was moved to {kept}", flush=True)
             sys.exit(2)
+        if rec["reruns"]:
+            print(f"    (a Docker error with Docker healthy: run again once; "
+                  f"{'the same error again, kept as a failed attempt' if rec['docker_line_kept'] else 'clean the second time'})",
+                  flush=True)
         print(f"[{i}/{len(left)}] {config} {case_id} seed {seed}: first fix "
               f"{'passed' if rec['first_fix_passed'] else 'no'}, fixed {'yes' if rec['final_ok'] else 'no'}, "
               f"{len(rec['attempts'])} fix(es), {rec['seconds']:.0f} s", flush=True)

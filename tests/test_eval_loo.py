@@ -213,3 +213,55 @@ def test_action_accuracy():
     assert res["configs"]["v1"]["action"]["rate"] == 0.0 and res["configs"]["v1"]["action_kinds"]["wrong"] == 2
     assert "action" not in res["comparisons"]                    # secondary: never compared
     assert "Action accuracy (secondary)" in analyze.markdown(res, "main")
+
+
+# --- changes during the run (2026-10-14): stopped runs are kept; Docker errors with Docker healthy rerun once ----
+
+DOCKER_TAIL = ("error during connect: Get http://%2F%2F.%2Fpipe%2FdockerDesktopLinuxEngine/v1.47/info: EOF",)
+
+
+def stopped(tmp_path):
+    return sorted(p for p in (tmp_path / "_stopped").rglob("seed-*") if p.is_dir())
+
+
+def test_a_stopped_run_is_moved_not_deleted(tmp_path, monkeypatch):
+    monkeypatch.setattr(run, "loo_docs", lambda case_id: [])
+    d = run.run_dir(tmp_path, "main", "v1", "gen-002", 101)
+    (d / "partial").mkdir(parents=True)                                     # an interrupted earlier run
+    with pytest.raises(run.Stop, match="moved to"):
+        run.run_one(d, "main", "v1", CASE, 101, {}, "m", initial=fake_sandbox_result(), health=lambda: None,
+                    run_fix_loop=lambda *a, **k: fake_result(error="URLError: refused"))
+    assert not d.exists()
+    kept = stopped(tmp_path)
+    assert len(kept) == 2 and all(k.parent == tmp_path / "_stopped" / "main" / "v1" / "gen-002" for k in kept)
+    reasons = sorted((k / "reason.txt").read_text(encoding="utf-8") for k in kept)
+    assert any("LLM call failed" in r for r in reasons) and any("incomplete" in r for r in reasons)
+    assert any((k / "sandbox_attempts.jsonl").exists() for k in kept)        # the evidence is still there
+
+
+def test_a_docker_error_with_docker_healthy_is_rerun_once(tmp_path, monkeypatch):
+    monkeypatch.setattr(run, "loo_docs", lambda case_id: [])
+    results = [fake_result(tail=DOCKER_TAIL), fake_result()]                 # clean the second time
+    d = run.run_dir(tmp_path, "main", "v1", "gen-002", 103)
+    rec = run.run_one(d, "main", "v1", CASE, 103, {}, "m", health=lambda: None,
+                      run_fix_loop=lambda *a, **k: results.pop(0))
+    assert run.is_done(d) and rec["docker_line_kept"] is None and len(rec["reruns"]) == 1
+    assert "dockerDesktopLinuxEngine" in rec["reruns"][0]["line"] and len(stopped(tmp_path)) == 1
+
+
+def test_the_same_docker_error_twice_is_kept_as_a_failed_attempt(tmp_path, monkeypatch):
+    monkeypatch.setattr(run, "loo_docs", lambda case_id: [])
+    d = run.run_dir(tmp_path, "main", "v1", "gen-002", 104)
+    rec = run.run_one(d, "main", "v1", CASE, 104, {}, "m", health=lambda: None,
+                      run_fix_loop=lambda *a, **k: fake_result(tail=DOCKER_TAIL, outcome="failed at build"))
+    assert run.is_done(d) and "dockerDesktopLinuxEngine" in rec["docker_line_kept"]
+    assert rec["final_ok"] is False and len(rec["reruns"]) == 1 and len(stopped(tmp_path)) == 1
+
+
+def test_a_docker_error_with_docker_down_stops(tmp_path, monkeypatch):
+    monkeypatch.setattr(run, "loo_docs", lambda case_id: [])
+    d = run.run_dir(tmp_path, "main", "v1", "gen-002", 105)
+    with pytest.raises(run.Stop, match="Docker error"):
+        run.run_one(d, "main", "v1", CASE, 105, {}, "m", health=lambda: "Docker is not answering",
+                    run_fix_loop=lambda *a, **k: fake_result(tail=DOCKER_TAIL))
+    assert not d.exists() and len(stopped(tmp_path)) == 1
