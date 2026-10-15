@@ -1,0 +1,197 @@
+{
+ "pass": "t0",
+ "config": "v5-advanced",
+ "case": "gen-013",
+ "variant": "mlflow_uri_empty",
+ "family": "env_var",
+ "seed": 42,
+ "temperature": 0.0,
+ "model": "qwen2.5-coder:7b",
+ "model_digest": "dae161e27b0e90dd1856c8bb3209201fd6736d8eb66298e75ed87571486f4364",
+ "prompt_version": "diagnose_v5",
+ "prompt_sha256": "7d1673de9bfa3b6ceb130a621732d6f8bfd4a2278ff149f88945fe1316bd5ff1",
+ "retriever": "advanced",
+ "memory": "loo",
+ "memory_ids": [
+  "fault-001",
+  "gen-001",
+  "gen-002",
+  "gen-003",
+  "gen-004",
+  "gen-005",
+  "gen-006",
+  "gen-007",
+  "gen-008",
+  "gen-009",
+  "gen-010",
+  "gen-011",
+  "gen-012"
+ ],
+ "memory_sha256": "4c7630f637d5cb84f3aca1fe843c4d90a10b1a333d97496a83a27743f9188e78",
+ "python_rule": false,
+ "initial": "failed at evaluate",
+ "initial_attempt_id": "20261013T165207Z-cda4c4",
+ "initial_shared": true,
+ "final_ok": true,
+ "stopped_because": "passed",
+ "first_fix_passed": false,
+ "fixes_to_pass": 2,
+ "attempts": [
+  {
+   "n": 1,
+   "stage": "evaluate",
+   "error_tail": [
+    " Container builder-sbx-taxi-trip-regression-serving-current-run-a63e1d698690 Creating ",
+    " Container builder-sbx-taxi-trip-regression-serving-current-run-a63e1d698690 Created ",
+    "python pipeline/evaluate.py",
+    "Traceback (most recent call last):",
+    "  File \"/app/pipeline/evaluate.py\", line 119, in <module>",
+    "    main()",
+    "  File \"/app/pipeline/evaluate.py\", line 93, in main",
+    "    model = mlflow.xgboost.load_model(uri)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/xgboost/__init__.py\", line 337, in load_model",
+    "    local_model_path = _download_artifact_from_uri(artifact_uri=model_uri, output_path=dst_path)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/tracking/artifact_utils.py\", line 108, in _download_artifact_from_uri",
+    "    repo = get_artifact_repository(artifact_uri=root_uri)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/store/artifact/artifact_repository_registry.py\", line 132, in get_artifact_repository",
+    "    return _artifact_repository_registry.get_artifact_repository(artifact_uri)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/store/artifact/artifact_repository_registry.py\", line 77, in get_artifact_repository",
+    "    return repository(artifact_uri)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/store/artifact/runs_artifact_repo.py\", line 26, in __init__",
+    "    uri = RunsArtifactRepository.get_underlying_uri(artifact_uri)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/store/artifact/runs_artifact_repo.py\", line 39, in get_underlying_uri",
+    "    uri = get_artifact_uri(run_id, artifact_path, tracking_uri)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/tracking/artifact_utils.py\", line 52, in get_artifact_uri",
+    "    run = store.get_run(run_id)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/store/tracking/file_store.py\", line 693, in get_run",
+    "    run_info = self._get_run_info(run_id)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/store/tracking/file_store.py\", line 718, in _get_run_info",
+    "    raise MlflowException(",
+    "mlflow.exceptions.MlflowException: Run '6be4537fdd3e4ffda329b1e866d05bda' not found",
+    "make: *** [Makefile:32: evaluate] Error 1"
+   ],
+   "action": {
+    "action": "pin_package",
+    "name": "mlflow",
+    "version": "2.17.2"
+   },
+   "action_text": "pin_package mlflow==2.17.2",
+   "analysis": null,
+   "reason": "The error indicates that the MLflow client version 3.x is not compatible with the MLflow server version 2.17.2. Pinning the MLflow package to version 2.17.2 should resolve the compatibility issue.",
+   "outcome": "failed at evaluate",
+   "sandbox_attempt_id": "20261014T204741Z-6a921b",
+   "retrieved": [
+    {
+     "id": "gen-001",
+     "variant": "mlflow_client_3_1_4",
+     "score": 0.03151,
+     "ranks": {
+      "vector": 2,
+      "bm25": 5
+     }
+    },
+    {
+     "id": "gen-012",
+     "variant": "mlflow_uri_wrong_port",
+     "score": 0.0315,
+     "ranks": {
+      "vector": 4,
+      "bm25": 3
+     }
+    },
+    {
+     "id": "gen-008",
+     "variant": "mlflow_client_unpinned",
+     "score": 0.03132,
+     "ranks": {
+      "vector": 1,
+      "bm25": 7
+     }
+    }
+   ],
+   "source": "llm",
+   "n_calls": 1,
+   "rejected": []
+  },
+  {
+   "n": 2,
+   "stage": "evaluate",
+   "error_tail": [
+    " Container builder-sbx-taxi-trip-regression-serving-current-run-9d72f3ffe78c Creating ",
+    " Container builder-sbx-taxi-trip-regression-serving-current-run-9d72f3ffe78c Created ",
+    "python pipeline/evaluate.py",
+    "Traceback (most recent call last):",
+    "  File \"/app/pipeline/evaluate.py\", line 119, in <module>",
+    "    main()",
+    "  File \"/app/pipeline/evaluate.py\", line 93, in main",
+    "    model = mlflow.xgboost.load_model(uri)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/xgboost/__init__.py\", line 337, in load_model",
+    "    local_model_path = _download_artifact_from_uri(artifact_uri=model_uri, output_path=dst_path)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/tracking/artifact_utils.py\", line 108, in _download_artifact_from_uri",
+    "    repo = get_artifact_repository(artifact_uri=root_uri)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/store/artifact/artifact_repository_registry.py\", line 132, in get_artifact_repository",
+    "    return _artifact_repository_registry.get_artifact_repository(artifact_uri)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/store/artifact/artifact_repository_registry.py\", line 77, in get_artifact_repository",
+    "    return repository(artifact_uri)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/store/artifact/runs_artifact_repo.py\", line 26, in __init__",
+    "    uri = RunsArtifactRepository.get_underlying_uri(artifact_uri)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/store/artifact/runs_artifact_repo.py\", line 39, in get_underlying_uri",
+    "    uri = get_artifact_uri(run_id, artifact_path, tracking_uri)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/tracking/artifact_utils.py\", line 52, in get_artifact_uri",
+    "    run = store.get_run(run_id)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/store/tracking/file_store.py\", line 693, in get_run",
+    "    run_info = self._get_run_info(run_id)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/store/tracking/file_store.py\", line 718, in _get_run_info",
+    "    raise MlflowException(",
+    "mlflow.exceptions.MlflowException: Run 'dab930178ded4397b749e8c845916311' not found",
+    "make: *** [Makefile:32: evaluate] Error 1"
+   ],
+   "action": {
+    "action": "set_env_var",
+    "name": "MLFLOW_TRACKING_URI",
+    "value": "http://mlflow:5000"
+   },
+   "action_text": "set_env_var MLFLOW_TRACKING_URI=http://mlflow:5000",
+   "analysis": null,
+   "reason": "The error indicates that the MLflow client is trying to connect to the tracking server on port 5001, but the server is listening on port 5000.",
+   "outcome": "passed",
+   "sandbox_attempt_id": "20261014T204811Z-12554e",
+   "retrieved": [
+    {
+     "id": "gen-001",
+     "variant": "mlflow_client_3_1_4",
+     "score": 0.03151,
+     "ranks": {
+      "vector": 2,
+      "bm25": 5
+     }
+    },
+    {
+     "id": "gen-012",
+     "variant": "mlflow_uri_wrong_port",
+     "score": 0.0315,
+     "ranks": {
+      "vector": 4,
+      "bm25": 3
+     }
+    },
+    {
+     "id": "gen-008",
+     "variant": "mlflow_client_unpinned",
+     "score": 0.03132,
+     "ranks": {
+      "vector": 1,
+      "bm25": 7
+     }
+    }
+   ],
+   "source": "llm",
+   "n_calls": 1,
+   "rejected": []
+  }
+ ],
+ "started": "2026-10-14T20:47:08+00:00",
+ "seconds": 99.1,
+ "reruns": [],
+ "docker_line_kept": null
+}

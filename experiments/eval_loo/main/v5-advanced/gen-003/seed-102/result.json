@@ -1,0 +1,120 @@
+{
+ "pass": "main",
+ "config": "v5-advanced",
+ "case": "gen-003",
+ "variant": "numpy_2_0_2",
+ "family": "incompatible_pin",
+ "seed": 102,
+ "temperature": 0.7,
+ "model": "qwen2.5-coder:7b",
+ "model_digest": "dae161e27b0e90dd1856c8bb3209201fd6736d8eb66298e75ed87571486f4364",
+ "prompt_version": "diagnose_v5",
+ "prompt_sha256": "7d1673de9bfa3b6ceb130a621732d6f8bfd4a2278ff149f88945fe1316bd5ff1",
+ "retriever": "advanced",
+ "memory": "loo",
+ "memory_ids": [
+  "fault-001",
+  "gen-001",
+  "gen-002",
+  "gen-004",
+  "gen-005",
+  "gen-006",
+  "gen-007",
+  "gen-008",
+  "gen-009",
+  "gen-010",
+  "gen-011",
+  "gen-012",
+  "gen-013"
+ ],
+ "memory_sha256": "55009365465b2003a59c4ddfc4dc4b13daf82f9db9e1cb7799b36b230fb512d7",
+ "python_rule": false,
+ "initial": "failed at train",
+ "initial_attempt_id": "20261013T190412Z-577862",
+ "initial_shared": true,
+ "final_ok": true,
+ "stopped_because": "passed",
+ "first_fix_passed": true,
+ "fixes_to_pass": 1,
+ "attempts": [
+  {
+   "n": 1,
+   "stage": "train",
+   "error_tail": [
+    " Container builder-sbx-taxi-trip-regression-serving-current-run-b0a7a452a94a Creating ",
+    " Container builder-sbx-taxi-trip-regression-serving-current-run-b0a7a452a94a Created ",
+    "python pipeline/train.py",
+    "Traceback (most recent call last):",
+    "  File \"/app/pipeline/train.py\", line 13, in <module>",
+    "    import mlflow",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/__init__.py\", line 35, in <module>",
+    "    from mlflow import (",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/data/__init__.py\", line 5, in <module>",
+    "    from mlflow.data import dataset_registry",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/data/dataset_registry.py\", line 137, in <module>",
+    "    from mlflow.data.pandas_dataset import from_pandas",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/data/pandas_dataset.py\", line 6, in <module>",
+    "    import pandas as pd",
+    "  File \"/usr/local/lib/python3.9/site-packages/pandas/__init__.py\", line 22, in <module>",
+    "    from pandas.compat import is_numpy_dev as _is_numpy_dev  # pyright: ignore # noqa:F401",
+    "  File \"/usr/local/lib/python3.9/site-packages/pandas/compat/__init__.py\", line 25, in <module>",
+    "    from pandas.compat.numpy import (",
+    "  File \"/usr/local/lib/python3.9/site-packages/pandas/compat/numpy/__init__.py\", line 4, in <module>",
+    "    from pandas.util.version import Version",
+    "  File \"/usr/local/lib/python3.9/site-packages/pandas/util/__init__.py\", line 2, in <module>",
+    "    from pandas.util._decorators import (  # noqa:F401",
+    "  File \"/usr/local/lib/python3.9/site-packages/pandas/util/_decorators.py\", line 14, in <module>",
+    "    from pandas._libs.properties import cache_readonly",
+    "  File \"/usr/local/lib/python3.9/site-packages/pandas/_libs/__init__.py\", line 13, in <module>",
+    "    from pandas._libs.interval import Interval",
+    "  File \"pandas/_libs/interval.pyx\", line 1, in init pandas._libs.interval",
+    "ValueError: numpy.dtype size changed, may indicate binary incompatibility. Expected 96 from C header, got 88 from PyObject",
+    "make: *** [Makefile:27: train] Error 1"
+   ],
+   "action": {
+    "action": "pin_package",
+    "name": "numpy",
+    "version": "1.21.5"
+   },
+   "action_text": "pin_package numpy==1.21.5",
+   "analysis": null,
+   "reason": "The error suggests a binary incompatibility issue with numpy. Pinning numpy to a known good version (1.21.5) may resolve this compatibility problem.",
+   "outcome": "passed",
+   "sandbox_attempt_id": "20261013T191743Z-8edbaa",
+   "retrieved": [
+    {
+     "id": "gen-006",
+     "variant": "libffi8_removed",
+     "score": 0.03952,
+     "ranks": {
+      "vector": 1,
+      "bm25": 7
+     }
+    },
+    {
+     "id": "gen-002",
+     "variant": "xgboost_uninstalled",
+     "score": 0.03897,
+     "ranks": {
+      "vector": 6,
+      "bm25": 4
+     }
+    },
+    {
+     "id": "fault-001",
+     "variant": "mlflow_client_server_mismatch",
+     "score": 0.03882,
+     "ranks": {
+      "vector": 9,
+      "bm25": 2
+     }
+    }
+   ],
+   "source": "llm",
+   "n_calls": 1,
+   "rejected": []
+  }
+ ],
+ "started": "2026-10-13T19:17:35+00:00",
+ "seconds": 28.2
+}

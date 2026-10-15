@@ -1,0 +1,143 @@
+{
+ "pass": "t0",
+ "config": "v5-advanced",
+ "case": "gen-012",
+ "variant": "mlflow_uri_wrong_port",
+ "family": "env_var",
+ "seed": 42,
+ "temperature": 0.0,
+ "model": "qwen2.5-coder:7b",
+ "model_digest": "dae161e27b0e90dd1856c8bb3209201fd6736d8eb66298e75ed87571486f4364",
+ "prompt_version": "diagnose_v5",
+ "prompt_sha256": "7d1673de9bfa3b6ceb130a621732d6f8bfd4a2278ff149f88945fe1316bd5ff1",
+ "retriever": "advanced",
+ "memory": "loo",
+ "memory_ids": [
+  "fault-001",
+  "gen-001",
+  "gen-002",
+  "gen-003",
+  "gen-004",
+  "gen-005",
+  "gen-006",
+  "gen-007",
+  "gen-008",
+  "gen-009",
+  "gen-010",
+  "gen-011",
+  "gen-013"
+ ],
+ "memory_sha256": "468fba185949e1a216d248797c883aee1f6d4c4ba6dfc06229c1faa7efbff68f",
+ "python_rule": false,
+ "initial": "failed at train",
+ "initial_attempt_id": "20261013T220429Z-a89068",
+ "initial_shared": true,
+ "final_ok": true,
+ "stopped_because": "passed",
+ "first_fix_passed": true,
+ "fixes_to_pass": 1,
+ "attempts": [
+  {
+   "n": 1,
+   "stage": "train",
+   "error_tail": [
+    "Traceback (most recent call last):",
+    "  File \"/usr/local/lib/python3.9/site-packages/requests/adapters.py\", line 644, in send",
+    "    resp = conn.urlopen(",
+    "  File \"/usr/local/lib/python3.9/site-packages/urllib3/connectionpool.py\", line 871, in urlopen",
+    "    return self.urlopen(",
+    "  File \"/usr/local/lib/python3.9/site-packages/urllib3/connectionpool.py\", line 871, in urlopen",
+    "    return self.urlopen(",
+    "  File \"/usr/local/lib/python3.9/site-packages/urllib3/connectionpool.py\", line 871, in urlopen",
+    "    return self.urlopen(",
+    "  [Previous line repeated 2 more times]",
+    "  File \"/usr/local/lib/python3.9/site-packages/urllib3/connectionpool.py\", line 841, in urlopen",
+    "    retries = retries.increment(",
+    "  File \"/usr/local/lib/python3.9/site-packages/urllib3/util/retry.py\", line 535, in increment",
+    "    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]",
+    "urllib3.exceptions.MaxRetryError: HTTPConnectionPool(host='mlflow', port=5001): Max retries exceeded with url: /api/2.0/mlflow/experiments/get-by-name?experiment_name=mlops-zoomcamp-experiment (Caused by NewConnectionError(\"HTTPConnection(host='mlflow', port=5001): Failed to establish a new connection: [Errno 111] Connection refused\"))",
+    "During handling of the above exception, another exception occurred:",
+    "Traceback (most recent call last):",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/utils/rest_utils.py\", line 189, in http_request",
+    "    return _get_http_response_with_retries(",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/utils/request_utils.py\", line 237, in _get_http_response_with_retries",
+    "    return session.request(method, url, allow_redirects=allow_redirects, **kwargs)",
+    "  File \"/usr/local/lib/python3.9/site-packages/requests/sessions.py\", line 589, in request",
+    "    resp = self.send(prep, **send_kwargs)",
+    "  File \"/usr/local/lib/python3.9/site-packages/requests/sessions.py\", line 703, in send",
+    "    r = adapter.send(request, **kwargs)",
+    "  File \"/usr/local/lib/python3.9/site-packages/requests/adapters.py\", line 677, in send",
+    "    raise ConnectionError(e, request=request)",
+    "requests.exceptions.ConnectionError: HTTPConnectionPool(host='mlflow', port=5001): Max retries exceeded with url: /api/2.0/mlflow/experiments/get-by-name?experiment_name=mlops-zoomcamp-experiment (Caused by NewConnectionError(\"HTTPConnection(host='mlflow', port=5001): Failed to establish a new connection: [Errno 111] Connection refused\"))",
+    "During handling of the above exception, another exception occurred:",
+    "Traceback (most recent call last):",
+    "  File \"/app/pipeline/train.py\", line 96, in <module>",
+    "    main()",
+    "  File \"/app/pipeline/train.py\", line 67, in main",
+    "    mlflow.set_experiment(EXPERIMENT)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/tracking/fluent.py\", line 145, in set_experiment",
+    "    experiment = client.get_experiment_by_name(experiment_name)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/tracking/client.py\", line 1256, in get_experiment_by_name",
+    "    return self._tracking_client.get_experiment_by_name(name)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/tracking/_tracking_service/client.py\", line 501, in get_experiment_by_name",
+    "    return self.store.get_experiment_by_name(name)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/store/tracking/rest_store.py\", line 519, in get_experiment_by_name",
+    "    response_proto = self._call_endpoint(GetExperimentByName, req_body)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/store/tracking/rest_store.py\", line 82, in _call_endpoint",
+    "    return call_endpoint(self.get_host_creds(), endpoint, method, json_body, response_proto)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/utils/rest_utils.py\", line 365, in call_endpoint",
+    "    response = http_request(**call_kwargs)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/utils/rest_utils.py\", line 212, in http_request",
+    "    raise MlflowException(f\"API request to {url} failed with exception {e}\")",
+    "mlflow.exceptions.MlflowException: API request to http://mlflow:5001/api/2.0/mlflow/experiments/get-by-name failed with exception HTTPConnectionPool(host='mlflow', port=5001): Max retries exceeded with url: /api/2.0/mlflow/experiments/get-by-name?experiment_name=mlops-zoomcamp-experiment (Caused by NewConnectionError(\"HTTPConnection(host='mlflow', port=5001): Failed to establish a new connection: [Errno 111] Connection refused\"))",
+    "make: *** [Makefile:27: train] Error 1"
+   ],
+   "action": {
+    "action": "set_env_var",
+    "name": "MLFLOW_TRACKING_URI",
+    "value": "http://mlflow:5000"
+   },
+   "action_text": "set_env_var MLFLOW_TRACKING_URI=http://mlflow:5000",
+   "analysis": null,
+   "reason": "The tracking URI points at mlflow-server; the compose service is called mlflow.",
+   "outcome": "passed",
+   "sandbox_attempt_id": "20261014T210220Z-dbfa10",
+   "retrieved": [
+    {
+     "id": "gen-005",
+     "variant": "mlflow_uri_wrong_host",
+     "score": 0.04098,
+     "ranks": {
+      "vector": 1,
+      "bm25": 1
+     }
+    },
+    {
+     "id": "gen-008",
+     "variant": "mlflow_client_unpinned",
+     "score": 0.03995,
+     "ranks": {
+      "vector": 2,
+      "bm25": 4
+     }
+    },
+    {
+     "id": "fault-001",
+     "variant": "mlflow_client_server_mismatch",
+     "score": 0.03948,
+     "ranks": {
+      "vector": 6,
+      "bm25": 2
+     }
+    }
+   ],
+   "source": "llm",
+   "n_calls": 1,
+   "rejected": []
+  }
+ ],
+ "started": "2026-10-14T21:01:48+00:00",
+ "seconds": 60.1,
+ "reruns": [],
+ "docker_line_kept": null
+}

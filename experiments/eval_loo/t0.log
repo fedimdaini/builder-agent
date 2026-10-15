@@ -1,0 +1,58 @@
+t0: 0 of 42 runs done, 42 left
+gen-005: first sandbox run reused (failed at train, 0 s)
+[1/42] v3-advanced gen-005 seed 42: first fix no, fixed no, 2 fix(es), 136 s
+[2/42] v5-advanced gen-005 seed 42: first fix no, fixed no, 2 fix(es), 129 s
+[3/42] v1 gen-005 seed 42: first fix no, fixed no, 3 fix(es), 550 s
+gen-013: first sandbox run reused (failed at evaluate, 0 s)
+[4/42] v3-advanced gen-013 seed 42: first fix no, fixed yes, 2 fix(es), 394 s
+[5/42] v5-advanced gen-013 seed 42: first fix no, fixed yes, 2 fix(es), 99 s
+[6/42] v1 gen-013 seed 42: first fix no, fixed no, 3 fix(es), 465 s
+gen-012: first sandbox run reused (failed at train, 0 s)
+[7/42] v3-advanced gen-012 seed 42: first fix passed, fixed yes, 1 fix(es), 38 s
+[8/42] v1 gen-012 seed 42: first fix no, fixed no, 2 fix(es), 272 s
+[9/42] v5-advanced gen-012 seed 42: first fix passed, fixed yes, 1 fix(es), 60 s
+gen-009: first sandbox run reused (failed at build, 0 s)
+[10/42] v5-advanced gen-009 seed 42: first fix passed, fixed yes, 1 fix(es), 350 s
+[11/42] v1 gen-009 seed 42: first fix passed, fixed yes, 1 fix(es), 364 s
+[12/42] v3-advanced gen-009 seed 42: first fix passed, fixed yes, 1 fix(es), 59 s
+gen-007: first sandbox run reused (failed at train, 0 s)
+[13/42] v5-advanced gen-007 seed 42: first fix passed, fixed yes, 1 fix(es), 31 s
+[14/42] v3-advanced gen-007 seed 42: first fix passed, fixed yes, 1 fix(es), 28 s
+[15/42] v1 gen-007 seed 42: first fix no, fixed yes, 3 fix(es), 616 s
+gen-001: first sandbox run reused (failed at train, 0 s)
+[16/42] v5-advanced gen-001 seed 42: first fix passed, fixed yes, 1 fix(es), 30 s
+[17/42] v1 gen-001 seed 42: first fix no, fixed yes, 3 fix(es), 455 s
+[18/42] v3-advanced gen-001 seed 42: first fix passed, fixed yes, 1 fix(es), 31 s
+gen-008: first sandbox run reused (failed at train, 0 s)
+[19/42] v1 gen-008 seed 42: first fix no, fixed yes, 3 fix(es), 460 s
+[20/42] v5-advanced gen-008 seed 42: first fix no, fixed yes, 2 fix(es), 230 s
+[21/42] v3-advanced gen-008 seed 42: first fix no, fixed yes, 2 fix(es), 66 s
+gen-003: first sandbox run reused (failed at train, 0 s)
+[22/42] v3-advanced gen-003 seed 42: first fix passed, fixed yes, 1 fix(es), 258 s
+[23/42] v5-advanced gen-003 seed 42: first fix passed, fixed yes, 1 fix(es), 30 s
+[24/42] v1 gen-003 seed 42: first fix passed, fixed yes, 1 fix(es), 27 s
+gen-002: first sandbox run reused (failed at train, 0 s)
+[25/42] v1 gen-002 seed 42: first fix passed, fixed yes, 1 fix(es), 337 s
+[26/42] v3-advanced gen-002 seed 42: first fix passed, fixed yes, 1 fix(es), 28 s
+[27/42] v5-advanced gen-002 seed 42: first fix passed, fixed yes, 1 fix(es), 28 s
+fault-001: first sandbox run reused (failed at train, 0 s)
+[28/42] v1 fault-001 seed 42: first fix no, fixed yes, 3 fix(es), 95 s
+[29/42] v5-advanced fault-001 seed 42: first fix no, fixed yes, 2 fix(es), 67 s
+[30/42] v3-advanced fault-001 seed 42: first fix no, fixed yes, 2 fix(es), 64 s
+gen-006: first sandbox run reused (failed at train, 0 s)
+[31/42] v1 gen-006 seed 42: first fix passed, fixed yes, 1 fix(es), 204 s
+[32/42] v5-advanced gen-006 seed 42: first fix passed, fixed yes, 1 fix(es), 28 s
+[33/42] v3-advanced gen-006 seed 42: first fix passed, fixed yes, 1 fix(es), 29 s
+gen-011: first sandbox run reused (failed at build, 0 s)
+[34/42] v1 gen-011 seed 42: first fix no, fixed no, 3 fix(es), 162 s
+[35/42] v3-advanced gen-011 seed 42: first fix no, fixed yes, 2 fix(es), 283 s
+[36/42] v5-advanced gen-011 seed 42: first fix no, fixed yes, 3 fix(es), 387 s
+gen-010: first sandbox run reused (failed at health, 0 s)
+[37/42] v5-advanced gen-010 seed 42: first fix passed, fixed yes, 1 fix(es), 216 s
+[38/42] v3-advanced gen-010 seed 42: first fix passed, fixed yes, 1 fix(es), 30 s
+[39/42] v1 gen-010 seed 42: first fix passed, fixed yes, 1 fix(es), 27 s
+gen-004: first sandbox run reused (failed at build, 0 s)
+[40/42] v5-advanced gen-004 seed 42: first fix passed, fixed yes, 1 fix(es), 30 s
+[41/42] v3-advanced gen-004 seed 42: first fix passed, fixed yes, 1 fix(es), 198 s
+[42/42] v1 gen-004 seed 42: first fix passed, fixed yes, 1 fix(es), 194 s
+done

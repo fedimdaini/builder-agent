@@ -1,0 +1,452 @@
+{
+ "r01": {
+  "config": "v3-advanced",
+  "case": "gen-011",
+  "seed": 103,
+  "fix_n": 1,
+  "fix": "add_system_package clang",
+  "filter_true": false,
+  "filter_why": "names no term of this case's error line"
+ },
+ "r02": {
+  "config": "v3-advanced",
+  "case": "gen-001",
+  "seed": 102,
+  "fix_n": 1,
+  "fix": "pin_package mlflow==2.17.2",
+  "filter_true": true,
+  "filter_why": "refers to mlflow"
+ },
+ "r03": {
+  "config": "v1",
+  "case": "gen-012",
+  "seed": 104,
+  "fix_n": 2,
+  "fix": "add_system_package curl",
+  "filter_true": false,
+  "filter_why": "names no term of this case's error line"
+ },
+ "r04": {
+  "config": "v3-advanced",
+  "case": "gen-013",
+  "seed": 105,
+  "fix_n": 1,
+  "fix": "pin_package mlflow==2.17.2",
+  "filter_true": false,
+  "filter_why": "names 3.x from a retrieved case, not from this error"
+ },
+ "r05": {
+  "config": "v3-advanced",
+  "case": "gen-012",
+  "seed": 105,
+  "fix_n": 1,
+  "fix": "set_env_var MLFLOW_TRACKING_URI=http://mlflow:5000",
+  "filter_true": false,
+  "filter_why": "names server from a retrieved case, not from this error"
+ },
+ "r06": {
+  "config": "v3-advanced",
+  "case": "gen-008",
+  "seed": 103,
+  "fix_n": 2,
+  "fix": "pin_package mlflow==2.17.2",
+  "filter_true": false,
+  "filter_why": "names no term of this case's error line"
+ },
+ "r07": {
+  "config": "v5-advanced",
+  "case": "gen-004",
+  "seed": 105,
+  "fix_n": 3,
+  "fix": "pin_package pipenv==2023.11.14",
+  "filter_true": true,
+  "filter_why": "refers to 2023, 2023.11.23, pipenv"
+ },
+ "r08": {
+  "config": "v3-advanced",
+  "case": "gen-010",
+  "seed": 105,
+  "fix_n": 1,
+  "fix": "add_system_package libffi8",
+  "filter_true": false,
+  "filter_why": "names libffi, libffi.so.8, may from a retrieved case, not from this error"
+ },
+ "r09": {
+  "config": "v3-advanced",
+  "case": "fault-001",
+  "seed": 101,
+  "fix_n": 1,
+  "fix": "set_env_var GIT_PYTHON_REFRESH=quiet",
+  "filter_true": false,
+  "filter_why": "names no term of this case's error line"
+ },
+ "r10": {
+  "config": "v1",
+  "case": "gen-006",
+  "seed": 101,
+  "fix_n": 2,
+  "fix": "add_system_package libffi8",
+  "filter_true": false,
+  "filter_why": "names no term of this case's error line"
+ },
+ "r11": {
+  "config": "v1",
+  "case": "gen-007",
+  "seed": 102,
+  "fix_n": 3,
+  "fix": "pin_package mlflow==1.26.0",
+  "filter_true": false,
+  "filter_why": "names no term of this case's error line"
+ },
+ "r12": {
+  "config": "v5-advanced",
+  "case": "gen-001",
+  "seed": 101,
+  "fix_n": 1,
+  "fix": "pin_package mlflow==2.17.2",
+  "filter_true": true,
+  "filter_why": "refers to mlflow"
+ },
+ "r13": {
+  "config": "v1",
+  "case": "gen-012",
+  "seed": 102,
+  "fix_n": 2,
+  "fix": "pin_package google.protobuf==3.19.1",
+  "filter_true": false,
+  "filter_why": "names no term of this case's error line"
+ },
+ "r14": {
+  "config": "v5-advanced",
+  "case": "gen-011",
+  "seed": 103,
+  "fix_n": 1,
+  "fix": "add_system_package clang",
+  "filter_true": false,
+  "filter_why": "names no term of this case's error line"
+ },
+ "r15": {
+  "config": "v1",
+  "case": "gen-008",
+  "seed": 103,
+  "fix_n": 1,
+  "fix": "set_env_var GIT_PYTHON_REFRESH=quiet",
+  "filter_true": true,
+  "filter_why": "refers to mlflow"
+ },
+ "r16": {
+  "config": "v1",
+  "case": "gen-013",
+  "seed": 104,
+  "fix_n": 1,
+  "fix": "set_env_var MLFLOW_TRACKING_URI=file:///mlflow",
+  "filter_true": true,
+  "filter_why": "refers to mlflow, run"
+ },
+ "r17": {
+  "config": "v3-advanced",
+  "case": "gen-008",
+  "seed": 103,
+  "fix_n": 1,
+  "fix": "set_env_var GIT_PYTHON_REFRESH=quiet",
+  "filter_true": false,
+  "filter_why": "names no term of this case's error line"
+ },
+ "r18": {
+  "config": "v5-advanced",
+  "case": "gen-012",
+  "seed": 102,
+  "fix_n": 1,
+  "fix": "set_env_var MLFLOW_TRACKING_URI=http://mlflow:5000",
+  "filter_true": true,
+  "filter_why": "refers to mlflow, name"
+ },
+ "r19": {
+  "config": "v1",
+  "case": "gen-007",
+  "seed": 103,
+  "fix_n": 1,
+  "fix": "set_env_var GIT_PYTHON_REFRESH=quiet",
+  "filter_true": true,
+  "filter_why": "refers to mlflow"
+ },
+ "r20": {
+  "config": "v3-advanced",
+  "case": "gen-012",
+  "seed": 104,
+  "fix_n": 1,
+  "fix": "set_env_var MLFLOW_TRACKING_URI=http://mlflow:5000",
+  "filter_true": true,
+  "filter_why": "refers to http, mlflow"
+ },
+ "r21": {
+  "config": "v5-advanced",
+  "case": "gen-013",
+  "seed": 105,
+  "fix_n": 1,
+  "fix": "pin_package mlflow==2.17.2",
+  "filter_true": false,
+  "filter_why": "names 3.x, v2.17.2 from a retrieved case, not from this error"
+ },
+ "r22": {
+  "config": "v1",
+  "case": "gen-001",
+  "seed": 102,
+  "fix_n": 2,
+  "fix": "set_env_var MLFLOW_TRACKING_URI=http://mlflow:5000",
+  "filter_true": false,
+  "filter_why": "names no term of this case's error line"
+ },
+ "r23": {
+  "config": "v5-advanced",
+  "case": "gen-007",
+  "seed": 104,
+  "fix_n": 1,
+  "fix": "pin_package mlflow==2.17.2",
+  "filter_true": true,
+  "filter_why": "refers to mlflow"
+ },
+ "r24": {
+  "config": "v3-advanced",
+  "case": "gen-005",
+  "seed": 104,
+  "fix_n": 1,
+  "fix": "pin_package mlflow==2.17.2",
+  "filter_true": true,
+  "filter_why": "refers to mlflow, server"
+ },
+ "r25": {
+  "config": "v1",
+  "case": "gen-011",
+  "seed": 102,
+  "fix_n": 2,
+  "fix": "add_system_package gdal-bin",
+  "filter_true": true,
+  "filter_why": "refers to bin"
+ },
+ "r26": {
+  "config": "v5-advanced",
+  "case": "gen-005",
+  "seed": 105,
+  "fix_n": 1,
+  "fix": "add_system_package curl",
+  "filter_true": false,
+  "filter_why": "names no term of this case's error line"
+ },
+ "r27": {
+  "config": "v1",
+  "case": "gen-008",
+  "seed": 101,
+  "fix_n": 1,
+  "fix": "set_env_var GIT_PYTHON_REFRESH=quiet",
+  "filter_true": false,
+  "filter_why": "names no term of this case's error line"
+ },
+ "r28": {
+  "config": "v1",
+  "case": "gen-012",
+  "seed": 104,
+  "fix_n": 1,
+  "fix": "pin_package mlflow==2.10.0",
+  "filter_true": true,
+  "filter_why": "refers to mlflow"
+ },
+ "r29": {
+  "config": "v1",
+  "case": "gen-008",
+  "seed": 102,
+  "fix_n": 1,
+  "fix": "set_env_var GIT_PYTHON_REFRESH=quiet",
+  "filter_true": false,
+  "filter_why": "names no term of this case's error line"
+ },
+ "r30": {
+  "config": "v5-advanced",
+  "case": "gen-007",
+  "seed": 101,
+  "fix_n": 1,
+  "fix": "pin_package mlflow==2.17.2",
+  "filter_true": true,
+  "filter_why": "refers to mlflow"
+ },
+ "r31": {
+  "config": "v1",
+  "case": "gen-008",
+  "seed": 104,
+  "fix_n": 1,
+  "fix": "set_env_var GIT_PYTHON_REFRESH=quiet",
+  "filter_true": true,
+  "filter_why": "refers to mlflow"
+ },
+ "r32": {
+  "config": "v5-advanced",
+  "case": "gen-006",
+  "seed": 101,
+  "fix_n": 2,
+  "fix": "pin_package libffi==8.4.12",
+  "filter_true": false,
+  "filter_why": "names no term of this case's error line"
+ },
+ "r33": {
+  "config": "v5-advanced",
+  "case": "gen-006",
+  "seed": 105,
+  "fix_n": 1,
+  "fix": "add_system_package libffi8",
+  "filter_true": true,
+  "filter_why": "refers to libffi, libffi.so.8, shared"
+ },
+ "r34": {
+  "config": "v1",
+  "case": "gen-001",
+  "seed": 101,
+  "fix_n": 2,
+  "fix": "pin_package mlflow==2.3.0",
+  "filter_true": false,
+  "filter_why": "names no term of this case's error line"
+ },
+ "r35": {
+  "config": "v3-advanced",
+  "case": "fault-001",
+  "seed": 101,
+  "fix_n": 2,
+  "fix": "pin_package mlflow==2.17.2",
+  "filter_true": false,
+  "filter_why": "names 2.x from a retrieved case, not from this error"
+ },
+ "r36": {
+  "config": "v5-advanced",
+  "case": "gen-004",
+  "seed": 102,
+  "fix_n": 1,
+  "fix": "pin_package pipenv==2023.12.1",
+  "filter_true": false,
+  "filter_why": "names no term of this case's error line"
+ },
+ "r37": {
+  "config": "v3-advanced",
+  "case": "gen-011",
+  "seed": 104,
+  "fix_n": 2,
+  "fix": "set_env_var GDAL_CONFIG=/usr/bin/gdal-config",
+  "filter_true": false,
+  "filter_why": "names no term of this case's error line"
+ },
+ "r38": {
+  "config": "v1",
+  "case": "gen-008",
+  "seed": 105,
+  "fix_n": 1,
+  "fix": "set_env_var GIT_PYTHON_REFRESH=quiet",
+  "filter_true": false,
+  "filter_why": "names no term of this case's error line"
+ },
+ "r39": {
+  "config": "v3-advanced",
+  "case": "gen-002",
+  "seed": 101,
+  "fix_n": 1,
+  "fix": "add_dependency xgboost",
+  "filter_true": true,
+  "filter_why": "refers to xgboost"
+ },
+ "r40": {
+  "config": "v5-advanced",
+  "case": "gen-011",
+  "seed": 102,
+  "fix_n": 1,
+  "fix": "add_system_package build-essential",
+  "filter_true": false,
+  "filter_why": "names no term of this case's error line"
+ },
+ "r41": {
+  "config": "v5-advanced",
+  "case": "gen-001",
+  "seed": 103,
+  "fix_n": 1,
+  "fix": "pin_package mlflow==2.17.2",
+  "filter_true": true,
+  "filter_why": "refers to mlflow"
+ },
+ "r42": {
+  "config": "v3-advanced",
+  "case": "gen-004",
+  "seed": 105,
+  "fix_n": 1,
+  "fix": "pin_package pipenv==2023.11.27",
+  "filter_true": false,
+  "filter_why": "names no term of this case's error line"
+ },
+ "r43": {
+  "config": "v1",
+  "case": "gen-004",
+  "seed": 104,
+  "fix_n": 1,
+  "fix": "set_python_version 3.11",
+  "filter_true": false,
+  "filter_why": "names no term of this case's error line"
+ },
+ "r44": {
+  "config": "v3-advanced",
+  "case": "gen-009",
+  "seed": 102,
+  "fix_n": 1,
+  "fix": "set_python_version 3.10",
+  "filter_true": true,
+  "filter_why": "refers to xgboost"
+ },
+ "r45": {
+  "config": "v5-advanced",
+  "case": "gen-008",
+  "seed": 101,
+  "fix_n": 1,
+  "fix": "pin_package mlflow==2.17.2",
+  "filter_true": true,
+  "filter_why": "refers to mlflow"
+ },
+ "r46": {
+  "config": "v5-advanced",
+  "case": "gen-006",
+  "seed": 104,
+  "fix_n": 1,
+  "fix": "add_system_package libffi8",
+  "filter_true": true,
+  "filter_why": "refers to libffi, libffi.so.8, shared"
+ },
+ "r47": {
+  "config": "v5-advanced",
+  "case": "gen-010",
+  "seed": 104,
+  "fix_n": 1,
+  "fix": "pin_package werkzeug==2.3.1",
+  "filter_true": false,
+  "filter_why": "names 3.9 from a retrieved case, not from this error"
+ },
+ "r48": {
+  "config": "v1",
+  "case": "gen-002",
+  "seed": 103,
+  "fix_n": 1,
+  "fix": "add_dependency xgboost",
+  "filter_true": true,
+  "filter_why": "refers to xgboost"
+ },
+ "r49": {
+  "config": "v3-advanced",
+  "case": "gen-001",
+  "seed": 104,
+  "fix_n": 1,
+  "fix": "pin_package mlflow==2.17.2",
+  "filter_true": true,
+  "filter_why": "refers to mlflow"
+ },
+ "r50": {
+  "config": "v3-advanced",
+  "case": "gen-013",
+  "seed": 103,
+  "fix_n": 2,
+  "fix": "set_env_var MLFLOW_TRACKING_URI=http://mlflow:5000",
+  "filter_true": false,
+  "filter_why": "names 5001, port from a retrieved case, not from this error"
+ }
+}

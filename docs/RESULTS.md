@@ -11,6 +11,9 @@ The fine-tune on v5 data with `diagnose_v5` (section 9) has the highest first fi
 but one of the three reuses a retrieved fault's answer with a false reason and another needs the
 validator; one run per fault, so the default is not changed.
 v3 + advanced on the base model stays the default because section 9's lead is one run per fault on 4 faults, rests on a copied answer (gen-013) and a validator rejection (gen-010), loses gen-011, and needs a fine-tuned model no other configuration does; the leave-one-out evaluation (ROADMAP B5) decides it.
+**Leave-one-out (section 12):** under the protocol's decision rule no configuration is shown better than another
+on any metric; v3 and v5 with the advanced retriever tie at 57% first fix passes (v1: 36%), so v3 + advanced
+stays the default.
 
 The LLM does two jobs, and both answer as strict JSON:
 
@@ -608,6 +611,153 @@ Logs: `experiments/runtime_retry/` (create reports and outputs).
 
 ---
 
+## 12. Leave-one-out evaluation over the 14 faults (ROADMAP B5)
+
+Protocol: `docs/EVAL_PROTOCOL.md`, frozen before the first run, with its recorded changes (action accuracy,
+the filter acceptance rule, the retriever crash fix, and the runner changes during the run, none of which
+changed a finished run). Each of the 14 faults is fixed with a memory of the other 13 (12 for the twins
+gen-008 and fault-001); base model `qwen2.5-coder:7b` (digest `dae161e2...`, the same in all 252 runs),
+`--no-python-rule`, at most 3 fixes. Faithfulness filter frozen at commit `c8cb5c8`.
+
+- **Main pass:** temperature 0.7, seeds 101–105: 14 × 5 × 3 = 210 runs, 8.0 h of run time.
+- **Extra pass (Decisions 4):** temperature 0, seed 42: 14 × 3 = 42 runs, 2.1 h. Reported next to the main
+  pass, never pooled with it.
+
+Every run reproduced its fault on the first sandbox run. No run in the final data hit a Docker error; the two
+stopped gen-004 runs were done again (EVAL_PROTOCOL "Changes during the run").
+
+Intervals: 95% case-cluster bootstrap (14 cases resampled, 10,000 times); Wilson in brackets, for reference only.
+
+### Main pass (210 runs)
+
+| Metric | v1 (zero-shot) | v3 + advanced | v5 + advanced |
+|---|---|---|---|
+| **First fix passes** (main metric) | 36% (25/70); 16–57% [26–47%] | 57% (40/70); 37–77% [45–68%] | 57% (40/70); 37–77% [45–68%] |
+| Fixed within 3 | 61% (43/70); 40–81% [50–72%] | 86% (60/70); 73–96% [76–92%] | 81% (57/70); 64–96% [71–89%] |
+| Action accuracy (secondary) | 29% (20/70); 9–50% | 50% (35/70); 27–73% | 51% (36/70); 30–73% |
+| True reasons, **preliminary** | 39% (48/122); 27–56% | 53% (52/98); 39–71% | 55% (51/93); 41–73% |
+| Copied reasons, **preliminary** | 0% (0/122) | 13% (13/98); 3–27% | 12% (11/93); 2–26% |
+
+**True and copied reasons are preliminary, hand labels pending (protocol filter acceptance rule).** They are
+the faithfulness filter's verdicts on every applied fix. The 50-reason blind sheet is generated
+(`experiments/eval_loo/labels/to_label.csv`, 17 / 17 / 16 reasons from v1 / v3 / v5, configs hidden; the key is
+in `key.json`, not to be opened before labelling). If the filter agrees with the hand labels on fewer than 80%
+of them, these two rows are reported again from the hand labels and marked unreliable. v1 retrieves nothing,
+so its 0% copied is true by construction.
+
+Action accuracy, first LLM action (exact / same target / verified alternative / wrong / none): v1 8 / 12 / 0 /
+48 / 2; v3 25 / 6 / 4 / 35 / 0; v5 28 / 5 / 3 / 33 / 1.
+
+**Paired comparisons** (per case, later config minus earlier one; Holm over the 3 pairs of each metric):
+
+| Metric | Pair | Difference, 95% interval | Sign test better / worse, p, Holm p | Verdict |
+|---|---|---|---|---|
+| First fix passes | v3 − v1 | +21% (+1% to +44%) | 5 / 2, 0.453, 0.906 | no difference shown |
+| First fix passes | v5 − v1 | +21% (−1% to +46%) | 6 / 2, 0.289, 0.867 | no difference shown |
+| First fix passes | v5 − v3 | +0% (−7% to +6%) | 2 / 1, 1.000, 1.000 | no difference shown |
+| Fixed within 3 | v3 − v1 | +24% (+4% to +46%) | 8 / 2, 0.109, 0.328 | no difference shown |
+| Fixed within 3 | v5 − v1 | +20% (+1% to +40%) | 8 / 2, 0.109, 0.328 | no difference shown |
+| Fixed within 3 | v5 − v3 | −4% (−13% to +4%) | 2 / 3, 1.000, 1.000 | no difference shown |
+| True reasons (preliminary) | v3 − v1 | +14% (−2% to +33%) | 8 / 4, 0.388, 0.775 | no difference shown |
+| True reasons (preliminary) | v5 − v1 | +15% (+0% to +34%) | 8 / 2, 0.109, 0.328 | no difference shown |
+| True reasons (preliminary) | v5 − v3 | +2% (−5% to +8%) | 6 / 3, 0.508, 0.775 | no difference shown |
+| Copied reasons (preliminary) | v3 − v1 | +13% (+3% to +27%) | 5 / 0, 0.062, 0.188 | no difference shown |
+| Copied reasons (preliminary) | v5 − v1 | +12% (+2% to +26%) | 4 / 0, 0.125, 0.250 | no difference shown |
+| Copied reasons (preliminary) | v5 − v3 | −1% (−5% to +3%) | 3 / 2, 1.000, 1.000 | no difference shown |
+
+**Verdict under the declared rule: no configuration is shown better than another on any metric.** For
+retrieval against v1, several bootstrap intervals exclude 0 (first fix passes v3 − v1, fixed within 3 for
+both), but the sign test doesn't pass: only 7 to 10 of the 14 cases differ at all, and the gain sits on a few
+cases (below). v5 and v3 are indistinguishable (40 / 70 each, 3 cases differ).
+
+McNemar on the 70 (case, seed) pairs, reported only (it ignores the clustering): in `main/summary.json`.
+
+### Per case, first fix passes out of 5 (fixed within 3 in brackets)
+
+| Case | Family | Sibling in memory | v1 | v3 + adv | v5 + adv |
+|---|---|---|---|---|---|
+| fault-001 | version mismatch | yes | 1 (4) | 1 (5) | 1 (5) |
+| gen-001 | version mismatch | yes | 0 (4) | **5** (5) | **5** (5) |
+| gen-007 | version mismatch | yes | 0 (2) | **5** (5) | **5** (5) |
+| gen-008 | version mismatch | yes | 0 (3) | 1 (5) | 1 (5) |
+| gen-005 | env var | yes | 0 (0) | 0 (1) | 0 (0) |
+| gen-012 | env var | yes | 0 (0) | **5** (5) | **5** (5) |
+| gen-013 | env var | yes | 0 (0) | 0 (5) | 0 (3) |
+| gen-004 | Python version | yes | 3 (4) | 2 (4) | 2 (5) |
+| gen-011 | Python version | yes | 1 (1) | 1 (3) | 1 (3) |
+| gen-002 | missing dependency | no | 5 (5) | 5 (5) | 5 (5) |
+| gen-003 | incompatible pin | no | 5 (5) | 5 (5) | 5 (5) |
+| gen-006 | system library | no | 2 (5) | 3 (3) | 4 (4) |
+| gen-009 | incompatible pin | no | 5 (5) | 4 (4) | 2 (2) |
+| gen-010 | incompatible pin | no | 3 (5) | 3 (5) | 4 (5) |
+
+**The 5 cases with no same-fix sibling (descriptive):**
+
+| Metric | v1 | v3 + adv | v5 + adv |
+|---|---|---|---|
+| First fix passes | 80% (20/25) | 80% (20/25) | 80% (20/25) |
+| Fixed within 3 | 100% (25/25) | 88% (22/25) | 84% (21/25) |
+| Action accuracy | 68% (17/25) | 68% (17/25) | 64% (16/25) |
+| True reasons, preliminary | 83% (25/30) | 75% (21/28) | 83% (20/24) |
+| Copied reasons, preliminary | 0% (0/30) | 7% (2/28) | 8% (2/24) |
+
+On the 9 sibling cases, first fix passes are v1 5 / 45, v3 20 / 45, v5 20 / 45.
+
+### What happened
+
+- **Retrieval's whole gain is on cases whose sibling's fix is the answer.** Three cases go from 0 / 5 to
+  5 / 5: gen-001 and gen-007 (their top 3 are the three other MLflow-client faults) and gen-012 (gen-005's
+  `MLFLOW_TRACKING_URI` fix). On the 5 no-sibling cases, retrieval adds nothing on the first fix (80% for all
+  three) and is lower on fixed within 3 (88% and 84% against 100%).
+- **Retrieval also misleads.** gen-013 (tracking URI empty, `Run ... not found` at evaluate) retrieves
+  gen-001 and gen-008 first, and all 10 retrieval runs start with `pin_package mlflow==2.17.2`, which fails;
+  the env-var fix comes second (fixed 5 / 5 with v3, 3 / 5 with v5). gen-005 starts with the same MLflow pin
+  in 8 of 10 runs and is fixed once in 10. On gen-009 (xgboost 3.0.0), the retrieved Python-version faults
+  lead to `set_python_version 3.10`, a verified alternative that passes, in 5 of 10 runs, while v1 pins
+  xgboost 5 / 5; v5 then gives up or finds no valid fix in 3 runs.
+- **The twins gen-008 and fault-001** have the same error line as gen-001, but with each other left out
+  their top 3 holds only two MLflow-pin faults plus gen-005 (an env-var fix). 8 of the 10 retrieval runs
+  start with `set_env_var GIT_PYTHON_REFRESH=quiet` (a warning in the tail of all four MLflow-client faults),
+  and pin MLflow second; all 20 are fixed within 3.
+- **Python version (gen-004, gen-011) is weak in every config,** LLM only: 1–3 / 5 first fixes, and gen-011's
+  first actions are mostly build tools (`build-essential`, `clang`, `gdal`). Section 10's rule fixes both
+  without the LLM; it was off here on purpose.
+- **Env-var faults are never fixed without retrieval** (v1: 0 / 15, even within 3 fixes).
+- **v5's PYTHON line changes nothing measurable** against v3: 40 / 70 each, and per family the totals differ
+  by at most one run.
+
+### Temperature 0 pass (42 runs, one per case and config; descriptive)
+
+| Metric | v1 | v3 + adv | v5 + adv |
+|---|---|---|---|
+| First fix passes | 43% (6/14) | 64% (9/14) | 64% (9/14) |
+| Fixed within 3 | 71% (10/14) | 93% (13/14) | 93% (13/14) |
+| Action accuracy | 36% (5/14) | 57% (8/14) | 57% (8/14) |
+| True reasons, preliminary | 35% (9/26) | 39% (7/18) | 42% (8/19) |
+| Copied reasons, preliminary | 0% (0/26) | 33% (6/18) | 21% (4/19) |
+
+The same picture as the main pass: the retrieval configs win gen-001, gen-007 and gen-012 and lose nothing,
+v3 and v5 pass the same cases, and no comparison is shown under the rule (first fix passes: sign test 3 / 0,
+Holm p 0.75). At temperature 0 the no-sibling cases all pass on the first fix in every config.
+
+### Lessons
+
+- **Section 4's choice holds, now with intervals:** retrieval raises first fix passes from 36% to 57%, but on
+  14 cases that isn't shown under the declared rule, and it comes from three sibling cases. The default stays
+  v3 + advanced; v5 adds nothing measurable.
+- **Retrieval is a copying mechanism here, in both directions:** it brings the right fix when a neighbour has
+  it, and a wrong first fix when the nearest neighbour is the MLflow pin (gen-005, gen-013, the twins). A
+  memory with more distinct faults per error family, or a check that a retrieved fix's error line matches,
+  are the next things to try (ROADMAP 5b).
+- **Reasons are true about half the time with retrieval and 39% without (filter, preliminary)**, and about
+  one in eight retrieval reasons names a term only a retrieved other fault has. Both wait for the hand labels.
+
+Logs: `experiments/eval_loo/main/` and `experiments/eval_loo/t0/` (per run: `result.json`, the fix and sandbox
+logs; `summary.md` and `summary.json` per pass), the shared first runs in `experiments/eval_loo/_initial/`,
+run logs `main.log` and `t0.log`. Analysis: `experiments/eval_loo/analyze.py --pass main|t0`.
+
+---
+
 ## Not run yet
 
 - DPO training (roadmap item 9 step 4); the pairs are in section 5.
@@ -617,3 +767,5 @@ Logs: `experiments/runtime_retry/` (create reports and outputs).
   each has only one variant that breaks, and it is in memory.
 - 4 test faults are few: one fault can change a total by 25 points. Read the tables as directions,
   not as measurements.
+- Section 12: the 50 blind hand labels (true and copied reasons stay preliminary until then), and the
+  fine-tuned models on the 4 test faults (EVAL_PROTOCOL section 6, 40 runs; the runner has no support yet).

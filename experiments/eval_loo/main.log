@@ -1,0 +1,232 @@
+main: 0 of 210 runs done, 210 left
+gen-013: first sandbox run done (failed at evaluate, 22 s)
+[1/210] v3-advanced gen-013 seed 101: first fix no, fixed yes, 2 fix(es), 56 s
+[2/210] v3-advanced gen-013 seed 102: first fix no, fixed yes, 2 fix(es), 69 s
+[3/210] v5-advanced gen-013 seed 104: first fix no, fixed yes, 2 fix(es), 64 s
+[4/210] v5-advanced gen-013 seed 101: first fix no, fixed yes, 2 fix(es), 63 s
+[5/210] v1 gen-013 seed 102: first fix no, fixed no, 3 fix(es), 479 s
+[6/210] v1 gen-013 seed 104: first fix no, fixed no, 2 fix(es), 35 s
+[7/210] v1 gen-013 seed 105: first fix no, fixed no, 1 fix(es), 9 s
+[8/210] v1 gen-013 seed 103: first fix no, fixed no, 3 fix(es), 566 s
+[9/210] v5-advanced gen-013 seed 102: first fix no, fixed yes, 2 fix(es), 71 s
+[10/210] v5-advanced gen-013 seed 105: first fix no, fixed no, 2 fix(es), 48 s
+[11/210] v3-advanced gen-013 seed 103: first fix no, fixed yes, 2 fix(es), 56 s
+[12/210] v3-advanced gen-013 seed 105: first fix no, fixed yes, 2 fix(es), 74 s
+[13/210] v3-advanced gen-013 seed 104: first fix no, fixed yes, 2 fix(es), 62 s
+[14/210] v1 gen-013 seed 101: first fix no, fixed no, 1 fix(es), 7 s
+[15/210] v5-advanced gen-013 seed 103: first fix no, fixed no, 2 fix(es), 43 s
+gen-007: first sandbox run done (failed at train, 190 s)
+[16/210] v3-advanced gen-007 seed 101: first fix passed, fixed yes, 1 fix(es), 30 s
+[17/210] v5-advanced gen-007 seed 105: first fix passed, fixed yes, 1 fix(es), 28 s
+[18/210] v5-advanced gen-007 seed 104: first fix passed, fixed yes, 1 fix(es), 28 s
+[19/210] v1 gen-007 seed 103: first fix no, fixed no, 3 fix(es), 908 s
+[20/210] v5-advanced gen-007 seed 101: first fix passed, fixed yes, 1 fix(es), 29 s
+[21/210] v3-advanced gen-007 seed 105: first fix passed, fixed yes, 1 fix(es), 28 s
+[22/210] v1 gen-007 seed 101: first fix no, fixed yes, 2 fix(es), 224 s
+[23/210] v5-advanced gen-007 seed 103: first fix passed, fixed yes, 1 fix(es), 29 s
+[24/210] v1 gen-007 seed 105: first fix no, fixed yes, 2 fix(es), 217 s
+[25/210] v3-advanced gen-007 seed 104: first fix passed, fixed yes, 1 fix(es), 30 s
+[26/210] v1 gen-007 seed 104: first fix no, fixed no, 2 fix(es), 42 s
+[27/210] v1 gen-007 seed 102: first fix no, fixed no, 3 fix(es), 219 s
+[28/210] v5-advanced gen-007 seed 102: first fix passed, fixed yes, 1 fix(es), 30 s
+[29/210] v3-advanced gen-007 seed 103: first fix passed, fixed yes, 1 fix(es), 29 s
+[30/210] v3-advanced gen-007 seed 102: first fix passed, fixed yes, 1 fix(es), 28 s
+gen-001: first sandbox run done (failed at train, 190 s)
+[31/210] v5-advanced gen-001 seed 104: first fix passed, fixed yes, 1 fix(es), 29 s
+[32/210] v3-advanced gen-001 seed 105: first fix passed, fixed yes, 1 fix(es), 29 s
+[33/210] v3-advanced gen-001 seed 103: first fix passed, fixed yes, 1 fix(es), 28 s
+[34/210] v1 gen-001 seed 101: first fix no, fixed yes, 2 fix(es), 248 s
+[35/210] v3-advanced gen-001 seed 102: first fix passed, fixed yes, 1 fix(es), 29 s
+[36/210] v1 gen-001 seed 105: first fix no, fixed yes, 3 fix(es), 432 s
+[37/210] v5-advanced gen-001 seed 101: first fix passed, fixed yes, 1 fix(es), 29 s
+[38/210] v3-advanced gen-001 seed 104: first fix passed, fixed yes, 1 fix(es), 28 s
+[39/210] v1 gen-001 seed 102: first fix no, fixed yes, 3 fix(es), 448 s
+[40/210] v5-advanced gen-001 seed 105: first fix passed, fixed yes, 1 fix(es), 29 s
+[41/210] v5-advanced gen-001 seed 102: first fix passed, fixed yes, 1 fix(es), 28 s
+[42/210] v5-advanced gen-001 seed 103: first fix passed, fixed yes, 1 fix(es), 28 s
+[43/210] v1 gen-001 seed 103: first fix no, fixed no, 3 fix(es), 530 s
+[44/210] v3-advanced gen-001 seed 101: first fix passed, fixed yes, 1 fix(es), 29 s
+[45/210] v1 gen-001 seed 104: first fix no, fixed yes, 3 fix(es), 252 s
+gen-009: first sandbox run done (failed at build, 127 s)
+[46/210] v1 gen-009 seed 101: first fix passed, fixed yes, 1 fix(es), 268 s
+[47/210] v3-advanced gen-009 seed 104: first fix passed, fixed yes, 1 fix(es), 363 s
+[48/210] v3-advanced gen-009 seed 102: first fix passed, fixed yes, 1 fix(es), 94 s
+[49/210] v5-advanced gen-009 seed 101: first fix passed, fixed yes, 1 fix(es), 37 s
+[50/210] v1 gen-009 seed 105: first fix passed, fixed yes, 1 fix(es), 36 s
+[51/210] v5-advanced gen-009 seed 105: first fix no, fixed no, 1 fix(es), 48 s
+[52/210] v1 gen-009 seed 103: first fix passed, fixed yes, 1 fix(es), 30 s
+[53/210] v3-advanced gen-009 seed 103: first fix passed, fixed yes, 1 fix(es), 57 s
+[54/210] v3-advanced gen-009 seed 101: first fix passed, fixed yes, 1 fix(es), 76 s
+[55/210] v1 gen-009 seed 102: first fix passed, fixed yes, 1 fix(es), 365 s
+[56/210] v5-advanced gen-009 seed 103: first fix passed, fixed yes, 1 fix(es), 56 s
+[57/210] v3-advanced gen-009 seed 105: first fix no, fixed no, 1 fix(es), 24 s
+[58/210] v5-advanced gen-009 seed 104: first fix no, fixed no, 1 fix(es), 23 s
+[59/210] v1 gen-009 seed 104: first fix passed, fixed yes, 1 fix(es), 38 s
+[60/210] v5-advanced gen-009 seed 102: first fix no, fixed no, 1 fix(es), 25 s
+gen-003: first sandbox run done (failed at train, 211 s)
+[61/210] v5-advanced gen-003 seed 105: first fix passed, fixed yes, 1 fix(es), 276 s
+[62/210] v3-advanced gen-003 seed 101: first fix passed, fixed yes, 1 fix(es), 28 s
+[63/210] v1 gen-003 seed 101: first fix passed, fixed yes, 1 fix(es), 284 s
+[64/210] v5-advanced gen-003 seed 102: first fix passed, fixed yes, 1 fix(es), 28 s
+[65/210] v3-advanced gen-003 seed 103: first fix passed, fixed yes, 1 fix(es), 28 s
+[66/210] v1 gen-003 seed 102: first fix passed, fixed yes, 1 fix(es), 27 s
+[67/210] v3-advanced gen-003 seed 105: first fix passed, fixed yes, 1 fix(es), 35 s
+[68/210] v3-advanced gen-003 seed 102: first fix passed, fixed yes, 1 fix(es), 35 s
+[69/210] v5-advanced gen-003 seed 103: first fix passed, fixed yes, 1 fix(es), 35 s
+[70/210] v5-advanced gen-003 seed 104: first fix passed, fixed yes, 1 fix(es), 35 s
+[71/210] v3-advanced gen-003 seed 104: first fix passed, fixed yes, 1 fix(es), 28 s
+[72/210] v5-advanced gen-003 seed 101: first fix passed, fixed yes, 1 fix(es), 35 s
+[73/210] v1 gen-003 seed 105: first fix passed, fixed yes, 1 fix(es), 33 s
+[74/210] v1 gen-003 seed 104: first fix passed, fixed yes, 1 fix(es), 28 s
+[75/210] v1 gen-003 seed 103: first fix passed, fixed yes, 1 fix(es), 33 s
+gen-010: first sandbox run done (failed at health, 212 s)
+[76/210] v3-advanced gen-010 seed 101: first fix no, fixed yes, 2 fix(es), 444 s
+[77/210] v1 gen-010 seed 101: first fix no, fixed yes, 2 fix(es), 503 s
+[78/210] v1 gen-010 seed 104: first fix passed, fixed yes, 1 fix(es), 34 s
+[79/210] v3-advanced gen-010 seed 102: first fix passed, fixed yes, 1 fix(es), 52 s
+[80/210] v1 gen-010 seed 105: first fix no, fixed yes, 2 fix(es), 66 s
+[81/210] v3-advanced gen-010 seed 105: first fix no, fixed yes, 2 fix(es), 550 s
+[82/210] v3-advanced gen-010 seed 103: first fix passed, fixed yes, 1 fix(es), 36 s
+[83/210] v5-advanced gen-010 seed 103: first fix passed, fixed yes, 1 fix(es), 29 s
+[84/210] v5-advanced gen-010 seed 101: first fix no, fixed yes, 2 fix(es), 67 s
+[85/210] v5-advanced gen-010 seed 102: first fix passed, fixed yes, 1 fix(es), 54 s
+[86/210] v5-advanced gen-010 seed 105: first fix passed, fixed yes, 1 fix(es), 34 s
+[87/210] v1 gen-010 seed 103: first fix passed, fixed yes, 1 fix(es), 27 s
+[88/210] v3-advanced gen-010 seed 104: first fix passed, fixed yes, 1 fix(es), 28 s
+[89/210] v5-advanced gen-010 seed 104: first fix passed, fixed yes, 1 fix(es), 29 s
+[90/210] v1 gen-010 seed 102: first fix passed, fixed yes, 1 fix(es), 213 s
+gen-006: first sandbox run done (failed at train, 191 s)
+[91/210] v3-advanced gen-006 seed 101: first fix no, fixed no, 3 fix(es), 169 s
+[92/210] v5-advanced gen-006 seed 101: first fix no, fixed no, 3 fix(es), 154 s
+[93/210] v5-advanced gen-006 seed 104: first fix passed, fixed yes, 1 fix(es), 234 s
+[94/210] v1 gen-006 seed 102: first fix no, fixed yes, 2 fix(es), 41 s
+[95/210] v5-advanced gen-006 seed 102: first fix passed, fixed yes, 1 fix(es), 226 s
+[96/210] v3-advanced gen-006 seed 102: first fix no, fixed no, 3 fix(es), 173 s
+[97/210] v3-advanced gen-006 seed 105: first fix passed, fixed yes, 1 fix(es), 35 s
+[98/210] v1 gen-006 seed 105: first fix no, fixed yes, 2 fix(es), 38 s
+[99/210] v5-advanced gen-006 seed 103: first fix passed, fixed yes, 1 fix(es), 29 s
+[100/210] v3-advanced gen-006 seed 103: first fix passed, fixed yes, 1 fix(es), 29 s
+[101/210] v5-advanced gen-006 seed 105: first fix passed, fixed yes, 1 fix(es), 32 s
+[102/210] v1 gen-006 seed 101: first fix no, fixed yes, 2 fix(es), 38 s
+[103/210] v1 gen-006 seed 104: first fix passed, fixed yes, 1 fix(es), 27 s
+[104/210] v1 gen-006 seed 103: first fix passed, fixed yes, 1 fix(es), 28 s
+[105/210] v3-advanced gen-006 seed 104: first fix passed, fixed yes, 1 fix(es), 30 s
+gen-008: first sandbox run done (failed at train, 200 s)
+[106/210] v1 gen-008 seed 105: first fix no, fixed yes, 2 fix(es), 402 s
+[107/210] v3-advanced gen-008 seed 103: first fix no, fixed yes, 2 fix(es), 236 s
+[108/210] v1 gen-008 seed 103: first fix no, fixed no, 3 fix(es), 701 s
+[109/210] v5-advanced gen-008 seed 103: first fix no, fixed yes, 2 fix(es), 90 s
+[110/210] v5-advanced gen-008 seed 102: first fix no, fixed yes, 2 fix(es), 61 s
+[111/210] v3-advanced gen-008 seed 105: first fix passed, fixed yes, 1 fix(es), 30 s
+[112/210] v1 gen-008 seed 102: first fix no, fixed yes, 3 fix(es), 258 s
+[113/210] v3-advanced gen-008 seed 101: first fix no, fixed yes, 2 fix(es), 68 s
+[114/210] v1 gen-008 seed 101: first fix no, fixed yes, 2 fix(es), 241 s
+[115/210] v1 gen-008 seed 104: first fix no, fixed no, 3 fix(es), 456 s
+[116/210] v3-advanced gen-008 seed 102: first fix no, fixed yes, 2 fix(es), 63 s
+[117/210] v3-advanced gen-008 seed 104: first fix no, fixed yes, 2 fix(es), 62 s
+[118/210] v5-advanced gen-008 seed 101: first fix passed, fixed yes, 1 fix(es), 30 s
+[119/210] v5-advanced gen-008 seed 104: first fix no, fixed yes, 2 fix(es), 62 s
+[120/210] v5-advanced gen-008 seed 105: first fix no, fixed yes, 2 fix(es), 64 s
+fault-001: first sandbox run done (failed at train, 214 s)
+[121/210] v1 fault-001 seed 104: first fix no, fixed yes, 3 fix(es), 284 s
+[122/210] v3-advanced fault-001 seed 103: first fix no, fixed yes, 2 fix(es), 88 s
+[123/210] v1 fault-001 seed 101: first fix passed, fixed yes, 1 fix(es), 58 s
+[124/210] v5-advanced fault-001 seed 105: first fix no, fixed yes, 2 fix(es), 90 s
+[125/210] v5-advanced fault-001 seed 103: first fix no, fixed yes, 2 fix(es), 90 s
+[126/210] v3-advanced fault-001 seed 102: first fix no, fixed yes, 2 fix(es), 84 s
+[127/210] v5-advanced fault-001 seed 102: first fix no, fixed yes, 2 fix(es), 87 s
+[128/210] v5-advanced fault-001 seed 101: first fix passed, fixed yes, 1 fix(es), 41 s
+[129/210] v3-advanced fault-001 seed 104: first fix no, fixed yes, 2 fix(es), 78 s
+[130/210] v1 fault-001 seed 102: first fix no, fixed yes, 3 fix(es), 359 s
+[131/210] v3-advanced fault-001 seed 101: first fix no, fixed yes, 2 fix(es), 95 s
+[132/210] v1 fault-001 seed 105: first fix no, fixed yes, 2 fix(es), 471 s
+[133/210] v5-advanced fault-001 seed 104: first fix no, fixed yes, 2 fix(es), 75 s
+[134/210] v1 fault-001 seed 103: first fix no, fixed no, 3 fix(es), 538 s
+[135/210] v3-advanced fault-001 seed 105: first fix passed, fixed yes, 1 fix(es), 31 s
+gen-012: first sandbox run done (failed at train, 249 s)
+[136/210] v1 gen-012 seed 104: first fix no, fixed no, 3 fix(es), 786 s
+[137/210] v3-advanced gen-012 seed 102: first fix passed, fixed yes, 1 fix(es), 204 s
+[138/210] v5-advanced gen-012 seed 102: first fix passed, fixed yes, 1 fix(es), 30 s
+[139/210] v5-advanced gen-012 seed 104: first fix passed, fixed yes, 1 fix(es), 31 s
+[140/210] v3-advanced gen-012 seed 101: first fix passed, fixed yes, 1 fix(es), 30 s
+[141/210] v1 gen-012 seed 105: first fix no, fixed no, 1 fix(es), 20 s
+[142/210] v3-advanced gen-012 seed 103: first fix passed, fixed yes, 1 fix(es), 30 s
+[143/210] v5-advanced gen-012 seed 105: first fix passed, fixed yes, 1 fix(es), 30 s
+[144/210] v1 gen-012 seed 102: first fix no, fixed no, 3 fix(es), 437 s
+[145/210] v3-advanced gen-012 seed 104: first fix passed, fixed yes, 1 fix(es), 38 s
+[146/210] v1 gen-012 seed 103: first fix no, fixed no, 2 fix(es), 275 s
+[147/210] v3-advanced gen-012 seed 105: first fix passed, fixed yes, 1 fix(es), 48 s
+[148/210] v5-advanced gen-012 seed 103: first fix passed, fixed yes, 1 fix(es), 38 s
+[149/210] v1 gen-012 seed 101: first fix no, fixed no, 1 fix(es), 25 s
+[150/210] v5-advanced gen-012 seed 101: first fix passed, fixed yes, 1 fix(es), 38 s
+gen-011: first sandbox run done (failed at build, 24 s)
+[151/210] v3-advanced gen-011 seed 104: first fix no, fixed no, 3 fix(es), 211 s
+[152/210] v1 gen-011 seed 101: first fix no, fixed no, 3 fix(es), 192 s
+[153/210] v5-advanced gen-011 seed 105: first fix no, fixed yes, 3 fix(es), 342 s
+[154/210] v5-advanced gen-011 seed 101: first fix passed, fixed yes, 1 fix(es), 31 s
+[155/210] v1 gen-011 seed 104: first fix no, fixed no, 3 fix(es), 128 s
+[156/210] v1 gen-011 seed 105: first fix passed, fixed yes, 1 fix(es), 204 s
+[157/210] v3-advanced gen-011 seed 101: first fix passed, fixed yes, 1 fix(es), 30 s
+[158/210] v5-advanced gen-011 seed 104: first fix no, fixed no, 3 fix(es), 271 s
+[159/210] v1 gen-011 seed 102: first fix no, fixed no, 3 fix(es), 96 s
+[160/210] v5-advanced gen-011 seed 103: first fix no, fixed no, 3 fix(es), 159 s
+[161/210] v1 gen-011 seed 103: first fix no, fixed no, 3 fix(es), 126 s
+[162/210] v3-advanced gen-011 seed 103: first fix no, fixed yes, 2 fix(es), 256 s
+[163/210] v3-advanced gen-011 seed 102: first fix no, fixed yes, 2 fix(es), 276 s
+[164/210] v5-advanced gen-011 seed 102: first fix no, fixed yes, 3 fix(es), 340 s
+[165/210] v3-advanced gen-011 seed 105: first fix no, fixed no, 3 fix(es), 129 s
+gen-002: first sandbox run done (failed at train, 163 s)
+[166/210] v1 gen-002 seed 101: first fix passed, fixed yes, 1 fix(es), 326 s
+[167/210] v3-advanced gen-002 seed 104: first fix passed, fixed yes, 1 fix(es), 28 s
+[168/210] v5-advanced gen-002 seed 103: first fix passed, fixed yes, 1 fix(es), 28 s
+[169/210] v5-advanced gen-002 seed 101: first fix passed, fixed yes, 1 fix(es), 27 s
+[170/210] v1 gen-002 seed 102: first fix passed, fixed yes, 1 fix(es), 27 s
+[171/210] v1 gen-002 seed 104: first fix passed, fixed yes, 1 fix(es), 27 s
+[172/210] v3-advanced gen-002 seed 103: first fix passed, fixed yes, 1 fix(es), 28 s
+[173/210] v5-advanced gen-002 seed 104: first fix passed, fixed yes, 1 fix(es), 28 s
+[174/210] v3-advanced gen-002 seed 105: first fix passed, fixed yes, 1 fix(es), 27 s
+[175/210] v3-advanced gen-002 seed 102: first fix passed, fixed yes, 1 fix(es), 28 s
+[176/210] v1 gen-002 seed 105: first fix passed, fixed yes, 1 fix(es), 27 s
+[177/210] v1 gen-002 seed 103: first fix passed, fixed yes, 1 fix(es), 26 s
+[178/210] v5-advanced gen-002 seed 102: first fix passed, fixed yes, 1 fix(es), 28 s
+[179/210] v5-advanced gen-002 seed 105: first fix passed, fixed yes, 1 fix(es), 28 s
+[180/210] v3-advanced gen-002 seed 101: first fix passed, fixed yes, 1 fix(es), 28 s
+gen-005: first sandbox run done (failed at train, 258 s)
+[181/210] v1 gen-005 seed 102: first fix no, fixed no, 3 fix(es), 415 s
+[182/210] v5-advanced gen-005 seed 102: first fix no, fixed no, 2 fix(es), 136 s
+[183/210] v3-advanced gen-005 seed 103: first fix no, fixed no, 2 fix(es), 128 s
+[184/210] v5-advanced gen-005 seed 101: first fix no, fixed no, 2 fix(es), 131 s
+[185/210] v3-advanced gen-005 seed 105: first fix no, fixed no, 3 fix(es), 459 s
+[186/210] v5-advanced gen-005 seed 104: first fix no, fixed no, 2 fix(es), 135 s
+[187/210] v5-advanced gen-005 seed 103: first fix no, fixed no, 2 fix(es), 130 s
+[188/210] v5-advanced gen-005 seed 105: first fix no, fixed no, 3 fix(es), 270 s
+[189/210] v1 gen-005 seed 105: first fix no, fixed no, 3 fix(es), 557 s
+[190/210] v1 gen-005 seed 101: first fix no, fixed no, 1 fix(es), 18 s
+[191/210] v3-advanced gen-005 seed 104: first fix no, fixed yes, 2 fix(es), 192 s
+[192/210] v1 gen-005 seed 104: first fix no, fixed no, 3 fix(es), 555 s
+[193/210] v3-advanced gen-005 seed 101: first fix no, fixed no, 2 fix(es), 161 s
+[194/210] v3-advanced gen-005 seed 102: first fix no, fixed no, 2 fix(es), 131 s
+[195/210] v1 gen-005 seed 103: first fix no, fixed no, 2 fix(es), 293 s
+gen-004: first sandbox run done (failed at build, 41 s)
+[196/210] v5-advanced gen-004 seed 103: first fix passed, fixed yes, 1 fix(es), 32 s
+[197/210] v3-advanced gen-004 seed 101: first fix no, fixed yes, 2 fix(es), 246 s
+[198/210] v3-advanced gen-004 seed 105: first fix no, fixed no, 3 fix(es), 180 s
+[199/210] v1 gen-004 seed 104: first fix passed, fixed yes, 1 fix(es), 197 s
+[200/210] v1 gen-004 seed 101: first fix no, fixed yes, 2 fix(es), 280 s
+STOP: v1 gen-004 seed 105: a Docker error is in the sandbox output; the run was deleted
+main: 200 of 210 runs done, 10 left
+gen-004: first sandbox run reused (failed at build, 0 s)
+[1/10] v1 gen-004 seed 105: first fix no, fixed no, 3 fix(es), 284 s
+[2/10] v5-advanced gen-004 seed 102: first fix no, fixed yes, 2 fix(es), 247 s
+STOP: v3-advanced gen-004 seed 103: a Docker error is in the sandbox output; the run was deleted
+main: 202 of 210 runs done, 8 left
+gen-004: first sandbox run reused (failed at build, 0 s)
+[1/8] v3-advanced gen-004 seed 103: first fix no, fixed yes, 2 fix(es), 80 s
+[2/8] v3-advanced gen-004 seed 104: first fix passed, fixed yes, 1 fix(es), 208 s
+[3/8] v1 gen-004 seed 103: first fix passed, fixed yes, 1 fix(es), 34 s
+[4/8] v5-advanced gen-004 seed 104: first fix passed, fixed yes, 1 fix(es), 30 s
+[5/8] v5-advanced gen-004 seed 105: first fix no, fixed yes, 3 fix(es), 396 s
+[6/8] v5-advanced gen-004 seed 101: first fix no, fixed yes, 2 fix(es), 254 s
+[7/8] v1 gen-004 seed 102: first fix passed, fixed yes, 1 fix(es), 36 s
+[8/8] v3-advanced gen-004 seed 102: first fix passed, fixed yes, 1 fix(es), 29 s
+done

@@ -1,0 +1,141 @@
+{
+ "pass": "main",
+ "config": "v3-advanced",
+ "case": "gen-001",
+ "variant": "mlflow_client_3_1_4",
+ "family": "version_mismatch",
+ "seed": 103,
+ "temperature": 0.7,
+ "model": "qwen2.5-coder:7b",
+ "model_digest": "dae161e27b0e90dd1856c8bb3209201fd6736d8eb66298e75ed87571486f4364",
+ "prompt_version": "diagnose_v3",
+ "prompt_sha256": "90877183f8a89b0e48bdfb4b462bd6170a5527c95bdb98adfc45a6393a747b62",
+ "retriever": "advanced",
+ "memory": "loo",
+ "memory_ids": [
+  "fault-001",
+  "gen-002",
+  "gen-003",
+  "gen-004",
+  "gen-005",
+  "gen-006",
+  "gen-007",
+  "gen-008",
+  "gen-009",
+  "gen-010",
+  "gen-011",
+  "gen-012",
+  "gen-013"
+ ],
+ "memory_sha256": "b99c52823cda788a9fd070440fa0c4ee8495c2094a4186a77b0319f3e62bac6d",
+ "python_rule": false,
+ "initial": "failed at train",
+ "initial_attempt_id": "20261013T175610Z-818dce",
+ "initial_shared": true,
+ "final_ok": true,
+ "stopped_because": "passed",
+ "first_fix_passed": true,
+ "fixes_to_pass": 1,
+ "attempts": [
+  {
+   "n": 1,
+   "stage": "train",
+   "error_tail": [
+    "python pipeline/train.py",
+    "2026/10/13 17:59:14 INFO mlflow.tracking.fluent: Experiment with name 'mlops-zoomcamp-experiment' does not exist. Creating a new experiment.",
+    "2026/10/13 17:59:17 WARNING mlflow.utils.git_utils: Failed to import Git (the Git executable is probably not on your PATH), so Git SHA is not available. Error: Failed to initialize: Bad git executable.",
+    "The git executable must be specified in one of the following ways:",
+    "    - be included in your $PATH",
+    "    - be set via $GIT_PYTHON_GIT_EXECUTABLE",
+    "    - explicitly set via git.refresh(<full-path-to-git-executable>)",
+    "All git commands will error until this is rectified.",
+    "This initial message can be silenced or aggravated in the future by setting the",
+    "$GIT_PYTHON_REFRESH environment variable. Use one of the following values:",
+    "    - quiet|q|silence|s|silent|none|n|0: for no message or exception",
+    "    - warn|w|warning|log|l|1: for a warning message (logging level CRITICAL, displayed by default)",
+    "    - error|e|exception|raise|r|2: for a raised exception",
+    "Example:",
+    "    export GIT_PYTHON_REFRESH=quiet",
+    "2026/10/13 17:59:18 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.",
+    "🏃 View run salty-roo-308 at: http://mlflow:5000/#/experiments/1/runs/529bb2fd49b7421c80c2204d22e37d84",
+    "🧪 View experiment at: http://mlflow:5000/#/experiments/1",
+    "Traceback (most recent call last):",
+    "  File \"/app/pipeline/train.py\", line 96, in <module>",
+    "    main()",
+    "  File \"/app/pipeline/train.py\", line 86, in main",
+    "    mlflow.xgboost.log_model(model, \"model\")",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/xgboost/__init__.py\", line 278, in log_model",
+    "    return Model.log(",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/models/model.py\", line 1161, in log",
+    "    model = mlflow.initialize_logged_model(",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/tracking/fluent.py\", line 2130, in initialize_logged_model",
+    "    model = _create_logged_model(",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/tracking/fluent.py\", line 2257, in _create_logged_model",
+    "    return MlflowClient().create_logged_model(",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/tracking/client.py\", line 5369, in create_logged_model",
+    "    return self._tracking_client.create_logged_model(",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/tracking/_tracking_service/client.py\", line 824, in create_logged_model",
+    "    return self.store.create_logged_model(",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/store/tracking/rest_store.py\", line 936, in create_logged_model",
+    "    response_proto = self._call_endpoint(CreateLoggedModel, req_body)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/store/tracking/rest_store.py\", line 135, in _call_endpoint",
+    "    return call_endpoint(",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/utils/rest_utils.py\", line 594, in call_endpoint",
+    "    response = verify_rest_response(response, endpoint)",
+    "  File \"/usr/local/lib/python3.9/site-packages/mlflow/utils/rest_utils.py\", line 314, in verify_rest_response",
+    "    raise MlflowException(",
+    "mlflow.exceptions.MlflowException: API request to endpoint /api/2.0/mlflow/logged-models failed with error code 404 != 200. Response body: '<!doctype html>",
+    "<html lang=en>",
+    "<title>404 Not Found</title>",
+    "<h1>Not Found</h1>",
+    "<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.</p>",
+    "'",
+    "make: *** [Makefile:27: train] Error 1"
+   ],
+   "action": {
+    "action": "pin_package",
+    "name": "mlflow",
+    "version": "2.17.2"
+   },
+   "action_text": "pin_package mlflow==2.17.2",
+   "analysis": null,
+   "reason": "The error indicates that the MLflow client version (3.x) is not compatible with the MLflow server version (2.17.2). Pinning the MLflow package to version 2.17.2 should resolve the compatibility issue.",
+   "outcome": "passed",
+   "sandbox_attempt_id": "20261013T180030Z-f1e65c",
+   "retrieved": [
+    {
+     "id": "gen-007",
+     "variant": "mlflow_client_3_0_1",
+     "score": 0.04098,
+     "ranks": {
+      "vector": 1,
+      "bm25": 1
+     }
+    },
+    {
+     "id": "gen-008",
+     "variant": "mlflow_client_unpinned",
+     "score": 0.04045,
+     "ranks": {
+      "vector": 2,
+      "bm25": 2
+     }
+    },
+    {
+     "id": "fault-001",
+     "variant": "mlflow_client_server_mismatch",
+     "score": 0.03994,
+     "ranks": {
+      "vector": 3,
+      "bm25": 3
+     }
+    }
+   ],
+   "source": "llm",
+   "n_calls": 1,
+   "rejected": []
+  }
+ ],
+ "started": "2026-10-13T18:00:22+00:00",
+ "seconds": 28.4
+}

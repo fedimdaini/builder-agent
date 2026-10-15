@@ -1,0 +1,166 @@
+{
+ "fingerprint": {
+  "builder_agent": "d85b5ca8c5d7d3af1dd145703c66a4581bdc38e7",
+  "contracts": "77b47708b19ea569f1dc53b91086032692d434bc",
+  "gold": "985e4684ebd230c458d200147ecab259d7883fe4",
+  "taxi_head": "e228accdb1234cc4de6726180a7fddc770b21801",
+  "uncommitted": false
+ },
+ "case": "gen-007",
+ "signature_seen": true,
+ "result": {
+  "attempt_id": "20261013T172108Z-76e5fd",
+  "repo": "taxi-trip-regression",
+  "started_at": "2026-10-13T17:24:18.913049+00:00",
+  "ok": false,
+  "failed_stage": "train",
+  "total_s": 190.0,
+  "workdir": "C:\\Users\\mdain\\AppData\\Local\\Temp\\builder-sbx-ewqyecf4\\taxi-trip-regression",
+  "compose_project": "builder-sbx-taxi-trip-regression",
+  "stages": [
+   {
+    "name": "render",
+    "status": "ok",
+    "duration_s": 0.5,
+    "command": null,
+    "exit_code": 0,
+    "output_tail": [
+     "rendered 11 files into C:\\Users\\mdain\\AppData\\Local\\Temp\\builder-sbx-ewqyecf4\\taxi-trip-regression"
+    ]
+   },
+   {
+    "name": "build",
+    "status": "ok",
+    "duration_s": 176.1,
+    "command": "docker compose -p builder-sbx-taxi-trip-regression -f compose.base.yml -f compose.sandbox.yml --progress plain build",
+    "exit_code": 0,
+    "output_tail": [
+     "#12 unpacking to docker.io/library/builder-sbx-taxi-trip-regression-serving-current:latest 6.2s done",
+     "#12 DONE 33.6s",
+     "#13 resolving provenance for metadata file",
+     "#13 DONE 0.0s",
+     " Image builder-sbx-taxi-trip-regression-serving-current Built "
+    ]
+   },
+   {
+    "name": "mlflow",
+    "status": "ok",
+    "duration_s": 4.2,
+    "command": "docker compose -p builder-sbx-taxi-trip-regression -f compose.base.yml -f compose.sandbox.yml up -d --no-deps mlflow",
+    "exit_code": 0,
+    "output_tail": [
+     " Volume builder-sbx-taxi-trip-regression_mlflow-data Created ",
+     " Container builder-sbx-taxi-trip-regression-mlflow-1 Creating ",
+     " Container builder-sbx-taxi-trip-regression-mlflow-1 Created ",
+     " Container builder-sbx-taxi-trip-regression-mlflow-1 Starting ",
+     " Container builder-sbx-taxi-trip-regression-mlflow-1 Started "
+    ]
+   },
+   {
+    "name": "data",
+    "status": "ok",
+    "duration_s": 0.6,
+    "command": "docker compose -p builder-sbx-taxi-trip-regression -f compose.base.yml -f compose.sandbox.yml run --rm -T --no-deps serving-current make data SAMPLE=1",
+    "exit_code": 0,
+    "output_tail": [
+     " Container builder-sbx-taxi-trip-regression-serving-current-run-b904e81fc403 Creating ",
+     " Container builder-sbx-taxi-trip-regression-serving-current-run-b904e81fc403 Created ",
+     "python pipeline/data.py",
+     "processed data ready: data/processed/train_large.csv, data/processed/test.csv"
+    ]
+   },
+   {
+    "name": "train",
+    "status": "failed",
+    "duration_s": 6.4,
+    "command": "docker compose -p builder-sbx-taxi-trip-regression -f compose.base.yml -f compose.sandbox.yml run --rm -T --no-deps serving-current make train SAMPLE=1",
+    "exit_code": 2,
+    "output_tail": [
+     "python pipeline/train.py",
+     "2026/10/13 17:24:12 INFO mlflow.tracking.fluent: Experiment with name 'mlops-zoomcamp-experiment' does not exist. Creating a new experiment.",
+     "2026/10/13 17:24:16 WARNING mlflow.utils.git_utils: Failed to import Git (the Git executable is probably not on your PATH), so Git SHA is not available. Error: Failed to initialize: Bad git executable.",
+     "The git executable must be specified in one of the following ways:",
+     "    - be included in your $PATH",
+     "    - be set via $GIT_PYTHON_GIT_EXECUTABLE",
+     "    - explicitly set via git.refresh(<full-path-to-git-executable>)",
+     "All git commands will error until this is rectified.",
+     "This initial message can be silenced or aggravated in the future by setting the",
+     "$GIT_PYTHON_REFRESH environment variable. Use one of the following values:",
+     "    - quiet|q|silence|s|silent|none|n|0: for no message or exception",
+     "    - warn|w|warning|log|l|1: for a warning message (logging level CRITICAL, displayed by default)",
+     "    - error|e|exception|raise|r|2: for a raised exception",
+     "Example:",
+     "    export GIT_PYTHON_REFRESH=quiet",
+     "2026/10/13 17:24:17 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.",
+     "🏃 View run dapper-wren-915 at: http://mlflow:5000/#/experiments/1/runs/c1cd11e86f754192942615f2e3421203",
+     "🧪 View experiment at: http://mlflow:5000/#/experiments/1",
+     "Traceback (most recent call last):",
+     "  File \"/app/pipeline/train.py\", line 96, in <module>",
+     "    main()",
+     "  File \"/app/pipeline/train.py\", line 86, in main",
+     "    mlflow.xgboost.log_model(model, \"model\")",
+     "  File \"/usr/local/lib/python3.9/site-packages/mlflow/xgboost/__init__.py\", line 278, in log_model",
+     "    return Model.log(",
+     "  File \"/usr/local/lib/python3.9/site-packages/mlflow/models/model.py\", line 1161, in log",
+     "    model = mlflow.initialize_logged_model(",
+     "  File \"/usr/local/lib/python3.9/site-packages/mlflow/tracking/fluent.py\", line 2129, in initialize_logged_model",
+     "    model = _create_logged_model(",
+     "  File \"/usr/local/lib/python3.9/site-packages/mlflow/tracking/fluent.py\", line 2256, in _create_logged_model",
+     "    return MlflowClient().create_logged_model(",
+     "  File \"/usr/local/lib/python3.9/site-packages/mlflow/tracking/client.py\", line 5274, in create_logged_model",
+     "    return self._tracking_client.create_logged_model(",
+     "  File \"/usr/local/lib/python3.9/site-packages/mlflow/tracking/_tracking_service/client.py\", line 824, in create_logged_model",
+     "    return self.store.create_logged_model(",
+     "  File \"/usr/local/lib/python3.9/site-packages/mlflow/store/tracking/rest_store.py\", line 918, in create_logged_model",
+     "    response_proto = self._call_endpoint(CreateLoggedModel, req_body)",
+     "  File \"/usr/local/lib/python3.9/site-packages/mlflow/store/tracking/rest_store.py\", line 134, in _call_endpoint",
+     "    return call_endpoint(",
+     "  File \"/usr/local/lib/python3.9/site-packages/mlflow/utils/rest_utils.py\", line 590, in call_endpoint",
+     "    response = verify_rest_response(response, endpoint)",
+     "  File \"/usr/local/lib/python3.9/site-packages/mlflow/utils/rest_utils.py\", line 310, in verify_rest_response",
+     "    raise MlflowException(",
+     "mlflow.exceptions.MlflowException: API request to endpoint /api/2.0/mlflow/logged-models failed with error code 404 != 200. Response body: '<!doctype html>",
+     "<html lang=en>",
+     "<title>404 Not Found</title>",
+     "<h1>Not Found</h1>",
+     "<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.</p>",
+     "'",
+     "make: *** [Makefile:27: train] Error 1"
+    ]
+   },
+   {
+    "name": "evaluate",
+    "status": "skipped",
+    "duration_s": 0.0,
+    "command": null,
+    "exit_code": null,
+    "output_tail": []
+   },
+   {
+    "name": "serve",
+    "status": "skipped",
+    "duration_s": 0.0,
+    "command": null,
+    "exit_code": null,
+    "output_tail": []
+   },
+   {
+    "name": "health",
+    "status": "skipped",
+    "duration_s": 0.0,
+    "command": null,
+    "exit_code": null,
+    "output_tail": []
+   },
+   {
+    "name": "predict",
+    "status": "skipped",
+    "duration_s": 0.0,
+    "command": null,
+    "exit_code": null,
+    "output_tail": []
+   }
+  ],
+  "teardown": "ok"
+ }
+}
